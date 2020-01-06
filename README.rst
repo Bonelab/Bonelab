@@ -26,3 +26,13 @@ Install
 Installing in an 'editable' format allows one to make changes to the code that
 can be immediately used by the binary programs. There is then no need to reinstall
 with ever edit.
+
+Install
+=======
+.. code-block:: bash
+
+    # Be at the root
+    cd bonelab
+
+    # Run tests
+    nosetests tests/
