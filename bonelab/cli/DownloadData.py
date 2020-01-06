@@ -10,10 +10,7 @@ from bonelab.io.download_data import \
 
 def DownloadData(url, output_directory, no_verify):
     # Python 2/3 compatible input
-    try:
-        input = raw_input
-    except NameError:
-        pass
+    from six.moves import input
     
     if not no_verify:
         print('Locations:')

@@ -2,6 +2,7 @@
 pbr
 argparse
 nose
+six
 
 # Image processing
 vtk
