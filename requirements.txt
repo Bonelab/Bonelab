@@ -1,0 +1,10 @@
+# Internal tools
+pbr
+click
+nose
+
+# Image processing
+vtk
+
+# Numerics
+numpy
