@@ -25,7 +25,7 @@ Install
 
 Installing in an 'editable' format allows one to make changes to the code that
 can be immediately used by the binary programs. There is then no need to reinstall
-with ever edit.
+with every edit.
 
 Running Tests
 =============
@@ -44,5 +44,5 @@ A collection of `example data`_ is provided by the `Bone Imaging Laboratory`_.
 .. _example data: https://github.com/Bonelab/BonelabData
 
 These data can be fetched by executing the command ``blDownloadData`` in your terminal.
-Currently, the data is download into the user's directory under the directory ``~/.bldata``.
+Currently, the data is downloaded into the user's directory under the directory ``~/.bldata``.
 Please see ``blDownloadData -h`` for additional information.
