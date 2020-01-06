@@ -16,7 +16,7 @@ Install
     conda env create -f environment.yml
 
     # ... alternatively, you can setup the environment directly
-    conda create -n bl -c numerics88 -c conda-forge python=3.8 n88tools
+    conda create -n bl -c numerics88 -c conda-forge python=3 n88tools pbr nose six
 
     # Activate the environemnt
     conda activate bl
@@ -24,12 +24,9 @@ Install
     # Install in an 'editable' format 
     pip install -e .
 
-    # ... or you can run the alternative method
-    python setup.py install
-
-Installing in an 'editable' format allows one to make changes to the code that
-can be immediately used by the binary programs. There is then no need to reinstall
-with every edit.
+Installing in an 'editable' format allows changes to the code to be immediately reflected in your programs.
+This removes the need to run ``pip install`` with each change. However, changing entry points in
+``setup.cfg`` will require re-runing ``pip install``.
 
 Running Tests
 =============

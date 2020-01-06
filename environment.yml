@@ -42,14 +42,17 @@ dependencies:
   - n88util=2.0.0=h5712eaf_0
   - ncurses=6.1=h0a44026_1002
   - netcdf4=1.5.3=nompi_py38hd261794_101
+  - nose=1.3.7=py38_1003
   - numpy=1.16.5=py38hde6bac1_0
   - openssl=1.1.1d=h0b31af3_0
+  - pbr=5.4.2=py_0
   - pip=19.3.1=py38_0
   - pqctio=1.0.0=h5712eaf_0
   - python=3.8.1=h5c2c468_1
   - readline=8.0=hcfe32e1_0
   - scipy=1.4.1=py38h82752d6_0
   - setuptools=44.0.0=py38_0
+  - six=1.13.0=py38_0
   - sqlite=3.30.1=h93121df_0
   - tbb=2019.9=ha1b3eb9_1
   - tk=8.6.10=hbbe82c9_0
@@ -59,10 +62,5 @@ dependencies:
   - xz=5.2.4=h1de35cc_1001
   - zlib=1.2.11=h0b31af3_1006
   - zstd=1.4.4=he7fca8b_1
-  - pip:
-    - click==7.0
-    - nose==1.3.7
-    - pbr==5.4.4
-    - simpleitk==1.2.4
 prefix: /Users/babesler/anaconda3/envs/bl
 

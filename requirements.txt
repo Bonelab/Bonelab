@@ -1,6 +1,5 @@
 # Internal tools
 pbr
-argparse
 nose
 six
 
