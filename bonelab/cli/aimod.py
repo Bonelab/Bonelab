@@ -105,7 +105,7 @@ vtk only supports modification of spacing, origin, and dimensions.
 
     # Parse and display
     args = parser.parse_args()
-    print(echo_arguments('DownloadData', vars(args)))
+    print(echo_arguments('aimod', vars(args)))
 
     # Run program
     aimod(**vars(args))
