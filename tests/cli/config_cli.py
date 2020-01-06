@@ -52,10 +52,10 @@ class ErrorObserver:
 cfg['ERROR_OBSERVER'] = ErrorObserver
 
 # Define a call run mechanic
-def run_call(command):
+def run_call(command, stdin=None):
     '''Returns true if call succeeds, false otherwise'''
     try:
-        subprocess.check_output(command)
+        subprocess.check_output(command, stdin=stdin)
     except subprocess.CalledProcessError as e:
         return False
     except OSError as e:

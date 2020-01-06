@@ -18,9 +18,9 @@ class TestCommandLineInterfeceRun(unittest.TestCase):
         'test25a.aim'
     ]
 
-    def runner(self, command):
+    def runner(self, command, stdin=None):
         self.assertTrue(
-            cfg['RUN_CALL'](command),
+            cfg['RUN_CALL'](command, stdin=stdin),
             'Could not run command \"{}\"'.format(' '.join(command))
         )
 

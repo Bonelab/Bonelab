@@ -19,6 +19,10 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
             'Could not run command \"{}\"'.format(' '.join(command))
         )
 
+    def test_aimod(self):
+        '''Can run `aimod`'''
+        self.runner('aimod')
+
     def test_aix(self):
         '''Can run `aix`'''
         self.runner('aix')
