@@ -8,10 +8,7 @@ from bonelab.io.vtk_helpers import get_vtk_reader, get_vtk_writer, handle_filety
 
 def ImageConverter(input_filename, output_filename, processing_log='', overwrite=False):
     # Python 2/3 compatible input
-    try:
-        input = raw_input
-    except NameError:
-        pass
+    from six.moves import input
 
     # Check if output exists and should overwrite
     if os.path.isfile(output_filename) and not overwrite:

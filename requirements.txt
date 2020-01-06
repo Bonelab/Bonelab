@@ -1,7 +1,8 @@
 # Internal tools
 pbr
-click
+argparse
 nose
+six
 
 # Image processing
 vtk

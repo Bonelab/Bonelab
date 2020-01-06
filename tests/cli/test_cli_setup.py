@@ -1,25 +1,21 @@
-'''Test command line interface'''
+'''Test command line interface setup'''
 
 import unittest
 import subprocess
 
+from .config_cli import cfg
 
-class TestCommandLineInterfece(unittest.TestCase):
-    '''Test command line interface'''
-
-    def run_command(self, command):
-        try:
-            subprocess.check_output(command)
-        except subprocess.CalledProcessError as e:
-            return False
-        except OSError as e:
-            return False
-        return True
+class TestCommandLineInterfeceSetup(unittest.TestCase):
+    '''Test command line interface setup
+    
+    The help section of all expected command line tools are ran here
+    to guarantee they were exported by setup.cfg using pbr
+    '''
 
     def runner(self, entry_point):
         command = [entry_point, '-h']
         self.assertTrue(
-            self.run_command(command),
+            cfg['RUN_CALL'](command),
             'Could not run command \"{}\"'.format(' '.join(command))
         )
 

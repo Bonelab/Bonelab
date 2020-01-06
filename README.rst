@@ -2,7 +2,11 @@ Bonelab
 =======
 Collection of scripts used in the `Bone Imaging Laboratory`_.
 
+|Build Status|_
+
 .. _Bone Imaging Laboratory: https://bonelab.ucalgary.ca/
+.. |Build Status| image:: https://dev.azure.com/babesler/Bone%20Imaging%20Laboratory/_apis/build/status/Bonelab.Bonelab?branchName=master
+.. _Build Status: https://dev.azure.com/babesler/Bone%20Imaging%20Laboratory/_build/latest?definitionId=12&branchName=master
 
 Install
 =======

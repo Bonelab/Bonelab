@@ -8,10 +8,7 @@ import numpy as np
 
 def aix(aim_file, log, stat, verbose):
     # Python 2/3 compatible input
-    try:
-        input = raw_input
-    except NameError:
-        pass
+    from six.moves import input
 
     # Read input file
     if not os.path.isfile(aim_file):
