@@ -36,3 +36,13 @@ Running Tests
 
     # Run tests
     nosetests tests/
+
+Downloading Bonelab Example Data
+================================
+A collection of `example data` is provided by the `Bone Imaging Laboratory`
+
+.. _example data: https://github.com/Bonelab/BonelabData
+
+These data can be fetched by executing the command `blDownloadData` in your terminal.
+Currently, the data is download into the user's directory under the directory `.bldata`.
+Please see `blDownloadData -h` for additional information.
