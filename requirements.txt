@@ -1,6 +1,6 @@
 # Internal tools
 pbr
-click
+argparse
 nose
 
 # Image processing
