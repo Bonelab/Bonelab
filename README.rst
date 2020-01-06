@@ -1,6 +1,6 @@
 Bonelab
 =======
-Collection of scripts used in the `Bone Imaging Laboratory`.
+Collection of scripts used in the `Bone Imaging Laboratory`_.
 
 .. _Bone Imaging Laboratory: https://bonelab.ucalgary.ca/
 
@@ -39,10 +39,10 @@ Running Tests
 
 Downloading Bonelab Example Data
 ================================
-A collection of `example data` is provided by the `Bone Imaging Laboratory`
+A collection of `example data`_ is provided by the `Bone Imaging Laboratory`_.
 
 .. _example data: https://github.com/Bonelab/BonelabData
 
-These data can be fetched by executing the command `blDownloadData` in your terminal.
-Currently, the data is download into the user's directory under the directory `.bldata`.
-Please see `blDownloadData -h` for additional information.
+These data can be fetched by executing the command ``blDownloadData`` in your terminal.
+Currently, the data is download into the user's directory under the directory ``~/.bldata``.
+Please see ``blDownloadData -h`` for additional information.
