@@ -23,6 +23,10 @@ class TestCommandLineInterfece(unittest.TestCase):
             'Could not run command \"{}\"'.format(' '.join(command))
         )
 
+    def test_aix(self):
+        '''Can run `aix`'''
+        self.runner('aix')
+
     def test_blImageConvert(self):
         '''Can run `blImageConvert`'''
         self.runner('blImageConvert')
