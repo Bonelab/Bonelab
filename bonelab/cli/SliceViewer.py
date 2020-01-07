@@ -80,6 +80,12 @@ def SliceViewer(input_filename, window, level, nThreads):
             # Set interpolation to cubic (makes a better visualization)
             imageProperty.SetInterpolationTypeToCubic()
             interactor.Render()
+        elif str(interactor.GetKeyCode()) == 'r':
+            window = scalarRanges[1] - scalarRanges[0]
+            level = (scalarRanges[1] + scalarRanges[0])/2
+            imageProperty.SetColorLevel(level)
+            imageProperty.SetColorWindow(window)
+            interactor.Render()
 
     # Add ability to switch between active layers
     interactor.AddObserver('KeyPressEvent', layerSwitcher, -1.0) # Call layerSwitcher as last observer
@@ -93,13 +99,22 @@ def main():
     description='''2D slice visualizer
 
 The following keyboard mappings are available:
-    w   Print Window/Level to terminal
+    w   Print window/Level to terminal
     n   Set interpolator to nearest neighbour
     c   Set interpolator to cubic
+    r   Reset window/level
     x   View in x-plane
     y   View in y-plane
     z   View in z-plane
     q   Quit
+
+The following mouse mappings are available:
+    left click + vertical scroll                Modify window
+    left click + horizontal scroll              Modify level
+    right click + vertical scroll               Zoom
+    control + left click + vertical scroll      Slice level
+    control + right click + vertical scroll     Rotate slice
+    shift + left click + vertical scroll        Translate slice
 '''
 
     # Setup argument parsing
