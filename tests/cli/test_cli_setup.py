@@ -39,6 +39,10 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
         '''Can run `blSliceViewer`'''
         self.runner('blSliceViewer')
 
+    def test_blVisualizeSegmentation(self):
+        '''Can run `blVisualizeSegmentation`'''
+        self.runner('blVisualizeSegmentation')
+
 
 if __name__ == '__main__':
     unittest.main()
