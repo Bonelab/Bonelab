@@ -1,0 +1,134 @@
+$! ## ==============================================================================
+$! ##    Register MRI and HR-pQCT gobjs
+$! ## ==============================================================================
+$! ## This script register the MRI and HR-pQCT gobjs in order to obtain an approximate
+$! ## initial guess for the greyscale registration
+$! ##
+$! ## Author: Jenn Bhatla, 2016 Updated July 2, 2017
+$! ##
+$! ## ------------------------------------------------------------------------------
+$! ##    Input parameters and output
+$! ## ------------------------------------------------------------------------------
+$! ##
+$! ## Input #1: MRI
+$! ## Input #2: HR-pQCT
+$! ##
+$! ## Output #1: Concatenated image of the HR-pQCT and MRI masks
+$! ## Output #2: Text file containing transformation matrix for the transformation of
+$! ## the MRI scan to the HR-pQCT scan
+$! ##
+$! ## Note that the bone (Femur vs. Tibia) is hardcoded into the script. Ideally this
+$! ## should be updated to be more robust such that any bone could be used.
+$! ## ------------------------------------------------------------------------------
+$! ##    START OF CODE
+$! ## ------------------------------------------------------------------------------
+$!
+$ ipl_scanco_prog := $um:ipl_scanco_M.exe !$um:ipl_scanco_regis_V107.exe
+$!
+$    CT = P1
+$    MR = P2
+$    REG = P3
+$
+$   FILENAME1 = F$PARSE("''CT'",,,"NAME")
+$   FILENAME2 = F$PARSE("''MR'",,,"NAME")
+$   FILENAME3 = F$PARSE("''REG'",,,"NAME")
+$
+$   DEV1 = F$PARSE("''CT'",,,"DEVICE")
+$   DEV2 = F$PARSE("''REG'",,,"DEVICE")
+$   DIR1 = F$PARSE("''CT'",,,"DIRECTORY")
+$   DIR2 = F$PARSE("''REG'",,,"DIRECTORY")
+$!
+$ MRI = DEV1 + DIR1 + FILENAME2 + ".AIM"
+$ MR_GOBJ = DEV1 + DIR1 + FILENAME2 + "_F.GOBJ"
+$!
+$ XCT = DEV1 + DIR1 + FILENAME1 + ".AIM"
+$ CT_GOBJ = DEV1 + DIR1 + FILENAME1 + "_F.GOBJ"
+$!
+$ CONCAT = DEV2 + DIR2 + FILENAME3 + "_F_CONCAT1.aim"
+$ REG_FILE = DEV2 + DIR2 + FILENAME3 + "_F_reg1.dat"
+$!
+$ ipl_scanco_prog
+
+/gobj_to_aim
+    -gobj_filename             "CT_GOBJ
+    -output                    ct_gobj
+    -peel_iter                 0
+
+/gobj_to_aim
+    -gobj_filename             "MR_GOBJ
+    -output                    mr_gobj
+    -peel_iter                 0
+
+/register
+  -in1                       ct_gobj
+  -in2                       mr_gobj
+  -Tmat_file_name            "REG_FILE
+  -orientation_search        0
+  -initial_rotation          -1.4 -0.15 1.92 ! -1.7 -0.05 1.57
+  -initial_translation       17.7 7.85 15.6 ! 12 3.4 21
+  -delta_rotation            0.100 0.100 0.500
+  -delta_translation         0.100 0.100 0.500
+  -resolution_scaling        10 4 0
+  -delta_scaling             1.000 0.100 0.100
+  -tolerance                 0.0000010
+  -min_corr_coef             0.50000
+  -min_method                1
+  -object_func               1
+  -max_nr_iter               1000
+  -output_option             1
+
+/transform
+  -in                        mr_gobj
+  -out                       mr_trans
+  -Tmat_file_name            "REG_FILE
+  -img_interpol_option       0
+  -el_size_mm_out            -1 -1 -1
+  -Tmat_invert               false
+
+/scale_elsize
+  -input                     mr_trans
+  -output                    mr_sca
+  -down_scale                1 1 1
+  -up_scale                  1.5000 1.5000 7.688
+  -integrate                 true
+
+/scale_elsize
+  -input                     ct_gobj
+  -output                    ct_sca
+  -down_scale                3.000 3.000 3.000
+  -up_scale                  1.000 1.000 1.000
+  -integrate                 true
+
+/set_value
+  -input                     mr_sca
+  -value_object              42
+  -value_background          0
+
+/set_value
+  -input                     ct_sca
+  -value_object              82
+  -value_background          0
+
+/concat
+  -input1                    mr_sca
+  -input2                    ct_sca
+  -output                    concat
+  -common_region_only        false
+  -add_not_overlay           true
+  -make_edge                 false
+  -shift_ofin2               0 0 0
+  -turnangle                 0.000000
+  -turnpoint_global          -1 -1
+
+/read xct "XCT
+
+/examine xct
+
+/read mri "MRI
+
+/examine mri
+
+/write concat  "CONCAT
+..
+$ EXIT
+$!

@@ -1,0 +1,58 @@
+$! ## ==============================================================================
+$! ##    Transform XCT
+$! ## ==============================================================================
+$! ## This script transforms the HR-pQCT Image to the MRI Image space. This is mainly
+$! ## for visualization to overlay the MRI on HR-pQCT with a checkerboard
+$! ## ------------------------------------------------------------------------------
+$! ##    Input parameters and output
+$! ## ------------------------------------------------------------------------------
+$! ##
+$! ## Input #1: HR-pQCT Image
+$! ## Input #2: Transformation matrix from registration
+$! ##
+$! ## Output #1: Transformed HR-pQCT Image
+$! ## ------------------------------------------------------------------------------
+$! ##    START OF CODE
+$! ## ------------------------------------------------------------------------------
+$!
+$ ipl_scanco_prog := $um:ipl_scanco_M.exe !$um:ipl_scanco_regis_V107.exe   !$ ipl_scanco_prog := $um:ipl_scanco_fe.exe
+$!
+$    CT_IMAGE = P1
+$    REG = P2
+$
+$   FILENAME_CT = F$PARSE("''CT_IMAGE'",,,"NAME")  !Input XCT Image
+$   FILENAME_REG = F$PARSE("''REG'",,,"NAME")      !Input transformation file
+$
+$   DEV_READ = F$PARSE("''CT_IMAGE'",,,"DEVICE")
+$   DEV_WRITE = F$PARSE("''REG'",,,"DEVICE")
+$   DIR_READ = F$PARSE("''CT_IMAGE'",,,"DIRECTORY")
+$   DIR_WRITE = F$PARSE("''REG'",,,"DIRECTORY")
+$!
+$ XCT = DEV_READ + DIR_READ + FILENAME_CT + "_F.AIM"  !Input HR-pQCT Image
+$ XCT_TRANS = DEV_WRITE + DIR_WRITE + FILENAME_CT + "_F_Trans3.AIM" !Output transformed HR-pQCT Image
+$!
+$ REG_FILE_F = DEV_WRITE + DIR_WRITE + FILENAME_REG + "_F_reg3.dat" !Input transformation matrix
+$!
+$ ipl_scanco_prog
+
+/read
+  -name                      xct
+  -filename                  "XCT
+
+/scale_elsize
+   -input                     xct
+   -output                    xct_sca
+   -down_scale                5 5 5
+   -up_scale                  1 1 1
+   -integrate                 true
+
+/transform
+   -in                        xct_sca
+   -out                       xct_trans
+   -Tmat_file_name            "REG_FILE_F
+   -img_interpol_option       0
+   -Tmat_invert               true
+
+/write xct_trans "XCT_TRANS
+..
+$ EXIT
