@@ -10,6 +10,8 @@ Collection of scripts used in the `Bone Imaging Laboratory`_.
 
 Install
 =======
+Clone the repository onto your computer and change into the directory.
+
 .. code-block:: bash
 
     # It is recommended to use anaconda and install from the environment file
@@ -21,7 +23,7 @@ Install
     # Activate the environemnt
     conda activate bl
 
-    # Install in an 'editable' format 
+    # Install in an 'editable' format
     pip install -e .
 
 Installing in an 'editable' format allows changes to the code to be immediately reflected in your programs.
