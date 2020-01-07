@@ -16,7 +16,7 @@ def DownloadData(url, output_directory, no_verify):
         print('Locations:')
         print('  url:              {}'.format(url))
         print('  output_directory: {}'.format(output_directory))
-        result = input('Are these location OK? [y/n]: ')
+        result = input('Are these locations OK? [y/n]: ')
         if result.lower() not in ['y', 'yes']:
             print('Exiting...')
             os.sys.exit()
