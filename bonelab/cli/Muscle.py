@@ -106,6 +106,11 @@ def Muscle(input_filename, converted_filename, csv_filename, tiff_filename, segm
     seg_muscle = (sitk.RelabelComponent(sitk.ConnectedComponent(seg_muscle>0))==1)*muscle_label
     print('')
 
+    # One, solid peice of background
+    temp_seg = (seg_bone>0) + (seg_muscle>0)
+    background = sitk.RelabelComponent(sitk.ConnectedComponent(temp_seg<1))==1
+    seg_muscle = (background<1)*muscle_label
+
     # Join segmentation
     seg_muscle = sitk.Mask(seg_muscle, 1-(seg_bone>0))
     seg = seg_bone + seg_muscle
