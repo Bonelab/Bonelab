@@ -20,7 +20,7 @@ def segment_bone(image, threshold):
     largest = sitk.RelabelComponent(sitk.ConnectedComponent(soft_tissue))==1
     return 1-largest
 
-def Muscle(input_filename, converted_filename, csv_filename, tiff_filename, segmentation_filename, bone_threshold, smoothing_iterations, segmentation_iterations, segmentation_multiplier, initial_neighborhood_radius):
+def Muscle(input_filename, converted_filename, csv_filename, tiff_filename, segmentation_filename, bone_threshold, smoothing_iterations, segmentation_iterations, segmentation_multiplier, initial_neighborhood_radius, closing_radius):
     # Python 2/3 compatible input
     from six.moves import input
 
@@ -107,9 +107,15 @@ def Muscle(input_filename, converted_filename, csv_filename, tiff_filename, segm
     print('')
 
     # One, solid peice of background
-    temp_seg = (seg_bone>0) + (seg_muscle>0)
-    background = sitk.RelabelComponent(sitk.ConnectedComponent(temp_seg<1))==1
-    seg_muscle = (background<1)*muscle_label
+    print('Cleaning up segmentation')
+    vector_radius = [int(max(1, closing_radius//s)) for s in image.GetSpacing()]
+    print('  Closing radius [mm]:    {}'.format(closing_radius))
+    print('  Vector radius [voxels]: {}'.format(vector_radius))
+    seg = (seg_bone+seg_muscle)>0
+    seg = sitk.BinaryDilate(seg, vector_radius)
+    background = sitk.RelabelComponent(sitk.ConnectedComponent(seg<1))==1
+    seg_muscle = sitk.BinaryErode(background<1, vector_radius)*muscle_label
+    print('')
 
     # Join segmentation
     seg_muscle = sitk.Mask(seg_muscle, 1-(seg_bone>0))
@@ -233,6 +239,9 @@ To compute the real density and cross sectional area, use the following formulas
     parser.add_argument('--initial_neighborhood_radius',
                         default=1, type=int,
                         help='Initial neighborhood radius in confidence connected thresholding (default: %(default)s)')
+    parser.add_argument('--closing_radius',
+                        default=0.5, type=float,
+                        help='Morphological closing radius for cleaning up image (default: %(default)s)')
 
     # Parse and display
     args = parser.parse_args()
