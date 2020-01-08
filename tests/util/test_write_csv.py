@@ -89,5 +89,26 @@ class TestWriteCSV(unittest.TestCase):
         self.assertTrue(filecmp.cmp(correct_file_name, self.csv_file_name),
           'Files are not the same')
 
+    def test_special_characters(self):
+        # Create test data
+        data = OrderedDict()
+        data['Spacing.X [mm]'] = 3
+        data['C^asdf'] = 'Hello'
+
+        # Create the expected file
+        correct_file_name = os.path.join(self.test_dir, 'test_correct.csv')
+        with open(correct_file_name, 'w') as f:
+            f.write('Spacing.X [mm],C^asdf' + os.linesep)
+            f.write('3,Hello' + os.linesep)
+
+        # Print result
+        write_csv(data, self.csv_file_name)
+
+        # Test
+        self.assertTrue(os.path.exists(self.csv_file_name),
+          'Could not create file')
+        self.assertTrue(filecmp.cmp(correct_file_name, self.csv_file_name),
+          'Files are not the same')
+
 if __name__ == '__main__':
     unittest.main()

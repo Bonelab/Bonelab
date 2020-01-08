@@ -1,6 +1,7 @@
 '''Utility function for writing to a csv file'''
 
 import os
+from collections import OrderedDict
 
 
 def write_csv(entry, csv_file, delimiter=','):
@@ -24,10 +25,6 @@ def write_csv(entry, csv_file, delimiter=','):
     Returns:
         None
     '''
-    # Create formating strings
-    format_header = ['{{{}}}'.format(x) for x in entry.keys()]
-    format_string = delimiter.join(format_header)
-
     # If we doesn't exist, need to write header
     if not os.path.exists(csv_file):
         with open(csv_file, 'w') as f:
@@ -35,4 +32,4 @@ def write_csv(entry, csv_file, delimiter=','):
 
     # Write entry
     with open(csv_file, 'a') as f:
-        f.write(format_string.format(**entry) + os.linesep)
+        f.write(delimiter.join(['{}'.format(v) for k,v in entry.items()]) + os.linesep)

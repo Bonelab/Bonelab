@@ -25,7 +25,7 @@ Clone the repository onto your computer and change into the directory.
     conda env create -f environment.yml
 
     # ... alternatively, you can setup the environment directly
-    conda create -n bl -c numerics88 -c conda-forge python=3 n88tools pbr nose six
+    conda create -n bl -c numerics88 -c simpleitk -c conda-forge python=3.7 n88tools pbr nose six simpleitk
 
     # Activate the environemnt
     conda activate bl
