@@ -191,6 +191,9 @@ def main():
     # Setup description
     description='''Muscle segmentation and quantification
 
+Example usage:
+    blMuscle D0010131.AIM D0010131.nii D0010131_SEG.nii --csv_filename muscle.csv --tiff_filename D0010131_MUSCLE.tif
+
 It is assumed that the voxel coordinate z-axis corresponds to the
 proximal-distal direction in the image. If strange cross sectional
 areas are being found, check the `converted_filename` image
@@ -207,6 +210,12 @@ Output TIFFs have been window/leveled to have display range (0, `bone_threshold`
 To compute the real density and cross sectional area, use the following formulas:
     density = density_slope * 'muscle density [native]' + density_intercept
     Cross.A = 'Spacing.X [mm]' * 'Spacing.Y [mm]' * 'A.Cross [vox^2]'
+
+Note that for very poor quality muscles, it is possible to get negative density
+values. Of course this is not reasonable. The source of this error is that
+the calibration equation is a linearization around bone of a true, non-linear
+calibration equation. Alternatively, a calibration phantom more appropriate for
+density and fat could be provided.
 '''
 
     # Setup argument parsing
