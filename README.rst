@@ -8,6 +8,13 @@ Collection of scripts used in the `Bone Imaging Laboratory`_.
 .. |Build Status| image:: https://dev.azure.com/babesler/Bone%20Imaging%20Laboratory/_apis/build/status/Bonelab.Bonelab?branchName=master
 .. _Build Status: https://dev.azure.com/babesler/Bone%20Imaging%20Laboratory/_build/latest?definitionId=12&branchName=master
 
+Guiding Principles
+==================
+- **Python**      All source code is Python, no C++, ergo no compilation
+- **Examples**    Please do upload individual, one-off project scripts to the examples/ directory!
+- **Open source** The whole world can see your code, and the whole world can contribute back
+- **Testing**     Automatically runs tests on a server. So, please write your tests!
+
 Install
 =======
 Clone the repository onto your computer and change into the directory.
