@@ -18,7 +18,7 @@ from .ImageConverter import ImageConverter
 def segment_bone(image, threshold):
     soft_tissue = image<threshold
     largest = sitk.RelabelComponent(sitk.ConnectedComponent(soft_tissue))==1
-    return 1-largest
+    return largest<1
 
 def Muscle(input_filename, converted_filename, csv_filename, tiff_filename, segmentation_filename, bone_threshold, smoothing_iterations, segmentation_iterations, segmentation_multiplier, initial_neighborhood_radius, closing_radius):
     # Python 2/3 compatible input
@@ -88,17 +88,18 @@ def Muscle(input_filename, converted_filename, csv_filename, tiff_filename, segm
         timeStep=timeStep,
         numberOfIterations=smoothing_iterations
     )
-    sitk.WriteImage(smooth_image, 'aniso.nii')
     print('')
 
     # Segment muscle
     print('Segmenting muscle')
+    radius = int(max(1, initial_neighborhood_radius/image.GetSpacing()[0]))
+    print('  initialNeighborhoodRadius [vox]: {}'.format(radius))
     seg_muscle = sitk.ConfidenceConnected(
         smooth_image,
         seedList=[seed_index],
         numberOfIterations=segmentation_iterations,
         multiplier=segmentation_multiplier,
-        initialNeighborhoodRadius=initial_neighborhood_radius,
+        initialNeighborhoodRadius=radius,
         replaceValue=1
     )
 
@@ -243,14 +244,14 @@ density and fat could be provided.
                         default=2, type=int,
                         help='Number of iterations in confidence connected thresholding (default: %(default)s)')
     parser.add_argument('--segmentation_multiplier',
-                        default=3.5, type=float,
+                        default=2.0, type=float,
                         help='Multiplier in confidence connected thresholding (default: %(default)s)')
     parser.add_argument('--initial_neighborhood_radius',
-                        default=1, type=int,
-                        help='Initial neighborhood radius in confidence connected thresholding (default: %(default)s)')
+                        default=1.0, type=float,
+                        help='Initial neighborhood radius in confidence connected thresholding (default: %(default)s [mm])')
     parser.add_argument('--closing_radius',
                         default=0.5, type=float,
-                        help='Morphological closing radius for cleaning up image (default: %(default)s)')
+                        help='Morphological closing radius for cleaning up image (default: %(default)s [mm]) ')
 
     # Parse and display
     args = parser.parse_args()
