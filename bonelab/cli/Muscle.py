@@ -193,7 +193,7 @@ def main():
     description='''Muscle segmentation and quantification
 
 Example usage:
-    blMuscle D0010131.AIM D0010131.nii D0010131_SEG.nii --csv_filename muscle.csv --tiff_filename D0010131_MUSCLE.tif
+    blMuscle ~/.bldata/D0010131.AIM D0010131.nii D0010131_SEG.nii --csv_filename muscle.csv --tiff_filename D0010131_MUSCLE.tif
 
 It is assumed that the voxel coordinate z-axis corresponds to the
 proximal-distal direction in the image. If strange cross sectional
@@ -228,10 +228,10 @@ density and fat could be provided.
     parser.add_argument('input_filename', help='Input image')
     parser.add_argument('converted_filename', help='Output converted image (typically .nii)')
     parser.add_argument('segmentation_filename', help='Input image (typically .nii)')
-    parser.add_argument('--csv_filename',
+    parser.add_argument('--csv_filename', '-o',
                         default='', type=str,
                         help='Write results to CSV file (empty string causes no write)')
-    parser.add_argument('--tiff_filename',
+    parser.add_argument('--tiff_filename', '-i',
                         default='', type=str,
                         help='Write one slice to a TIFF image (empty string causes no write)')
     parser.add_argument('--bone_threshold',
