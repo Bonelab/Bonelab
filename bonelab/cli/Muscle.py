@@ -134,10 +134,10 @@ def Muscle(input_filename, converted_filename, csv_filename, tiff_filename, segm
     muscle_density = intensity_filter.GetMean(muscle_label)
 
     # Quantify cross sectional area
-    # Note that since 
+    # Note that since
     stat_filter = sitk.LabelShapeStatisticsImageFilter()
     stat_filter.Execute(seg)
-    ave_cross_area = stat_filter.GetNumberOfPixels(muscle_label) / seg.GetSize()[2]
+    ave_cross_area = float(stat_filter.GetNumberOfPixels(muscle_label)) / seg.GetSize()[2]
 
     print('  density:       {}'.format(muscle_density))
     print('  cross section: {}'.format(ave_cross_area))
