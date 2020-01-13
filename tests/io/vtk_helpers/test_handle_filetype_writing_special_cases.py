@@ -32,9 +32,8 @@ class TestHandleFiletypeWritingSpecialCases(unittest.TestCase):
 
     def test_passes_unsupported_filters(self):
         '''Passes unsupported filters'''
-        reader = vtk.vtkImageCast()
         writer = vtk.vtkImageCast()
-        handle_filetype_writing_special_cases(reader, writer)
+        handle_filetype_writing_special_cases(writer)
 
     def test_write_aim_short(self):
         '''Can write aim file with type short'''
@@ -43,12 +42,11 @@ class TestHandleFiletypeWritingSpecialCases(unittest.TestCase):
         scalar_type = vtk.VTK_SHORT
 
         source = self.generate_image(scalar_type)
-        reader = vtk.vtkImageCast()
         writer = vtkbone.vtkboneAIMWriter()
         writer.SetInputConnection(source.GetOutputPort())
         writer.SetFileName(filename)
 
-        handle_filetype_writing_special_cases(reader, writer)
+        handle_filetype_writing_special_cases(writer)
 
         writer.Update()
         self.assertTrue(os.path.isfile(filename))
@@ -67,12 +65,11 @@ class TestHandleFiletypeWritingSpecialCases(unittest.TestCase):
         scalar_type = vtk.VTK_UNSIGNED_LONG
 
         source = self.generate_image(scalar_type)
-        reader = vtk.vtkImageCast()
         writer = vtkbone.vtkboneAIMWriter()
         writer.SetInputConnection(source.GetOutputPort())
         writer.SetFileName(filename)
 
-        handle_filetype_writing_special_cases(reader, writer)
+        handle_filetype_writing_special_cases(writer)
 
         writer.Update()
         self.assertTrue(os.path.isfile(filename))
@@ -92,12 +89,11 @@ class TestHandleFiletypeWritingSpecialCases(unittest.TestCase):
         processing_log = 'This is a fake processing log'
 
         source = self.generate_image(scalar_type)
-        reader = vtk.vtkImageCast()
         writer = vtkbone.vtkboneAIMWriter()
         writer.SetInputConnection(source.GetOutputPort())
         writer.SetFileName(filename)
 
-        handle_filetype_writing_special_cases(reader, writer, processing_log=processing_log)
+        handle_filetype_writing_special_cases(writer, processing_log=processing_log)
 
         writer.Update()
         self.assertTrue(os.path.isfile(filename))
@@ -119,12 +115,11 @@ class TestHandleFiletypeWritingSpecialCases(unittest.TestCase):
         scalar_type = vtk.VTK_UNSIGNED_SHORT
 
         source = self.generate_image(scalar_type)
-        reader = vtk.vtkImageCast()
         writer = vtk.vtkTIFFWriter()
         writer.SetInputConnection(source.GetOutputPort())
         writer.SetFileName(filename)
 
-        handle_filetype_writing_special_cases(reader, writer)
+        handle_filetype_writing_special_cases(writer)
 
         writer.Update()
         self.assertTrue(os.path.isfile(filename))
@@ -142,12 +137,11 @@ class TestHandleFiletypeWritingSpecialCases(unittest.TestCase):
         scalar_type = vtk.VTK_UNSIGNED_LONG
 
         source = self.generate_image(scalar_type)
-        reader = vtk.vtkImageCast()
         writer = vtk.vtkTIFFWriter()
         writer.SetInputConnection(source.GetOutputPort())
         writer.SetFileName(filename)
 
-        handle_filetype_writing_special_cases(reader, writer)
+        handle_filetype_writing_special_cases(writer)
 
         writer.Update()
         self.assertTrue(os.path.isfile(filename))

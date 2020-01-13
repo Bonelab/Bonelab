@@ -66,7 +66,7 @@ def get_vtk_writer(filename):
             return writer()
     return None
 
-def handle_filetype_writing_special_cases(reader, writer, **kwargs):
+def handle_filetype_writing_special_cases(writer, **kwargs):
     '''Handle intermediate steps for writing filetype
 
     Calls the associated function for each writer type to try
@@ -81,7 +81,6 @@ def handle_filetype_writing_special_cases(reader, writer, **kwargs):
     class just before calling update to avoid common data typing errors.
     
     Args:
-        reader (vtk.vtkImageReader):    The original file reader
         writer (vtk.vtkImageWriter):    The file writer
         kwargs (dict):                  Dictionary of args passed to subsequent functions
 
@@ -90,14 +89,16 @@ def handle_filetype_writing_special_cases(reader, writer, **kwargs):
     '''
     step_map = {
         type(vtkbone.vtkboneAIMWriter()):   handle_aim_writing_special_cases,
-        type(vtk.vtkTIFFWriter()):          handle_tiff_writing_special_cases
+        type(vtk.vtkTIFFWriter()):          handle_tiff_writing_special_cases,
+        type(vtk.vtkPNGWriter()):           handle_png_writing_special_cases,
+        type(vtk.vtkBMPWriter()):           handle_bmp_writing_special_cases
     }
 
     if type(writer) in step_map:
-        return step_map[type(writer)](reader, writer, **kwargs)
+        return step_map[type(writer)](writer, **kwargs)
     return None
 
-def handle_supported_types(reader, writer, typelist):
+def handle_supported_types(writer, typelist, output_type=vtk.VTK_FLOAT):
     '''Cast to float if input data is not correct type'''
     # Determine input scalar type
     input_algorithm = writer.GetInputAlgorithm()
@@ -111,13 +112,17 @@ def handle_supported_types(reader, writer, typelist):
 
     # Cast if not appropriate
     if scalar_type not in typelist:
-        caster = vtk.vtkImageCast()
-        caster.SetInputConnection(input_algorithm.GetOutputPort())
-        caster.SetOutputScalarTypeToFloat()
+        # If we can cast to float, just cast to float
+        if output_type != output_type:
+            pass
+        else:
+            caster = vtk.vtkImageCast()
+            caster.SetInputConnection(input_algorithm.GetOutputPort())
+            caster.SetOutputScalarType(output_type)
 
         writer.SetInputConnection(caster.GetOutputPort())
 
-def handle_aim_writing_special_cases(reader, writer, processing_log='', **kwargs):
+def handle_aim_writing_special_cases(writer, processing_log='', output_type=vtk.VTK_FLOAT, **kwargs):
     '''Specific handling of AIM data writting
     
     This includes functionality to:
@@ -125,7 +130,6 @@ def handle_aim_writing_special_cases(reader, writer, processing_log='', **kwargs
         - Convert to supported types
 
     Args:
-        reader (vtk.vtkImageReader):        The original file reader
         writer (vtkbone.vtkboneAIMWriter):  The file writer
         processing_log (string):            An optional processing log
         kwargs (dict):                      Dictionary of args used for 
@@ -134,28 +138,23 @@ def handle_aim_writing_special_cases(reader, writer, processing_log='', **kwargs
         Nothing
     '''
     # Handle setting processing log
-    if len(processing_log) > 0 and type(reader) == type(vtkbone.vtkboneAIMReader):
-        log = reader.GetProcessingLog() + os.linesep + processing_log
-        writer.SetProcessingLog(log)
-    elif type(reader) == type(vtkbone.vtkboneAIMReader):
-        writer.SetProcessingLog(reader.GetProcessingLog())
-    elif len(processing_log) > 0:
+    if len(processing_log) > 0:
         writer.SetProcessingLog(processing_log)
 
     # Handle supported types
     handle_supported_types(
-        reader, writer,
-        [vtk.VTK_CHAR, vtk.VTK_SHORT, vtk.VTK_FLOAT]
+        writer,
+        [vtk.VTK_CHAR, vtk.VTK_SHORT, vtk.VTK_FLOAT],
+        output_type
     )
 
-def handle_tiff_writing_special_cases(reader, writer, **kwargs):
+def handle_tiff_writing_special_cases(writer, output_type=vtk.VTK_FLOAT, **kwargs):
     '''Specific handling of tiff data writting
     
     This includes functionality to:
         - Convert to supported types
 
     Args:
-        reader (vtk.vtkImageReader):    The original file reader
         writer (vtk.vtkTIFFWriter):     The file writer
         kwargs (dict):                  Dictionary of args used for 
 
@@ -164,6 +163,47 @@ def handle_tiff_writing_special_cases(reader, writer, **kwargs):
     '''
     # Handle supported types
     handle_supported_types(
-        reader, writer,
-        [vtk.VTK_UNSIGNED_CHAR, vtk.VTK_UNSIGNED_SHORT, vtk.VTK_FLOAT]
+        writer,
+        [vtk.VTK_UNSIGNED_CHAR, vtk.VTK_UNSIGNED_SHORT, vtk.VTK_FLOAT],
+        output_type
+    )
+
+def handle_png_writing_special_cases(writer, output_type=vtk.VTK_FLOAT, **kwargs):
+    '''Specific handling of png data writting
+    
+    This includes functionality to:
+        - Convert to supported types
+
+    Args:
+        writer (vtk.vtkPNGWriter):      The file writer
+        kwargs (dict):                  Dictionary of args used for 
+
+    Returns:
+        Nothing
+    '''
+    # Handle supported types
+    handle_supported_types(
+        writer,
+        [vtk.VTK_UNSIGNED_CHAR, vtk.VTK_UNSIGNED_SHORT, vtk.VTK_FLOAT],
+        output_type
+    )
+
+def handle_bmp_writing_special_cases(writer, output_type=vtk.VTK_FLOAT, **kwargs):
+    '''Specific handling of bmp data writting
+    
+    This includes functionality to:
+        - Convert to supported types
+
+    Args:
+        writer (vtk.vtkBMPWriter):      The file writer
+        kwargs (dict):                  Dictionary of args used for 
+
+    Returns:
+        Nothing
+    '''
+    # Handle supported types
+    handle_supported_types(
+        writer,
+        [vtk.VTK_UNSIGNED_CHAR, vtk.VTK_UNSIGNED_SHORT, vtk.VTK_FLOAT],
+        output_type
     )
