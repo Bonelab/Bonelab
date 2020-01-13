@@ -81,6 +81,7 @@ def aimod(input_aim, output_aim):
     writer = vtkbone.vtkboneAIMWriter()
     writer.SetInputData(image)
     writer.SetFileName(output_aim)
+    writer.SetProcessingLog(reader.GetProcessingLog())
     writer.Update()
 
 def main():
