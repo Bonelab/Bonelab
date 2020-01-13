@@ -8,7 +8,7 @@ import os
 from .config_cli import cfg
 
 
-class TestCommandLineInterfeceRun(unittest.TestCase):
+class TestCommandLineInterfaceRun(unittest.TestCase):
     '''Test command line interface run
     
     For non-visualization scripts, test that each command line functionality
@@ -57,6 +57,16 @@ class TestCommandLineInterfeceRun(unittest.TestCase):
         '''Can run `aix`'''
         command = ['aix', os.path.join(self.test_dir, 'test25a.aim')]
         self.runner(command)
+
+    def test_blImage2ImageSeries(self):
+        '''Can run `blImage2ImageSeries`'''
+        name = os.path.join(self.test_dir, 'test25a')
+        command = ['blImage2ImageSeries', os.path.join(self.test_dir, 'test25a.aim'), name]
+        self.runner(command)
+        formatter = '{}_%04d.bmp'.format(name)
+        for i in range(25):
+            filename = formatter % i
+            self.assertTrue(os.path.isfile(filename), 'Cannot find file ' + filename)
 
     def test_blImageConvert(self):
         '''Can run `blImageConvert`'''
