@@ -20,7 +20,7 @@ def segment_bone(image, threshold):
     largest = sitk.RelabelComponent(sitk.ConnectedComponent(soft_tissue))==1
     return largest<1
 
-def Muscle(input_filename, converted_filename, csv_filename, tiff_filename, segmentation_filename, bone_threshold, smoothing_iterations, segmentation_iterations, segmentation_multiplier, initial_neighborhood_radius, closing_radius):
+def Muscle(input_filename, converted_filename, segmentation_filename, bone_threshold, smoothing_iterations, segmentation_iterations, segmentation_multiplier, initial_neighborhood_radius, closing_radius, csv_filename='', tiff_filename='', histogram_filename=''):
     # Python 2/3 compatible input
     from six.moves import input
 
@@ -121,6 +121,7 @@ def Muscle(input_filename, converted_filename, csv_filename, tiff_filename, segm
     # Join segmentation
     seg_muscle = sitk.Mask(seg_muscle, 1-(seg_bone>0))
     seg = seg_bone + seg_muscle
+    seg = sitk.Cast(seg, sitk.sitkInt8)
 
     # Write segmentation
     print('Writing segmentation to ' + segmentation_filename)
@@ -188,6 +189,23 @@ def Muscle(input_filename, converted_filename, csv_filename, tiff_filename, segm
         print('  Save single slice to ' + tiff_filename)
         sitk.WriteImage(tiff_image, tiff_filename)
 
+    # Create histogram
+    if len(histogram_filename)>0:
+        import matplotlib.pyplot as plt
+        print('Saving histogram to ' + histogram_filename)
+
+        data = m*sitk.GetArrayFromImage(image)+b
+        mask = sitk.GetArrayFromImage(seg)
+        data = data.ravel()
+        mask = mask.ravel()
+
+        plt.figure(figsize=(8, 6))
+        plt.hist(data[mask==muscle_label], bins=1000, density=True)
+        plt.xlabel('Density [mg HA/ccm]')
+        plt.ylabel('Normalized Count')
+        plt.pause(0.1)
+        plt.savefig(histogram_filename)
+
 def main():
     # Setup description
     description='''Muscle segmentation and quantification
@@ -252,6 +270,9 @@ density and fat could be provided.
     parser.add_argument('--closing_radius',
                         default=0.5, type=float,
                         help='Morphological closing radius for cleaning up image (default: %(default)s [mm]) ')
+    parser.add_argument('--histogram_filename',
+                        default='', type=str,
+                        help='Create a histogram and save to the defined file (typically, a TIFF or PDF)')
 
     # Parse and display
     args = parser.parse_args()

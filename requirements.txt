@@ -9,3 +9,4 @@ simpleitk
 
 # Numerics
 numpy
+matplotlib
