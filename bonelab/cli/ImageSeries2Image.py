@@ -27,7 +27,7 @@ def ImageSeries2Image(input_directory, output_filename, expression, overwrite=Fa
     if len(filenames) < 0:
         os.sys.exit('Found no files')
     if verbose:
-        print('Filenames: {}'.format(print(filenames)))
+        print('Filenames: {}'.format(filenames))
     reader = get_vtk_reader(filenames[0])
     if reader is None:
         os.sys.exit('[ERROR] Cannot find reader for file \"{}\"'.format(input_filename))
