@@ -15,7 +15,8 @@ class TestCommandLineInterfaceRun(unittest.TestCase):
     can be ran
     '''
     filenames = [
-        'test25a.aim'
+        'test25a.aim',
+        'dicom'
     ]
 
     def runner(self, command, stdin=None):
@@ -35,8 +36,12 @@ class TestCommandLineInterfaceRun(unittest.TestCase):
             self.assertNotEqual(download_location, '', 'Unable to download file ' + filename)
 
             # Copy to temporary directory
-            shutil.copy(download_location, self.test_dir)
-            self.assertTrue(os.path.isfile(os.path.join(self.test_dir, filename)))
+            if os.path.isfile(download_location):
+                shutil.copy(download_location, self.test_dir)
+                self.assertTrue(os.path.isfile(os.path.join(self.test_dir, filename)))
+            else:
+                shutil.copytree(download_location, os.path.join(self.test_dir, filename))
+                self.assertTrue(os.path.isdir(os.path.join(self.test_dir, filename)))
 
     def tearDown(self):
         # Remove temporary directory and all files
@@ -51,7 +56,8 @@ class TestCommandLineInterfaceRun(unittest.TestCase):
         # Test that the expected files exist
         self.assertTrue(os.path.isdir(directory))
         for filename in self.filenames:
-            self.assertTrue(os.path.isfile(os.path.join(directory, filename)))
+            this_filename = os.path.join(directory, filename)
+            self.assertTrue(os.path.exists(this_filename), 'Cannot find file ' + this_filename)
 
     def test_aix(self):
         '''Can run `aix`'''
@@ -67,6 +73,13 @@ class TestCommandLineInterfaceRun(unittest.TestCase):
         for i in range(25):
             filename = formatter % i
             self.assertTrue(os.path.isfile(filename), 'Cannot find file ' + filename)
+
+    def test_blImageSeries2Image(self):
+        '''Can run `blImageSeries2Image`'''
+        name = os.path.join(self.test_dir, 'dicom.aim')
+        command = ['blImageSeries2Image', os.path.join(self.test_dir, 'dicom'), name, '-o']
+        self.runner(command)
+        self.assertTrue(os.path.isfile(name), 'Cannot find file ' + name)
 
     def test_blImageConvert(self):
         '''Can run `blImageConvert`'''

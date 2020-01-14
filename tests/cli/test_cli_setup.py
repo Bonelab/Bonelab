@@ -39,6 +39,10 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
         '''Can run `blImageConvert`'''
         self.runner('blImageConvert')
 
+    def test_blImageSeries2Image(self):
+        '''Can run `blImageSeries2Image`'''
+        self.runner('blImageSeries2Image')
+
     def test_blMuscle(self):
         '''Can run `blMuscle`'''
         self.runner('blMuscle')
