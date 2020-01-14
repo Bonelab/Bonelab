@@ -79,9 +79,9 @@ Supported extension include:
     parser.add_argument('input_filename', help='Input image')
     parser.add_argument('output_filename', help='Output converted image (typically .nii)')
     parser.add_argument( '-e', '--extension', default='bmp', type=str,
-                        help='Filename extension without a period (default: %(default)s)"')
+                        help='Filename extension without a period (default: %(default)s)')
     parser.add_argument( '-n', '--number_of_digits', default=4, type=int,
-                        help='Number of digits to format with (default: %(default)d)"')
+                        help='Number of digits to format with (default: %(default)d)')
 
     # Parse and display
     args = parser.parse_args()

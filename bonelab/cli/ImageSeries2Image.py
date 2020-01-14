@@ -110,7 +110,7 @@ Stacking of slices will be determined by an alpha-numeric sort.
     parser.add_argument('input_directory', help='Input image')
     parser.add_argument('output_filename', help='Output converted image (typically .nii)')
     parser.add_argument( '-e', '--expression', default='*', type=str,
-                        help='An expression for matching files (default: %(default)s)"')
+                        help='An expression for matching files (default: %(default)s)')
     parser.add_argument('-o', '--overwrite', action='store_true', help='Overwrite output without asking')
     parser.add_argument('-v', '--verbose', action='store_true', help='Verbose output')
     parser.add_argument('-m', '--multi_component', action='store_true',
