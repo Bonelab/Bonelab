@@ -16,6 +16,7 @@ class TestCommandLineInterfaceRun(unittest.TestCase):
     '''
     filenames = [
         'test25a.aim',
+        'test25a.nii',
         'dicom'
     ]
 
@@ -67,7 +68,7 @@ class TestCommandLineInterfaceRun(unittest.TestCase):
     def test_blImage2ImageSeries(self):
         '''Can run `blImage2ImageSeries`'''
         name = os.path.join(self.test_dir, 'test25a')
-        command = ['blImage2ImageSeries', os.path.join(self.test_dir, 'test25a.aim'), name]
+        command = ['blImage2ImageSeries', os.path.join(self.test_dir, 'test25a.nii'), name, '-n', '4']
         self.runner(command)
         formatter = '{}_%04d.bmp'.format(name)
         for i in range(25):
