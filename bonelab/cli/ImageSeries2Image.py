@@ -2,14 +2,12 @@
 # Imports
 import argparse
 import os
-import vtk
+import SimpleITK as sitk
 import glob
 
 from bonelab.util.echo_arguments import echo_arguments
-from bonelab.io.vtk_helpers import get_vtk_reader, get_vtk_writer, handle_filetype_writing_special_cases
 
-
-def ImageSeries2Image(input_directory, output_filename, expression, overwrite=False, verbose=False, multi_component=False):
+def ImageSeries2Image(input_directory, output_filename, expression, overwrite=False, verbose=False):
     # Python 2/3 compatible input
     from six.moves import input
 
@@ -20,72 +18,32 @@ def ImageSeries2Image(input_directory, output_filename, expression, overwrite=Fa
             print('Not overwriting. Exiting...')
             os.sys.exit()
 
-    # Determine input type
-    filenames = glob.glob(os.path.join(input_directory, expression))
-    filenames.sort()
+    if output_filename.lower().endswith('aim'):
+        os.sys.exit('[ERROR] Cannot write to AIM. Please write to an intermediate type (say, .nii) and then use blImageConvert to convert to AIM.')
+
+    # First, we assume it is a DICOM series. If GDCM finds no DICOM files
+    # we assume it is otherwise
+    is_dicom = True
+    sitk.ProcessObject.GlobalWarningDisplayOff()
+    filenames = sitk.ImageSeriesReader.GetGDCMSeriesFileNames(input_directory)
+    sitk.ProcessObject.GlobalWarningDisplayOn()
+    filenames = [x for x in filenames]
+
+    if len(filenames)==0:
+        is_dicom = False
+        filenames = glob.glob(os.path.join(input_directory, expression))
+        filenames.sort()
     print('Found {} files'.format(len(filenames)))
     if len(filenames) < 0:
         os.sys.exit('Found no files')
     if verbose:
         print('Filenames: {}'.format(filenames))
-    reader = get_vtk_reader(filenames[0])
-    if reader is None:
-        os.sys.exit('[ERROR] Cannot find reader for file \"{}\"'.format(input_filename))
 
-    if type(reader) == type(vtk.vtkDICOMImageReader()):
-        # Found DICOM
-        print('Reading DICOM from directory ' + input_directory)
-        reader.SetDirectoryName(input_directory)
-        reader.Update()
-        output_filter = reader
+    print('Reading in {} files'.format(len(filenames)))
+    image = sitk.ReadImage(filenames)
 
-        if verbose:
-            print('DICOM Information')
-            print('  Pixel Spacing:             {}'.format(reader.GetPixelSpacing()))
-            print('  Width:                     {}'.format(reader.GetWidth()))
-            print('  Height:                    {}'.format(reader.GetHeight()))
-            print('  Image Orientation Patient: {}'.format(reader.GetImageOrientationPatient()))
-            print('  Image Position Patient:    {}'.format(reader.GetImagePositionPatient()))
-            print('  Bits Allocated:            {}'.format(reader.GetBitsAllocated()))
-            print('  Pixel Representation:      {}'.format(reader.GetPixelRepresentation()))
-            print('  Number of Components:      {}'.format(reader.GetNumberOfComponents()))
-            print('  Transfer Syntax UID:       {}'.format(reader.GetTransferSyntaxUID()))
-            print('  Rescale Slope:             {}'.format(reader.GetRescaleSlope()))
-            print('  Rescale Offset:            {}'.format(reader.GetRescaleOffset()))
-            print('  Patient Name:              {}'.format(reader.GetPatientName()))
-            print('  Study UID:                 {}'.format(reader.GetStudyUID()))
-            print('  Study ID:                  {}'.format(reader.GetStudyID()))
-            print('  Gantry Angle:              {}'.format(reader.GetGantryAngle()))
-            print('')
-    else:
-        # Found anything else
-        vtk_filenames = vtk.vtkStringArray()
-        for filename in filenames:
-            vtk_filenames.InsertNextValue(filename)
-        reader.SetFileNames(vtk_filenames)
-        reader.SetFileDimensionality(2)
-        reader.SetNumberOfScalarComponents(1)
-        reader.Update()
-        output_filter = reader
-
-        if not multi_component:
-            extractor = vtk.vtkImageExtractComponents()
-            extractor.SetInputConnection(reader.GetOutputPort())
-            extractor.SetComponents(1)
-            output_filter = extractor
-
-    # Create writer
-    writer = get_vtk_writer(output_filename)
-    if writer is None:
-        os.sys.exit('[ERROR] Cannot find writer for file \"{}\"'.format(output_filename))
-    writer.SetInputConnection(output_filter.GetOutputPort())
-    writer.SetFileName(output_filename)
-
-    # Handle edge cases for each output file type
-    handle_filetype_writing_special_cases(writer)
-
-    print('Saving image ' + output_filename)
-    writer.Update()
+    print('Writing to ' + output_filename)
+    sitk.WriteImage(image, output_filename)
 
 def main():
     # Setup description
@@ -94,11 +52,22 @@ def main():
 Example usage:
     blImageSeries2Image ~/.bldata/dicom dicom.nii
 
-There are a great deal of details in the DICOM standard of while not
-all are handled by this function. For projects larger than, say, 10
-subjects, one may want to go with a commercial DICOM importer.
+There are a great deal of details in the DICOM standard of which not
+all are handled by this function. If you experience nuanced outputs,
+please consult a commercial DICOM importer.
 
-Stacking of slices will be determined by an alpha-numeric sort.
+Stacking of slices will be determined by GDCM if the input is a DICOM
+series, otherwise an alpha-numeric sort.
+
+If you are not reading in a DICOM, it is highly recommended to set a
+matching expression with `-e` to avoid extra files - like .DS_store,
+text files, other images - from being input into the stack. If the
+script fails, this is almost always the problem. `expression` is
+ignored for DICOM data.
+
+The output cannot be an AIM type. If you require an AIM, please write
+to an intermediate type (say, .nii) and then convert to AIM using
+`blImageConvert`.
 '''
 
     # Setup argument parsing
@@ -108,13 +77,11 @@ Stacking of slices will be determined by an alpha-numeric sort.
         description=description
     )
     parser.add_argument('input_directory', help='Input image')
-    parser.add_argument('output_filename', help='Output converted image (typically .nii)')
+    parser.add_argument('output_filename', help='Output converted image')
     parser.add_argument( '-e', '--expression', default='*', type=str,
                         help='An expression for matching files (default: %(default)s)')
     parser.add_argument('-o', '--overwrite', action='store_true', help='Overwrite output without asking')
     parser.add_argument('-v', '--verbose', action='store_true', help='Verbose output')
-    parser.add_argument('-m', '--multi_component', action='store_true',
-                        help='Set to export all components of the image. By default, only the first component is exported.')
 
     # Parse and display
     args = parser.parse_args()

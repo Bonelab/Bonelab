@@ -77,7 +77,7 @@ class TestCommandLineInterfaceRun(unittest.TestCase):
 
     def test_blImageSeries2Image(self):
         '''Can run `blImageSeries2Image`'''
-        name = os.path.join(self.test_dir, 'dicom.aim')
+        name = os.path.join(self.test_dir, 'dicom.nii')
         command = ['blImageSeries2Image', os.path.join(self.test_dir, 'dicom'), name, '-o']
         self.runner(command)
         self.assertTrue(os.path.isfile(name), 'Cannot find file ' + name)
