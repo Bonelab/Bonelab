@@ -56,3 +56,23 @@ A collection of `example data`_ is provided by the `Bone Imaging Laboratory`_.
 These data can be fetched by executing the command ``blDownloadData`` in your terminal.
 Currently, the data is downloaded into the user's directory under the directory ``~/.bldata``.
 Please see ``blDownloadData -h`` for additional information.
+
+Adding a New Application
+========================
+If you're going to contribute to the repository, it is suggested you create a branch:
+
+.. code-block:: bash
+
+    $ git checkout master
+    $ git pull
+    $ git checkout -b <BRANCH_NAME>
+
+Merge the branch once you're certain your changes won't break other code.
+
+To add a new application, do the following:
+
+- Add entry point in setup.cfg
+- Add file with main function in bonelab.cli
+- Rerun `pip install -e .`
+- Add tests to tests.cli. test_cli_setup.py and, if appropriate, add other tests.
+

@@ -55,6 +55,10 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
         '''Can run `blVisualizeSegmentation`'''
         self.runner('blVisualizeSegmentation')
 
+    def test_blRapidPrototype(self):
+        '''Can run `blRapidPrototype`'''
+        self.runner('blRapidPrototype')
+
 
 if __name__ == '__main__':
     unittest.main()
