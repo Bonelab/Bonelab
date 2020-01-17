@@ -2,6 +2,7 @@
 # Imports
 import argparse
 import os
+import vtkbone
 
 from bonelab.util.echo_arguments import echo_arguments
 from bonelab.io.vtk_helpers import get_vtk_reader, get_vtk_writer, handle_filetype_writing_special_cases
@@ -36,10 +37,19 @@ def ImageConverter(input_filename, output_filename, processing_log='', overwrite
     writer.SetInputConnection(reader.GetOutputPort())
     writer.SetFileName(output_filename)
 
+    # Setup processing log
+    final_processing_log = ''
+    if len(processing_log) > 0 and type(reader) == type(vtkbone.vtkboneAIMReader):
+        final_processing_log = reader.GetProcessingLog() + os.linesep + processing_log
+    elif type(reader) == type(vtkbone.vtkboneAIMReader):
+        final_processing_log = reader.GetProcessingLog()
+    elif len(processing_log) > 0:
+        final_processing_log = processing_log
+
     # Handle edge cases for each output file type
     handle_filetype_writing_special_cases(
-        reader, writer,
-        processing_log=processing_log
+        writer,
+        processing_log=final_processing_log
     )
 
     print('Saving image ' + output_filename)
