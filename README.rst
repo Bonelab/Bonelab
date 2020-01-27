@@ -19,6 +19,8 @@ Install
 =======
 Clone the repository onto your computer and change into the directory.
 
+$ git clone git@github.com:Bonelab/Bonelab.git
+
 .. code-block:: bash
 
     # It is recommended to use anaconda and install from the environment file
@@ -42,7 +44,7 @@ Running Tests
 .. code-block:: bash
 
     # Be at the root
-    cd bonelab
+    cd Bonelab
 
     # Run tests
     nosetests tests/
