@@ -11,7 +11,7 @@ Collection of scripts used in the `Bone Imaging Laboratory`_.
 Guiding Principles
 ==================
 - **Python**      All source code is Python, no C++, ergo no compilation
-- **Examples**    Please do upload individual, one-off project scripts to the examples/ directory!
+- **Examples**    Please do upload individual, one-off project scripts to the /examples directory!
 - **Open source** The whole world can see your code, and the whole world can contribute back
 - **Testing**     Automatically runs tests on a server. So, please write your tests!
 
