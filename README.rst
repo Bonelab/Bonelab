@@ -19,6 +19,7 @@ Install
 =======
 
 .. code-block:: bash
+
     # Clone the repository onto your computer and change into the directory.
     git clone git@github.com:Bonelab/Bonelab.git
 
