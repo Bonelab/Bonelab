@@ -17,11 +17,10 @@ Guiding Principles
 
 Install
 =======
-Clone the repository onto your computer and change into the directory.
-
-$ git clone git@github.com:Bonelab/Bonelab.git
 
 .. code-block:: bash
+    # Clone the repository onto your computer and change into the directory.
+    git clone git@github.com:Bonelab/Bonelab.git
 
     # It is recommended to use anaconda and install from the environment file
     conda env create -f environment.yml
