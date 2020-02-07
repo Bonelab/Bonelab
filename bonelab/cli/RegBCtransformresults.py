@@ -10,24 +10,55 @@ import vtkbone
 
 from bonelab.util.echo_arguments import echo_arguments
 
-# Utility functions:
-
-
-def ReadTransform2Matrix():
-    x = 1
-
-
-def ReadResults2Vector():
-    y = 2
-
 
 def TransformResults(data_file, transform_file, output_file):
-    z = 3
+
+    # Read raw data file (Faim output):
+    with open(data_file) as indat:
+        reader = csv.DictReader(indat)
+        raw_data = [r for r in reader]
+
+    # Read in the rotation matrices from IPL 3D image registration:
+    with open(transform_file) as inmat:
+        reader = csv.DictReader(inmat)
+        transforms = [r for r in reader]
+
+    # Filter the data file to eliminate baseline scans:
+    trafo_data = dict()
+    i = 0
+    for scan in raw_data:
+        if "S1" in scan['filename']:
+            continue
+        trafo_data[i] = scan
+        i = i + 1
+
+    # Transform the reaction forces:
+    for scan, mat in zip(trafo_data, transforms):
+
+        R = np.array([[float(mat['r11']), float(mat['r12']), float(mat['r13'])],
+                      [float(mat['r21']), float(mat['r22']), float(mat['r23'])],
+                      [float(mat['r31']), float(mat['r32']), float(mat['r33'])]])
+        fz = np.array([float(trafo_data[scan]['fx_ns1']),
+                       float(trafo_data[scan]['fy_ns1']),
+                       float(trafo_data[scan]['fz_ns1'])])
+        fz_rot = np.dot(R, fz)
+
+        trafo_data[scan]['fx_ns1'] = fz_rot[0]
+        trafo_data[scan]['fy_ns1'] = fz_rot[1]
+        trafo_data[scan]['fz_ns1'] = fz_rot[2]
+
+    # Write the transformed data to a new csv:
+    trafo_data_keys = list(trafo_data[0].keys())
+    with open(output_file, 'w') as outcsv:
+        writer = csv.DictWriter(outcsv, fieldnames=trafo_data_keys)
+        writer.writeheader()
+        for data in trafo_data:
+            writer.writerow(trafo_data[data])
 
 
 def main():
 
-    description = '''Transforms FE results from the '''
+    description = '''Transforms Faim outputs generated from solving a RegBC N88 model.'''
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawTextHelpFormatter,
