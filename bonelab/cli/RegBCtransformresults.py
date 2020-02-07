@@ -38,14 +38,22 @@ def TransformResults(data_file, transform_file, output_file):
         R = np.array([[float(mat['r11']), float(mat['r12']), float(mat['r13'])],
                       [float(mat['r21']), float(mat['r22']), float(mat['r23'])],
                       [float(mat['r31']), float(mat['r32']), float(mat['r33'])]])
-        fz = np.array([float(trafo_data[scan]['fx_ns1']),
-                       float(trafo_data[scan]['fy_ns1']),
-                       float(trafo_data[scan]['fz_ns1'])])
-        fz_rot = np.dot(R, fz)
+        f = np.array([float(trafo_data[scan]['fx_ns1']),
+                      float(trafo_data[scan]['fy_ns1']),
+                      float(trafo_data[scan]['fz_ns1'])])
+        d = np.array([float(trafo_data[scan]['dx_avg_ns1']),
+                      float(trafo_data[scan]['dy_avg_ns1']),
+                      float(trafo_data[scan]['dz_avg_ns1'])])
 
-        trafo_data[scan]['fx_ns1'] = fz_rot[0]
-        trafo_data[scan]['fy_ns1'] = fz_rot[1]
-        trafo_data[scan]['fz_ns1'] = fz_rot[2]
+        f_rot = np.dot(R, f)
+        d_rot = np.dot(R, d)
+
+        trafo_data[scan]['fx_ns1'] = f_rot[0]
+        trafo_data[scan]['fy_ns1'] = f_rot[1]
+        trafo_data[scan]['fz_ns1'] = f_rot[2]
+        trafo_data[scan]['dx_avg_ns1'] = d_rot[0]
+        trafo_data[scan]['dy_avg_ns1'] = d_rot[1]
+        trafo_data[scan]['dz_avg_ns1'] = d_rot[2]
 
     # Write the transformed data to a new csv:
     trafo_data_keys = list(trafo_data[0].keys())
