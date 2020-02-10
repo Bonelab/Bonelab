@@ -174,7 +174,7 @@ def main():
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawTextHelpFormatter,
-        prog='blRegN88ModelGenerator',
+        prog='blRegBCn88modelgenerator',
         description=description
     )
     parser.add_argument('input_file', help='Input image file (*REG_HOM_LS.AIM).')
@@ -186,7 +186,7 @@ def main():
 
     # Parse and display arguments:
     args = parser.parse_args()
-    print((echo_arguments('RegN88ModelGenerator', vars(args))))
+    print((echo_arguments('blRegBCn88modelgenerator', vars(args))))
 
     # Run program HERE
     CreateN88Model(**vars(args))
