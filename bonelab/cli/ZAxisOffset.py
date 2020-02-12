@@ -3,6 +3,11 @@
 #
 # Author: Tannis Kemp
 # Date: Feb 12 2020
+#
+# Example command line use:
+#
+#   python ZAxisOffset.py -H -o output_dir/output_file.txt
+#                                               input_dir/input_file.txt
 
 # Import packages:
 
