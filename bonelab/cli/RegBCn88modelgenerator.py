@@ -38,7 +38,7 @@ def read_transform(IPL_transform_file):
 start_time = time.time()
 
 
-def CreateN88Model(input_file, config_file, correction, transform, overwrite):
+def CreateN88Model(input_file, config_file, correction, transform, overwrite, fixed_boundary):
 
     # Assign output file name:
     filename, ext = os.path.splitext(input_file)
@@ -144,7 +144,16 @@ def CreateN88Model(input_file, config_file, correction, transform, overwrite):
     message("Setting displacement boundary conditions...")
     e = np.array([0, 0, -load_input])
 
-    model.ApplyBoundaryCondition('face_z0', vtkbone.vtkboneConstraint.SENSE_Z, 0, 'z_fixed')
+    # Apply fixed boundary conditions:
+    if fixed_boundary == 'uniaxial':
+        model.ApplyBoundaryCondition('face_z0', vtkbone.vtkboneConstraint.SENSE_Z, 0, 'z_fixed')
+    elif fixed_boundary == 'axial':
+        model.FixNodes('face_z0', 'bottom_fixed')
+    else:
+        message("[ERROR] Invalid fixed boundary conditions!")
+        sys.exit(1)
+
+    # Apply displacement boundary conditions:
     model.ApplyBoundaryCondition('face_z1', vtkbone.vtkboneConstraint.SENSE_Z, e[2], 'z_moved')
     if (correction) and "S1" not in filename:
         e = np.dot(np.linalg.inv(rotation), e)
@@ -183,6 +192,8 @@ def main():
                         help='Apply transformed boundary conditions from 3D registration.')
     parser.add_argument('-t', '--transform', help='Transformation matrix (*.txt).')
     parser.add_argument('-o', '--overwrite', action='store_true', help='Overwrite existing output.')
+    parser.add_argument('-b', '--fixed_boundary', default='uniaxial',
+                        help='Fixed boundary type (uniaxial/axial)')
 
     # Parse and display arguments:
     args = parser.parse_args()
