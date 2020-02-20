@@ -59,6 +59,10 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
         '''Can run `blRapidPrototype`'''
         self.runner('blRapidPrototype')
 
+    def test_scrub_vms_extension(self):
+        '''Can run `scrub_vms_extension`'''
+        self.runner('scrub_vms_extension')
+
 
 if __name__ == '__main__':
     unittest.main()
