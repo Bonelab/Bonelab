@@ -78,7 +78,7 @@ slow for very large models.
         description=description
     )
     parser.add_argument('input_model', help='Input N88 model')
-    parser.add_argument('output_image', help='Output field')
+    parser.add_argument('output_image', help='Output image filename')
     parser.add_argument('-f', '--field_name', default='StrainEnergyDensity', type=str,
                         help='Field name to extract (default: %(default)s)')
     parser.add_argument('-o', '--outside_value', default=0.0, type=float,
