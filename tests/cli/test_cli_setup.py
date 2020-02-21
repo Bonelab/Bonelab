@@ -3,7 +3,7 @@
 import unittest
 import subprocess
 
-from .config_cli import cfg
+from tests.config_cli import cfg
 
 class TestCommandLineInterfeceSetup(unittest.TestCase):
     '''Test command line interface setup

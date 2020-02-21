@@ -12,7 +12,7 @@ except ModuleNotFoundError:
     from io import StringIO
 import vtkbone
 
-from .config_cli import cfg
+from tests.config_cli import cfg
 from bonelab.cli.aimod import aimod
 
 

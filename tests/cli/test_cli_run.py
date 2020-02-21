@@ -5,7 +5,7 @@ import subprocess
 import shutil, tempfile
 import os
 
-from .config_cli import cfg
+from tests.config_cli import cfg
 
 
 class TestCommandLineInterfaceRun(unittest.TestCase):
