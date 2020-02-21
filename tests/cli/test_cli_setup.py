@@ -31,6 +31,10 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
         '''Can run `blDownloadData`'''
         self.runner('blDownloadData')
 
+    def test_blExtractFields(self):
+        '''Can run `blExtractFields`'''
+        self.runner('blExtractFields')
+
     def test_blImage2ImageSeries(self):
         '''Can run `blImage2ImageSeries`'''
         self.runner('blImage2ImageSeries')
