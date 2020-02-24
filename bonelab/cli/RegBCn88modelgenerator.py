@@ -22,19 +22,6 @@ def message(msg, *additionalLines):
         print((" " * 9 + line))
 
 
-def read_transform(IPL_transform_file):
-    file = open(IPL_transform_file, 'r')
-    data = file.read()
-    split_data = data.split()
-    array_data = np.array(split_data)
-    i = [0, 1, 2, 3, 4, 5]
-    mat = np.delete(array_data, i)
-    mat = mat.astype(float)
-    mat = mat.reshape(4, 4)
-
-    return mat
-
-
 start_time = time.time()
 
 
@@ -89,8 +76,8 @@ def CreateN88Model(input_file, config_file, correction, transform, overwrite, fi
     # Read the transformation matrix:
     message("Reading IPL transformation matrix...")
     if(transform):
-        t_mat = read_transform(transform)
-        rotation = t_mat[:-1, :-1]
+        t_mat = np.loadtxt(fname=transform, skiprows=2)
+        rotation = t_mat[:3, :3]
 
     # Filter the image with a connectivity filter:
     message("Applying connectivity filter...")
@@ -144,7 +131,7 @@ def CreateN88Model(input_file, config_file, correction, transform, overwrite, fi
     message("Setting displacement boundary conditions...")
     e = np.array([0, 0, -load_input])
 
-    # Apply fixed boundary conditions:
+    # Apply fixed boundary conditions (default axial):
     if fixed_boundary == 'uniaxial':
         model.ApplyBoundaryCondition('face_z0', vtkbone.vtkboneConstraint.SENSE_Z, 0, 'z_fixed')
     elif fixed_boundary == 'axial':
@@ -165,7 +152,7 @@ def CreateN88Model(input_file, config_file, correction, transform, overwrite, fi
     pp_node_sets_key.Append(info, 'face_z1')
     pp_node_sets_key.Append(info, 'face_z0')
 
-    model.AppendHistory("Created with blRegN88ModelGenerator version 1.0")
+    model.AppendHistory("Created with blRegN88ModelGenerator version 1.1")
 
     # Write the n88model file:
     message("Writing n88model file...")
@@ -192,7 +179,7 @@ def main():
                         help='Apply transformed boundary conditions from 3D registration.')
     parser.add_argument('-t', '--transform', help='Transformation matrix (*.txt).')
     parser.add_argument('-o', '--overwrite', action='store_true', help='Overwrite existing output.')
-    parser.add_argument('-b', '--fixed_boundary', default='uniaxial',
+    parser.add_argument('-b', '--fixed_boundary', default='axial',
                         help='Fixed boundary type (uniaxial/axial)')
 
     # Parse and display arguments:
