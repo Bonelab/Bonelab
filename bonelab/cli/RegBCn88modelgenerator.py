@@ -129,7 +129,7 @@ def CreateN88Model(input_file, config_file, correction, transform, overwrite, fi
 
     # Apply boundary conditions:
     message("Setting displacement boundary conditions...")
-    e = np.array([0, 0, -load_input])
+    e_init = np.array([0, 0, -load_input])
 
     # Apply fixed boundary conditions (default axial):
     if fixed_boundary == 'uniaxial':
@@ -142,13 +142,18 @@ def CreateN88Model(input_file, config_file, correction, transform, overwrite, fi
 
     # Apply displacement boundary conditions:
     if "S1" in filename:
+        message("Setting non-registered boundary conditions.")
         model.ApplyBoundaryCondition('face_z1', vtkbone.vtkboneConstraint.SENSE_Z, e[2], 'z_moved')
-    if (correction) and "S1" not in filename:
+    else:
+        message("Setting registered boundary conditions.")
+        if not (correction):
+            message("[ERROR] Applying registered boundary conditions to the wrong image!")
+            sys.exit(1)
+
         e = np.dot(np.linalg.inv(rotation), e)
         model.ApplyBoundaryCondition('face_z1', vtkbone.vtkboneConstraint.SENSE_X, e[0], 'x_moved')
         model.ApplyBoundaryCondition('face_z1', vtkbone.vtkboneConstraint.SENSE_Y, e[1], 'y_moved')
         model.ApplyBoundaryCondition('face_z1', vtkbone.vtkboneConstraint.SENSE_Z, e[2], 'z_moved')
-
 
     info = model.GetInformation()
     pp_node_sets_key = vtkbone.vtkboneSolverParameters.POST_PROCESSING_NODE_SETS()
