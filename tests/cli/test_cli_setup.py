@@ -3,7 +3,7 @@
 import unittest
 import subprocess
 
-from .config_cli import cfg
+from tests.config_cli import cfg
 
 class TestCommandLineInterfeceSetup(unittest.TestCase):
     '''Test command line interface setup
@@ -30,6 +30,10 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
     def test_blDownloadData(self):
         '''Can run `blDownloadData`'''
         self.runner('blDownloadData')
+
+    def test_blExtractFields(self):
+        '''Can run `blExtractFields`'''
+        self.runner('blExtractFields')
 
     def test_blImage2ImageSeries(self):
         '''Can run `blImage2ImageSeries`'''
