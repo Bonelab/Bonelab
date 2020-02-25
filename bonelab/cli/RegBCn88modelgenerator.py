@@ -141,11 +141,14 @@ def CreateN88Model(input_file, config_file, correction, transform, overwrite, fi
         sys.exit(1)
 
     # Apply displacement boundary conditions:
-    model.ApplyBoundaryCondition('face_z1', vtkbone.vtkboneConstraint.SENSE_Z, e[2], 'z_moved')
+    if "S1" in filename:
+        model.ApplyBoundaryCondition('face_z1', vtkbone.vtkboneConstraint.SENSE_Z, e[2], 'z_moved')
     if (correction) and "S1" not in filename:
         e = np.dot(np.linalg.inv(rotation), e)
         model.ApplyBoundaryCondition('face_z1', vtkbone.vtkboneConstraint.SENSE_X, e[0], 'x_moved')
         model.ApplyBoundaryCondition('face_z1', vtkbone.vtkboneConstraint.SENSE_Y, e[1], 'y_moved')
+        model.ApplyBoundaryCondition('face_z1', vtkbone.vtkboneConstraint.SENSE_Z, e[2], 'z_moved')
+
 
     info = model.GetInformation()
     pp_node_sets_key = vtkbone.vtkboneSolverParameters.POST_PROCESSING_NODE_SETS()
