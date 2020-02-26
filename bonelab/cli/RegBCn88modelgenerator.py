@@ -144,6 +144,10 @@ def CreateN88Model(input_file, config_file, correction, transform, overwrite, fi
     if "S1" in filename:
         message("Setting non-registered boundary conditions.")
         model.ApplyBoundaryCondition(
+            'face_x1', vtkbone.vtkboneConstraint.SENSE_X, e_init[0], 'x_moved')
+        model.ApplyBoundaryCondition(
+            'face_y1', vtkbone.vtkboneConstraint.SENSE_Y, e_init[1], 'y_moved')
+        model.ApplyBoundaryCondition(
             'face_z1', vtkbone.vtkboneConstraint.SENSE_Z, e_init[2], 'z_moved')
     else:
         message("Setting registered boundary conditions.")
