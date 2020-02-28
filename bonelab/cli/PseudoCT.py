@@ -161,6 +161,10 @@ def PseudoCT(input_directory, output_directory, expression, overwrite=False, ver
     img_range = (img_max - img_min).astype(dtype=np.float32)
     message('{0}: {1} to {2} ({3}).'.format("Input image data range",img_min,img_max,img_range))
     
+    if (np.min(data_array) < 0):
+      message('ERROR: Input data array cannot contain negative values.')
+      exit(1)
+      
     # Log
     data_log = np.log(data_array+1)
     data_log_min = np.min(data_log)
@@ -197,8 +201,8 @@ def PseudoCT(input_directory, output_directory, expression, overwrite=False, ver
     PrintSample = 0
     idx=0
     for fname in filenames:
-      ds = pydicom.dcmread(fname)
-
+      ds = pydicom.dcmread(fname,force=True)
+      
       # Update meta data in dicom slice
       ds.StudyInstanceUID = study_instance_uid
       ds.SeriesInstanceUID = series_instance_uid
