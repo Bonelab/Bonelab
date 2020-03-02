@@ -13,7 +13,7 @@ from bonelab.cli.PseudoCT import PseudoCT
 class TestblPseudoCT(unittest.TestCase):
     '''Test blPseudoCT'''
     filenames = [
-        'dicom'
+        'COR_PD_3'
     ]
 
     def setUp(self):
@@ -35,8 +35,8 @@ class TestblPseudoCT(unittest.TestCase):
 
         # Run
         self.args = {
-            'input_directory':                  os.path.join(self.test_dir, 'dicom'),
-            'output_directory':                 os.path.join(self.test_dir, 'dicom_ct'),
+            'input_directory':                  os.path.join(self.test_dir, 'COR_PD_3'),
+            'output_directory':                 os.path.join(self.test_dir, 'COR_PD_3_ct'),
             'expression':                       '*',
             'overwrite':                        True,
             'verbose':                          False
