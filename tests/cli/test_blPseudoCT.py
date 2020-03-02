@@ -27,7 +27,10 @@ class TestblPseudoCT(unittest.TestCase):
             self.assertNotEqual(download_location, '', 'Unable to download file ' + filename)
 
             # Copy to temporary directory
-            shutil.copy(download_location, self.test_dir)
+            if os.path.isdir(self.test_dir):
+                shutil.copytree(download_location, os.path.join(self.test_dir, filename))
+            else:
+                shutil.copy(download_location, self.test_dir)
             self.assertTrue(os.path.isdir(os.path.join(self.test_dir, filename)))
 
         # Run
