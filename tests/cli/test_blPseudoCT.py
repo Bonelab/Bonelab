@@ -6,7 +6,7 @@ import shutil, tempfile
 import os
 import numpy.testing as npt
 
-from .config_cli import cfg
+from tests.config_cli import cfg
 from bonelab.cli.PseudoCT import PseudoCT
 
 
