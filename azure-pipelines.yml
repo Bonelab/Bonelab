@@ -25,7 +25,7 @@ jobs:
       steps:
       - bash: echo "##vso[task.prependpath]$CONDA/bin"
         displayName: Add conda to path
-      - script: conda create -y -n test -c numerics88 -c conda-forge python=$(python.version) n88tools
+      - script: conda create -y -n test -c numerics88 -c conda-forge python=$(python.version) n88tools gdcm
         displayName: Setup conda for testing
       - script: |
           source activate test

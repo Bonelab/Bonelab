@@ -202,6 +202,8 @@ def PseudoCT(input_directory, output_directory, expression, overwrite=False, ver
     idx=0
     for fname in filenames:
       ds = pydicom.dcmread(fname,force=True)
+      if ds.file_meta.TransferSyntaxUID.is_compressed is True:
+        ds.decompress()
       
       # Update meta data in dicom slice
       ds.StudyInstanceUID = study_instance_uid
