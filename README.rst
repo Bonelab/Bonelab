@@ -27,7 +27,7 @@ Install
     conda env create -f environment.yml
 
     # ... alternatively, you can setup the environment directly
-    conda create -n bl -c numerics88 -c simpleitk -c conda-forge python=3.7 n88tools pbr nose six simpleitk
+    conda create -n bl -c numerics88 -c simpleitk -c conda-forge python=3.7 n88tools pbr nose six simpleitk pydicom
 
     # Activate the environemnt
     conda activate bl
