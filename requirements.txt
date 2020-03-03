@@ -6,6 +6,7 @@ six
 # Image processing
 vtk
 simpleitk
+pydicom
 
 # Numerics
 numpy

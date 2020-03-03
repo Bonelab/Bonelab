@@ -67,6 +67,9 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
         '''Can run `scrub_vms_extension`'''
         self.runner('scrub_vms_extension')
 
+    def test_blPseudoCT(self):
+        '''Can run `blPseudoCT`'''
+        self.runner('blPseudoCT')
 
 if __name__ == '__main__':
     unittest.main()

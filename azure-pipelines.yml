@@ -20,12 +20,12 @@ jobs:
             python.version: '3.6'
           Python37:
             python.version: '3.7'
-          Python38:
-            python.version: '3.8'
+          #Python38:
+          #  python.version: '3.8'
       steps:
       - bash: echo "##vso[task.prependpath]$CONDA/bin"
         displayName: Add conda to path
-      - script: conda create -y -n test -c numerics88 -c conda-forge python=$(python.version) n88tools
+      - script: conda create -y -n test -c numerics88 -c conda-forge python=$(python.version) n88tools gdcm
         displayName: Setup conda for testing
       - script: |
           source activate test

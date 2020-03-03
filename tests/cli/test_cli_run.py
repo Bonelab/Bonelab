@@ -97,6 +97,5 @@ class TestCommandLineInterfaceRun(unittest.TestCase):
         self.runner(command)
         self.assertTrue(os.path.join(self.test_dir, 'test.aim'))
 
-
 if __name__ == '__main__':
     unittest.main()
