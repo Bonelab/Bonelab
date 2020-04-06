@@ -142,12 +142,12 @@ For now only AIM files can be used as input.
     )
     parser.add_argument('input_filename', help='Input image file')
     parser.add_argument('output_filename', help='Output image file')
-    parser.add_argument('-g', '--gaussian', type=float, default=0.7, help='Gaussian standard deviation')
-    parser.add_argument('-r', '--radius', type=float, default=1.0, help='Gaussian radius support')
-    parser.add_argument('-m', '--marching_cubes', type=float, default=50.0, help='Marching cubes threshold')
-    parser.add_argument('-d', '--decimation', type=float, default=0.85, help='Decimation between 0 and 1. To skip set to 1')
-    parser.add_argument('-v', '--visualize', action='store_false', help='Visualize the STL mesh')
-    parser.add_argument('-o', '--overwrite', action='store_true', help='Overwrite output without asking')
+    parser.add_argument('-g', '--gaussian', type=float, default=0.7, help='Gaussian standard deviation (default: %(default)s)')
+    parser.add_argument('-r', '--radius', type=float, default=1.0, help='Gaussian radius support (default: %(default)s)')
+    parser.add_argument('-m', '--marching_cubes', type=float, default=50.0, help='Marching cubes threshold (default: %(default)s)')
+    parser.add_argument('-d', '--decimation', type=float, default=0.85, help='Decimation 0 to 1. To skip set to 1 (default: %(default)s)')
+    parser.add_argument('-v', '--visualize', action='store_false', help='Visualize the STL mesh (default: %(default)s)')
+    parser.add_argument('-o', '--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
 
     # Parse and display
     args = parser.parse_args()
