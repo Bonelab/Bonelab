@@ -34,7 +34,7 @@ count = 0
 for input_file in args.input_files:
     count = count + 1
 
-    with open(input_file) as searchfile:
+    with open(input_file, encoding='cp1250') as searchfile:
         entry = []
         print (input_file)
 
@@ -86,7 +86,7 @@ for input_file in args.input_files:
                 break
 
         # Print the output
-        entry = zip(*entry)
+        entry = list(zip(*entry))
         if args.header & (count==1):
             out.write (args.delimiter.join(entry[0]) + "\n")
             out.write (args.delimiter.join(entry[2]) + "\n")
