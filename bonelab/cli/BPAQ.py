@@ -53,8 +53,15 @@ def set_pandas_display_options() -> None:
     
 # Calculate how many different activites were reported
 def calc_num_current_activities(freq_wk):
+    if not (isinstance(freq_wk,float) or isinstance(freq_wk,int)):
+        print('WARNING: Variable freq_wk is neither float nor int.')
+        print('         Variable freq_wk = ',freq_wk)
+        print('         Setting freq_wk to 0')
+        freq_wk = 0
+
     if (freq_wk > 0):
         return 1
+
     return 0
 
 # Calculate BPAQ score for activites within the last year
