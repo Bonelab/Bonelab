@@ -161,7 +161,7 @@ def BPAQ(
         exit()
     
     # Read input data from an excel file
-    message("Reading excel input file:\n"+ifile)
+    message("Reading excel input file:", ifile)
 
     df = pd.read_excel(ifile)
     df.set_index('record_id',inplace=True) # Assign the record ID as the table index
@@ -252,7 +252,7 @@ def BPAQ(
                                             axis=1)
 
     # Print output
-    message("Writing output file:\n",ofile+'.csv')
+    message("Writing output file:", ofile)
 
     df[['redcap_event_name',\
         'bpaq_current_activity',\
