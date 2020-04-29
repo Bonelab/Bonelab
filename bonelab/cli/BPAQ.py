@@ -261,7 +261,7 @@ def BPAQ(
         'bpaq_past_child_activity',\
         'bpaq_past_adult_activity',\
         'bpaq_past_res',\
-        'bpaq_tot_res']].to_csv(ofile+'.csv', float_format='%.6g', index=True)  
+        'bpaq_tot_res']].to_csv(ofile, float_format='%.6g', index=True)  
     #df.to_excel(ofile+'.xlsx', index=True, sheet_name='BPAQ scores')  
     #df.head(15)
 
