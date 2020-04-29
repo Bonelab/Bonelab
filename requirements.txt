@@ -11,3 +11,7 @@ pydicom
 # Numerics
 numpy
 matplotlib
+
+# Data
+pandas
+xlrd

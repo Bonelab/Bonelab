@@ -26,7 +26,9 @@ cfg['REGRESSION_FILES'] = [
     'dicom',
     'test25a_uniaxial_solved.n88model',
     'test25a_uniaxial.n88model',
-    'COR_PD_3'
+    'COR_PD_3',
+    'bpaq_data.xlsx',
+    'bpaq_output.csv'
 ]
 
 cfg['REGRESSION_DATA_URL'] = "https://github.com/Bonelab/BonelabData/trunk/data/"

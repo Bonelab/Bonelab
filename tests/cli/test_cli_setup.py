@@ -71,5 +71,9 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
         '''Can run `blPseudoCT`'''
         self.runner('blPseudoCT')
 
+    def test_blBPAQ(self):
+        '''Can run `blBPAQ`'''
+        self.runner('blBPAQ')
+
 if __name__ == '__main__':
     unittest.main()
