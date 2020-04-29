@@ -358,7 +358,7 @@ Steven Boyd, April 24, 2020.
     # Setup argument parsing
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawTextHelpFormatter,
-        prog="blExtractFields",
+        prog="blBPAQ",
         description=description
     )
     parser.add_argument('ifile', help='Input Excel file of completed BPAQ instrument')
