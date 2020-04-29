@@ -265,8 +265,6 @@ def BPAQ(
     #df.to_excel(ofile+'.xlsx', index=True, sheet_name='BPAQ scores')  
     #df.head(15)
 
-    exit()
-
 def main():
     # Setup description
     description='''Compute bone-specific physical activity (BPAQ).
