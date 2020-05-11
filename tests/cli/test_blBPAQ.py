@@ -14,7 +14,10 @@ class TestblBPAQ(unittest.TestCase):
     '''Test blBPAQ'''
     filenames = [
         'bpaq_data.xlsx',
-        'bpaq_output.csv'
+        'bpaq_output.csv',
+        'bpaq_individual.txt',
+        'bpaq_individual_output.csv',
+        'bpaq_template_out.txt'
     ]
 
     def setUp(self):
@@ -35,16 +38,44 @@ class TestblBPAQ(unittest.TestCase):
         self.excel_file = os.path.join(self.test_dir, 'bpaq_data.xlsx')
         self.csv_file_expected = os.path.join(self.test_dir, 'bpaq_output.csv')
         self.csv_file_produced = os.path.join(self.test_dir, 'bpaq_output_produced.csv')
+        
+        self.individual_profile = os.path.join(self.test_dir, 'bpaq_individual.txt')
+        self.individual_csv_file_expected = os.path.join(self.test_dir, 'bpaq_individual_output.csv')
+        self.individual_csv_file_produced = os.path.join(self.test_dir, 'bpaq_individual_output_produced.csv')
 
-        # Run
+        self.template = os.path.join(self.test_dir, 'bpaq_template.txt')
+        self.template_expected = os.path.join(self.test_dir, 'bpaq_template_out.txt')
+        self.template_produced = os.path.join(self.test_dir, 'bpaq_template.txt')
+
+        # Run 1
         self.args = {
-            'ifile':        self.excel_file,
-            'ofile':        self.csv_file_produced,
-            'show_table':   False,
-            'show_redcap':  False
+            'ifile':          self.excel_file,
+            'ofile':          self.csv_file_produced,
+            'show_table':     False,
+            'show_redcap':    False,
+            'print_template': False
         }
         BPAQ(**self.args)
 
+        # Run 2
+        self.args = {
+            'ifile':          self.individual_profile,
+            'ofile':          self.individual_csv_file_produced,
+            'show_table':     False,
+            'show_redcap':    False,
+            'print_template': False
+        }
+        BPAQ(**self.args)
+        
+        # Run 3
+        self.args = {
+            'ifile':          self.template,
+            'show_table':     False,
+            'show_redcap':    False,
+            'print_template': True
+        }
+        BPAQ(**self.args)
+        
     def tearDown(self):
         # Remove temporary directory and all files
         shutil.rmtree(self.test_dir)
@@ -61,10 +92,26 @@ class TestblBPAQ(unittest.TestCase):
         with open(self.csv_file_produced, 'r') as f:
             produced_contents = f.read()
 
-        # Check output is as expected
+        # Check output is as expected 1
         filecmp.clear_cache()
         self.assertTrue(
             filecmp.cmp(self.csv_file_expected, self.csv_file_produced, shallow=False),
+            '{o}Expected{o}"{}"{o}Received{o}"{}"{o}'.format(
+                expected_contents, produced_contents, o=os.linesep
+        ))
+
+        # Check output is as expected 2
+        filecmp.clear_cache()
+        self.assertTrue(
+            filecmp.cmp(self.individual_csv_file_expected, self.individual_csv_file_produced, shallow=False),
+            '{o}Expected{o}"{}"{o}Received{o}"{}"{o}'.format(
+                expected_contents, produced_contents, o=os.linesep
+        ))
+
+        # Check output is as expected 3
+        filecmp.clear_cache()
+        self.assertTrue(
+            filecmp.cmp(self.template_expected, self.template_produced, shallow=False),
             '{o}Expected{o}"{}"{o}Received{o}"{}"{o}'.format(
                 expected_contents, produced_contents, o=os.linesep
         ))
