@@ -3,6 +3,7 @@ import argparse
 import os
 import sys
 import time
+import math
 import vtk
 import vtkbone
 
@@ -15,40 +16,151 @@ def CheckExt(choices):
             ext = os.path.splitext(fname)[1][1:]
             if ext not in choices:
                 option_string = '({})'.format(option_string) if option_string else ''
-                parser.error("File ext must be {}{}".format(choices,option_string))
+                parser.error("File extension must be {}{}".format(choices,option_string))
             else:
                 setattr(namespace,self.dest,fname)
 
     return Act
 
-def CreateSTL(input_filename, output_filename, gaussian, radius, 
-              marching_cubes, decimation, visualize, overwrite):
+class Range(object):
+    def __init__(self, start, end):
+        self.start = start
+        self.end = end
+
+    def __eq__(self, other):
+        return self.start <= other <= self.end
+
+    def __contains__(self, item):
+        return self.__eq__(item)
+
+    def __iter__(self):
+        yield self
+
+    def __str__(self):
+        return '[{0},{1}]'.format(self.start, self.end)
+
+def printMatrix4x4(m):
+    print('[ {:8.4f}, {:8.4f}, {:8.4f}, {:8.4f} ]'.format(m.GetElement(0,0),m.GetElement(0,1),m.GetElement(0,2),m.GetElement(0,3)))
+    print('[ {:8.4f}, {:8.4f}, {:8.4f}, {:8.4f} ]'.format(m.GetElement(1,0),m.GetElement(1,1),m.GetElement(1,2),m.GetElement(1,3)))
+    print('[ {:8.4f}, {:8.4f}, {:8.4f}, {:8.4f} ]'.format(m.GetElement(2,0),m.GetElement(2,1),m.GetElement(2,2),m.GetElement(2,3)))
+    print('[ {:8.4f}, {:8.4f}, {:8.4f}, {:8.4f} ]'.format(m.GetElement(3,0),m.GetElement(3,1),m.GetElement(3,2),m.GetElement(3,3)))
+
+def keypress(obj, ev):
+    renderer = obj.GetRenderWindow().GetRenderers().GetFirstRenderer()
+    actorCollection = renderer.GetActors()
+    actorCollection.InitTraversal()
+    
+    key = obj.GetKeySym()
+    if key in 'h':
+      print('Press the \'u\' key to see the actor transform matrix.')
+    if key in 'u':
+      for index in range(actorCollection.GetNumberOfItems()):
+        nextActor = actorCollection.GetNextActor()
+        if (nextActor.GetPickable()==1):
+          printMatrix4x4(nextActor.GetMatrix())
+          #message('nextActor: {:.0f}'.format(index))
+
+def visualize_actors( pd1, pd2 ):
+
+  mapper = vtk.vtkDataSetMapper()
+  mapper.SetInputConnection( pd1 )
+
+  actor = vtk.vtkActor()
+  actor.SetMapper(mapper)
+  actor.GetProperty().SetColor(0.8900, 0.8100, 0.3400)
   
-  # Check if output exists and should overwrite
-  if os.path.isfile(output_filename) and not overwrite:
-    result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_filename))
+  renderWindow = vtk.vtkRenderWindow()
+  
+  renderer = vtk.vtkRenderer()
+  renderer.SetBackground(.4, .5, .7)
+
+  renderWindow.AddRenderer( renderer )
+  renderWindow.SetSize(2000,2000)
+
+  renderer.AddActor( actor )
+  
+  if pd2 is not None:
+    mapper2 = vtk.vtkDataSetMapper()
+    mapper2.SetInputConnection( pd2 )
+    actor2 = vtk.vtkActor()
+    actor2.SetMapper(mapper2)
+    actor2.PickableOff()
+    actor2.GetProperty().SetColor(0.9500, 0.9500, 0.9500)
+    renderer.AddActor( actor2 )
+  
+  renderer.ResetCamera()
+  renderer.GetActiveCamera().Azimuth(0.0)
+  renderer.GetActiveCamera().Elevation(0.0)
+  renderer.GetActiveCamera().Dolly(1.0)
+  renderer.ResetCameraClippingRange()
+
+  renderWindowInteractor = vtk.vtkRenderWindowInteractor()
+  renderWindowInteractor.SetRenderWindow( renderWindow )
+  renderWindow.Render()
+
+  message('Press the \'u\' key to see the actor transform matrix')
+  renderWindowInteractor.AddObserver(vtk.vtkCommand.KeyPressEvent, keypress, 1.0)
+  renderWindowInteractor.Initialize()
+  renderWindowInteractor.Start()
+  
+  return (actor.GetMatrix())
+
+def joinPolyData(pd1,pd2):
+  input1 = vtk.vtkPolyData()
+  input2 = vtk.vtkPolyData()
+  
+  input1.ShallowCopy( pd1 )
+  input2.ShallowCopy( pd2 )
+  
+  appendFilter = vtk.vtkAppendPolyData()
+  appendFilter.AddInputData( input1 )
+  appendFilter.AddInputData( input2 )
+  
+  cleanFilter = vtk.vtkCleanPolyData()
+  cleanFilter.SetInputConnection( appendFilter.GetOutputPort() )
+  cleanFilter.Update()
+  
+  return cleanFilter
+
+def write_stl(model,output_file,mat4x4):
+  
+  transform = vtk.vtkTransform()
+  transform.SetMatrix(mat4x4)
+
+  transformFilter = vtk.vtkTransformFilter()
+  transformFilter.SetInputConnection( model )
+  transformFilter.SetTransform( transform )
+  transformFilter.Update()
+  
+  writer = vtk.vtkSTLWriter()
+  writer.SetFileName(output_file)
+  writer.SetFileTypeToASCII()
+  writer.SetInputConnection( transformFilter.GetOutputPort() )
+  writer.Write()
+  message("Writing file " + output_file)
+
+def aim2stl(input_file, output_file, gaussian, radius, marching_cubes, decimation, visualize, overwrite, func):
+
+  if os.path.isfile(output_file) and not overwrite:
+    result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
     if result.lower() not in ['y', 'yes']:
       print('Not overwriting. Exiting...')
       os.sys.exit()
   
-  # Read input
-  if not os.path.isfile(input_filename):
-    os.sys.exit('[ERROR] Cannot find file \"{}\"'.format(input_filename))
-
-  message("Reading AIM file " + input_filename)
+  message("Reading AIM file " + input_file)
   reader = vtkbone.vtkboneAIMReader()
-  reader.SetFileName(input_filename)
+  reader.SetFileName(input_file)
   reader.DataOnCellsOff()
   reader.Update()
 
   image = reader.GetOutput()
-  message("Read %d points from AIM file." % image.GetNumberOfPoints())
+  message("Read %d points from AIM file" % image.GetNumberOfPoints())
   image_bounds = image.GetBounds()
   message("Image bounds:", (" %.4f"*6) % image_bounds)
   image_extent = image.GetExtent()
   message("Image extent:", (" %d"*6) % image_extent)
 
-  message("Gaussian smoothing.")
+  message("Gaussian smoothing")
   gauss = vtk.vtkImageGaussianSmooth()
   gauss.SetStandardDeviation(gaussian)
   gauss.SetRadiusFactor(radius)
@@ -56,7 +168,7 @@ def CreateSTL(input_filename, output_filename, gaussian, radius,
   gauss.Update()
   message("Total of %d voxels" % gauss.GetOutput().GetNumberOfCells())
   
-  log ("Padding the data.")
+  message("Padding the data")
   pad = vtk.vtkImageConstantPad()
   pad.SetConstant(0)
   pad.SetOutputWholeExtent(image_extent[0]-1,image_extent[1]+1,
@@ -66,79 +178,35 @@ def CreateSTL(input_filename, output_filename, gaussian, radius,
   pad.Update()
   message("Total of %d padded voxels" % pad.GetOutput().GetNumberOfCells())
 
-  message("Extracting isosurface.")
+  message("Extracting isosurface")
   mcube = vtk.vtkImageMarchingCubes()
+  mcube.ComputeScalarsOff()
+  mcube.ComputeNormalsOff()
   mcube.SetValue(0,marching_cubes)
   mcube.SetInputConnection(pad.GetOutputPort())
   mcube.Update()
   message("Generated %d triangles" % mcube.GetOutput().GetNumberOfCells())
-  #message(" mcube %s" % mcube.GetOutput())
   
-  if (decimation>0.0 and decimation<1.0):
-    message("Decimating the isosurface.")
+  if (decimation>0.0):
+    message("Decimating the isosurface. Targeting {:.1f}%".format(decimation*100.0))
     deci = vtk.vtkDecimatePro()
     deci.SetInputConnection(mcube.GetOutputPort())
-    deci.SetTargetReduction(decimation) # 0 to 1, 0 is no decimation.
+    deci.SetTargetReduction(decimation) # 0 is none, 1 is maximum decimation.
     deci.Update()
     message("Decimated to %d triangles" % deci.GetOutput().GetNumberOfCells())
-    mesh = deci.GetOutputPort()
+    mesh = deci
   else:
-    message("No decimation of the isosurface will be performed.")
-    mesh = mcube.GetOutputPort()
-      
+    message("No decimation of the isosurface")
+    mesh = mcube
+  
   if (visualize):
-    
-    ren = vtk.vtkRenderer()
-    renWin = vtk.vtkRenderWindow()
-    renWin.AddRenderer(ren)
-    renWin.SetSize(600,600)
-    renWin.SetWindowName("Bone Imaging Laboratory")
-    
-    iren = vtk.vtkRenderWindowInteractor()
-    iren.SetRenderWindow(renWin)
-    
-    mapper = vtk.vtkPolyDataMapper()
-    mapper.ScalarVisibilityOff()
-    mapper.SetInputConnection(mesh)
-    #mapper.SetInputConnection(mcube.GetOutputPort())
-    actor = vtk.vtkActor()
-    #actor.GetProperty().SetColor(.5,.5,.5)
-    actor.SetMapper(mapper)
-    
-    ren.AddActor(actor)
-    ren.SetBackground(.8,.8,.8)
-     
-    iren.Initialize()
-    renWin.Render()
-    iren.Start()
-
-  message("Writing STL file.")
-  writer = vtk.vtkSTLWriter()
-  writer.SetFileName(output_filename)
-  writer.SetFileTypeToBinary()
-  #writer.SetFileTypeToASCII()
-  writer.SetInputConnection(mesh)
-  #writer.SetInputConnection(mcube.GetOutputPort())
-  message("Writing mesh to " + output_filename)
-  writer.Write()
+    mat4x4 = visualize_actors( mesh.GetOutputPort(), None )
+  else:
+    mat4x4 = vtk.vtkMatrix4x4()
   
-  message("Done.")
-
-def aim2stl(input_file, output_file):
-
-  if os.path.isfile(output_file) and not overwrite:
-    result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
-    if result.lower() not in ['y', 'yes']:
-      print('Not overwriting. Exiting...')
-      os.sys.exit()
+  write_stl( mesh.GetOutputPort(), output_file, mat4x4 )
   
-  writer = vtk.vtkSTLWriter()
-  writer.SetFileName(output_file)
-  writer.SetFileTypeToASCII()
-  #writer.SetInputConnection( transformSignFilter.GetOutputPort() )
-  #writer.Write()
-  
-def stl2aim(input_file, output_file):
+def stl2aim(input_file, output_file, el_size_mm, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -146,13 +214,59 @@ def stl2aim(input_file, output_file):
       print('Not overwriting. Exiting...')
       os.sys.exit()
 
+  model = vtk.vtkSTLReader()
+  model.SetFileName(input_file)
+  model.Update()
+  
+  bounds = model.GetOutput().GetBounds()
+  dim = [1,1,1]
+  for i in range(3):
+    dim[i] = (math.ceil((bounds[i*2+1]-bounds[i*2]) / el_size_mm[i]))
+  origin = [1,1,1]
+  origin[0] = bounds[0] + el_size_mm[0] / 2
+  origin[1] = bounds[2] + el_size_mm[1] / 2
+  origin[2] = bounds[4] + el_size_mm[2] / 2
+  
+  whiteImage = vtk.vtkImageData()
+  whiteImage.SetSpacing(el_size_mm)
+  whiteImage.SetDimensions(dim)
+  whiteImage.SetExtent(0, dim[0] - 1, 0, dim[1] - 1, 0, dim[2] - 1)
+  whiteImage.SetOrigin(origin)
+  whiteImage.AllocateScalars(vtk.VTK_CHAR,1)
+  for i in range(whiteImage.GetNumberOfPoints()):
+    whiteImage.GetPointData().GetScalars().SetTuple1(i, 127)
+
+  pol2stenc = vtk.vtkPolyDataToImageStencil()
+  pol2stenc.SetInputData( model.GetOutput() )
+  pol2stenc.SetOutputOrigin( origin )
+  pol2stenc.SetOutputSpacing( el_size_mm )
+  pol2stenc.SetOutputWholeExtent( whiteImage.GetExtent() )
+  pol2stenc.Update()
+  
+  imgstenc = vtk.vtkImageStencil()
+  imgstenc.SetInputData(whiteImage)
+  imgstenc.SetStencilConnection( pol2stenc.GetOutputPort() )
+  imgstenc.ReverseStencilOff()
+  imgstenc.SetBackgroundValue(0)
+  imgstenc.Update()
+  
   writer = vtkbone.vtkboneAIMWriter()
+  writer.SetInputData( imgstenc.GetOutput() )
   writer.SetFileName(output_file)
-  #writer.SetInputData( imgstenc.GetOutput() )
-  #writer.SetProcessingLog(reader.GetProcessingLog())
-  #writer.Update()
+  writer.SetProcessingLog('!-------------------------------------------------------------------------------\n'+'Written by blRapidPrototype.')
+  writer.Update()
+
+  message("Writing file " + output_file)
+
+def view_stl(input_file, func):
+
+  model = vtk.vtkSTLReader()
+  model.SetFileName(input_file)
+  model.Update()
   
-def add_stl(input_file1, input_file2, output_file):
+  mat4x4 = visualize_actors( model.GetOutputPort(), None )
+  
+def add_stl(input_file1, input_file2, output_file, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -160,11 +274,30 @@ def add_stl(input_file1, input_file2, output_file):
       print('Not overwriting. Exiting...')
       os.sys.exit()
   
-  writer = vtk.vtkSTLWriter()
-  writer.SetFileName(output_file)
-  writer.SetFileTypeToASCII()
-  #writer.SetInputConnection( transformSignFilter.GetOutputPort() )
-  #writer.Write()
+  im1 = vtk.vtkSTLReader()
+  im1.SetFileName(input_file1)
+  im1.Update()
+  
+  im2 = vtk.vtkSTLReader()
+  im2.SetFileName(input_file2)
+  im2.Update()
+  
+  if (visualize):
+    mat4x4 = visualize_actors( im1.GetOutputPort(), im2.GetOutputPort() )
+  else:
+    mat4x4 = vtk.vtkMatrix4x4()
+
+  transform = vtk.vtkTransform()
+  transform.SetMatrix(mat4x4)
+  
+  transformFilter = vtk.vtkTransformFilter()
+  transformFilter.SetInputConnection( im1.GetOutputPort() )
+  transformFilter.SetTransform( transform )
+  transformFilter.Update()
+  
+  final_image = joinPolyData( transformFilter.GetOutput(), im2.GetOutput() )
+  
+  write_stl( final_image.GetOutputPort(), output_file, vtk.vtkMatrix4x4() )
   
 def subtract_stl(input_file1, input_file2, output_file):
 
@@ -179,8 +312,106 @@ def subtract_stl(input_file1, input_file2, output_file):
   writer.SetFileTypeToASCII()
   #writer.SetInputConnection( transformSignFilter.GetOutputPort() )
   #writer.Write()
+
+def create_sign(output_file, text, height, width, depth, nobacking, visualize, overwrite, func):
   
-def create_sphere(output_file, radius, phi, theta, phi_start, phi_end, theta_start, theta_end, center, overwrite, func):
+  if os.path.isfile(output_file) and not overwrite:
+    result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
+    if result.lower() not in ['y', 'yes']:
+      print('Not overwriting. Exiting...')
+      os.sys.exit()
+  
+  message("Create vector text.")
+  vecText = vtk.vtkVectorText()
+  vecText.SetText(text)
+    
+  message("Apply linear extrusion.")
+  extrude = vtk.vtkLinearExtrusionFilter()
+  extrude.SetInputConnection( vecText.GetOutputPort() )
+  extrude.SetExtrusionTypeToNormalExtrusion()
+  extrude.SetVector(0, 0, 1 )
+  extrude.SetScaleFactor (0.5)
+  
+  message("Apply triangle filter.")
+  triangleFilter = vtk.vtkTriangleFilter()
+  triangleFilter.SetInputConnection( extrude.GetOutputPort() )
+  triangleFilter.Update()
+  
+  i_width = triangleFilter.GetOutput().GetBounds()[1] - triangleFilter.GetOutput().GetBounds()[0]
+  i_height = triangleFilter.GetOutput().GetBounds()[3] - triangleFilter.GetOutput().GetBounds()[2]
+  i_depth = triangleFilter.GetOutput().GetBounds()[5] - triangleFilter.GetOutput().GetBounds()[4]
+  message('Input text:',
+          '{:8s} = {:8.2f} mm'.format('width',i_width),
+          '{:8s} = {:8.2f} mm'.format('height',i_height),
+          '{:8s} = {:8.2f} mm'.format('depth',i_depth))
+  
+  scale = 1
+  transform = vtk.vtkTransform()
+  if (width is not None and height is None):
+    message('Scaling to width of {:.2f} mm'.format(width))
+    scale_width = width/i_width
+    scale_height = scale_width
+  elif (width is None and height is not None):
+    message('Scaling to height of {:.2f} mm'.format(height))
+    scale_height = height/i_height
+    scale_width = scale_height
+  elif (width is not None and height is not None):
+    message('Scaling to height of {:.2f} mm and width of {:.2f} mm'.format(height,width),'Text may be distorted!')
+    scale_width = width/i_width
+    scale_height = height/i_height
+  else:
+    message('No scaling applied to text')
+    scale_width = 1
+    scale_height = 1
+    
+  if (depth is not None):
+    message('Setting depth to {:.2f} mm'.format(depth))
+    scale_depth = depth/i_depth
+    
+  transform.Scale(scale_width,scale_height,scale_depth)
+  
+  transformFilter = vtk.vtkTransformFilter()
+  transformFilter.SetInputConnection( triangleFilter.GetOutputPort() )
+  transformFilter.SetTransform( transform )
+  transformFilter.Update()
+
+  o_width = transformFilter.GetOutput().GetBounds()[1] - transformFilter.GetOutput().GetBounds()[0]
+  o_height = transformFilter.GetOutput().GetBounds()[3] - transformFilter.GetOutput().GetBounds()[2]
+  o_depth = transformFilter.GetOutput().GetBounds()[5] - transformFilter.GetOutput().GetBounds()[4]
+  o_center = transformFilter.GetOutput().GetCenter()
+  
+  message('Output text:',
+          '{:8s} = {:8.2f} mm'.format('width',o_width),
+          '{:8s} = {:8.2f} mm'.format('height',o_height),
+          '{:8s} = {:8.2f} mm'.format('depth',o_depth))
+  
+  if (not nobacking):
+    message('Create a backing for the text.')
+    cube = vtk.vtkCubeSource()
+    shift = o_depth/5.0
+    cube.SetBounds(
+      transformFilter.GetOutput().GetBounds()[0] - o_width * 0.05,
+      transformFilter.GetOutput().GetBounds()[1] + o_width * 0.05,
+      transformFilter.GetOutput().GetBounds()[2] - o_height * 0.1,
+      transformFilter.GetOutput().GetBounds()[3] + o_height * 0.1,
+      transformFilter.GetOutput().GetBounds()[4] - shift,
+      transformFilter.GetOutput().GetBounds()[5] - shift - o_depth * 0.65
+    )
+    cube.Update()
+    sign = joinPolyData( cube.GetOutput(), transformFilter.GetOutput() )
+  else:
+    sign = transformFilter
+  
+  if (visualize):
+    mat4x4 = visualize_actors( sign.GetOutputPort(), None )
+  else:
+    mat4x4 = vtk.vtkMatrix4x4()
+
+  write_stl( sign.GetOutputPort(), output_file, mat4x4 )
+  
+  return
+
+def create_sphere(output_file, radius, phi, theta, phi_start, phi_end, theta_start, theta_end, center, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -209,14 +440,14 @@ def create_sphere(output_file, radius, phi, theta, phi_start, phi_end, theta_sta
           '{:16s} = {:8d} degrees'.format('theta end',theta_end),
           '{:16s} = {:8.2f}, {:8.2f}, {:8.2f} mm'.format('center',center[0],center[1],center[2]))
   
-  writer = vtk.vtkSTLWriter()
-  writer.SetFileName(output_file)
-  writer.SetFileTypeToASCII()
-  writer.SetInputConnection( sphere.GetOutputPort() )
-  writer.Write()
-  message("Writing file " + output_file)
+  if (visualize):
+    mat4x4 = visualize_actors( sphere.GetOutputPort(), None )
+  else:
+    mat4x4 = vtk.vtkMatrix4x4()
+
+  write_stl( sphere.GetOutputPort(), output_file, mat4x4 )
   
-def create_cylinder(output_file, radius, height, resolution, capping, center, overwrite, func):
+def create_cylinder(output_file, radius, height, resolution, capping, center, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -237,15 +468,15 @@ def create_cylinder(output_file, radius, height, resolution, capping, center, ov
           '{:16s} = {:8d}'.format('resolution',resolution),
           '{:16s} = {:>8s}'.format('capping',('True' if capping else 'False')),
           '{:16s} = {:8.2f}, {:8.2f}, {:8.2f} mm'.format('center',center[0],center[1],center[2]))
-    
-  writer = vtk.vtkSTLWriter()
-  writer.SetFileName(output_file)
-  writer.SetFileTypeToASCII()
-  writer.SetInputConnection( cylinder.GetOutputPort() )
-  writer.Write()
-  message("Writing file " + output_file)
+
+  if (visualize):
+    mat4x4 = visualize_actors( cylinder.GetOutputPort(), None )
+  else:
+    mat4x4 = vtk.vtkMatrix4x4()
+
+  write_stl( cylinder.GetOutputPort(), output_file, mat4x4 )
   
-def create_cube(output_file, bounds, overwrite, func):
+def create_cube(output_file, bounds, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -267,11 +498,12 @@ def create_cube(output_file, bounds, overwrite, func):
           '{:16s} = {:8.2f} mm'.format('  Y',(bounds[3]-bounds[2])),
           '{:16s} = {:8.2f} mm'.format('  Z',(bounds[5]-bounds[4])))
   
-  writer = vtk.vtkSTLWriter()
-  writer.SetFileName(output_file)
-  writer.SetFileTypeToASCII()
-  writer.SetInputConnection( cube.GetOutputPort() )
-  writer.Write()
+  if (visualize):
+    mat4x4 = visualize_actors( cube.GetOutputPort(), None )
+  else:
+    mat4x4 = vtk.vtkMatrix4x4()
+
+  write_stl( cube.GetOutputPort(), output_file, mat4x4 )
   
 def main():
     # Setup description
@@ -284,20 +516,35 @@ opportunities for creating complex STL files from input AIMs as well
 as conversion back to an AIM format. 
 
 aim2stl         : takes a thresholded AIM file and applies isosurface for STL
-stl2aim         : takes an STL and converts to a thresholded AIM
-add_stl         : add two STL files together
-subtract_stl    : subtract one STL file from another
-create_sign     : make a sign with text
+stl2aim         : takes an STL model and converts to a thresholded AIM
 
+view_stl        : view an STL model
+add_stl         : add two STL models together
+subtract_stl    : subtract one STL model from another [NOT IMPLEMENTED]
+
+create_sign     : make a sign with text
 create_sphere   : make a sphere
 create_cylinder : make a cylinder
 create_cube     : make a cube
 
-Input AIM must be type 'char'. STL mesh properties can be controlled 
+Input AIM must be type 'char'. STL model mesh properties can be controlled 
 by setting gaussian smoothing and isosurface. The number of polygons
 can be reduced (decimation).
 
-For now only AIM files can be used as input.
+Visualization can be performed to view STL models. Some useful keys:
+
+ 'a' - actor mode (mouse, shift, control to manipulate) [REQUIRED]
+ 'c' - camera mode  (mouse, shift, control to manipulate)
+ 't' - trackball
+ 'j' - joystick
+ 'w' - wireframe
+ 's' - solid surface
+ 'u' – a user-defined function prints 4x4 transform.
+ 'p' – a user-defined function picks a point.
+ 'q' - quits
+ 
+When you quit from the visualization the model will be printed with the new 
+transform if you have applied one.
 '''
     epilog='''
 To see the options for each of the utilities, type something like this:
@@ -312,9 +559,56 @@ $ blRapidPrototype create_cube --help
     )
     subparsers = parser.add_subparsers()
     
+    # parser for aim2stl
+    parser_aim2stl = subparsers.add_parser('aim2stl')
+    parser_aim2stl.add_argument('input_file', action=CheckExt({'aim','AIM'}), help='Input AIM image file name')
+    parser_aim2stl.add_argument('output_file', action=CheckExt({'stl','STL'}), help='Output STL image file name')
+    parser_aim2stl.add_argument('--gaussian', type=float, default=0.7, metavar='GAUSS', help='Gaussian standard deviation (default: %(default)s)')
+    parser_aim2stl.add_argument('--radius', type=float, default=1.0, metavar='RADIUS', help='Gaussian radius support (default: %(default)s)')
+    parser_aim2stl.add_argument('--marching_cubes', type=float, default=50.0, metavar='MC', help='Marching cubes threshold (default: %(default)s)')
+    parser_aim2stl.add_argument('--decimation', type=float, default=0.0, metavar='DEC', choices=Range(0.0,1.0), help='Decimation is 0 (none) to 1 (max) (default: %(default)s)')
+    parser_aim2stl.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
+    parser_aim2stl.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
+    parser_aim2stl.set_defaults(func=aim2stl)
+    
+    # parser for stl2aim
+    parser_stl2aim = subparsers.add_parser('stl2aim')
+    parser_stl2aim.add_argument('input_file', action=CheckExt({'stl','STL'}), help='Input STL image file name')
+    parser_stl2aim.add_argument('output_file', action=CheckExt({'aim','AIM'}), help='Output AIM image file name')
+    parser_stl2aim.add_argument('--el_size_mm', type=float, nargs=3, default=[0.0607,0.0607,0.0607], metavar='0', help='Set element size (default: %(default)s)')
+    parser_stl2aim.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
+    parser_stl2aim.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
+    parser_stl2aim.set_defaults(func=stl2aim)
+    
+    # parser for view_stl
+    parser_view_stl = subparsers.add_parser('view_stl')
+    parser_view_stl.add_argument('input_file', action=CheckExt({'stl','STL'}), help='Input STL image file name')
+    parser_view_stl.set_defaults(func=view_stl)
+
+    # parser for add_stl
+    parser_add_stl = subparsers.add_parser('add_stl')
+    parser_add_stl.add_argument('input_file1', action=CheckExt({'stl','STL'}), help='Input STL image file name (edit position if necessary)')
+    parser_add_stl.add_argument('input_file2', action=CheckExt({'stl','STL'}), help='Input STL image file name')
+    parser_add_stl.add_argument('output_file', action=CheckExt({'stl','STL'}), help='Output STL image file name')
+    parser_add_stl.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
+    parser_add_stl.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
+    parser_add_stl.set_defaults(func=add_stl)
+    
+    # parser for create_sign
+    parser_create_sign = subparsers.add_parser('create_sign')
+    parser_create_sign.add_argument('output_file', action=CheckExt({'stl','STL'}), help='Output STL image file name')
+    parser_create_sign.add_argument('--text', default="Hello!", help='Letters for 3D rendering (default: %(default)s)')
+    parser_create_sign.add_argument('--width', type=float, help='Set width of text')
+    parser_create_sign.add_argument('--height', type=float, help='Set height of text')
+    parser_create_sign.add_argument('--depth', type=float, default=0.5, help='Set depth of text (default: %(default)s mm)')
+    parser_create_sign.add_argument('--nobacking', action='store_true', help='Suppress adding a backing to the text (default: %(default)s)')
+    parser_create_sign.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
+    parser_create_sign.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
+    parser_create_sign.set_defaults(func=create_sign)
+    
     # parser for create_sphere
     parser_create_sphere = subparsers.add_parser('create_sphere')
-    parser_create_sphere.add_argument('output_file', help='Output STL image file name')
+    parser_create_sphere.add_argument('output_file', action=CheckExt({'stl','STL'}), help='Output STL image file name')
     parser_create_sphere.add_argument('--radius', type=float, default=0.5, help='Sphere radius (default: %(default)s)')
     parser_create_sphere.add_argument('--phi', type=int, default=8, metavar='RES', help='Sphere phi_resolution (default: %(default)s)')
     parser_create_sphere.add_argument('--theta', type=int, default=8, metavar='RES', help='Sphere theta_resolution (default: %(default)s)')
@@ -323,6 +617,7 @@ $ blRapidPrototype create_cube --help
     parser_create_sphere.add_argument('--theta_start', type=int, default=0, choices=range(0,360), metavar='RES', help='Sphere theta start angle (default: %(default)s)')
     parser_create_sphere.add_argument('--theta_end', type=int, default=360, choices=range(0,360), metavar='RES', help='Sphere theta end angle (default: %(default)s)')
     parser_create_sphere.add_argument('--center', type=float, nargs=3, default=[0,0,0], metavar='0', help='Sphere center (default: %(default)s)')
+    parser_create_sphere.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
     parser_create_sphere.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
     parser_create_sphere.set_defaults(func=create_sphere)
         
@@ -334,26 +629,18 @@ $ blRapidPrototype create_cube --help
     parser_create_cylinder.add_argument('--resolution', type=int, default=6, metavar='RES', help='Cylinder resolution (default: %(default)s)')
     parser_create_cylinder.add_argument('--capping', action='store_false', help='Cylinder capping (default: %(default)s)')
     parser_create_cylinder.add_argument('--center', type=float, nargs=3, default=[0,0,0], metavar='0', help='Cylinder center (default: %(default)s)')
+    parser_create_cylinder.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
     parser_create_cylinder.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
     parser_create_cylinder.set_defaults(func=create_cylinder)
     
     # parser for create_cube
     parser_create_cube = subparsers.add_parser('create_cube')
-    parser_create_cube.add_argument('output_file', help='Output STL image file name')
+    parser_create_cube.add_argument('output_file', action=CheckExt({'stl','STL'}), help='Output STL image file name')
     parser_create_cube.add_argument('--bounds', type=float, nargs=6, default=[0,1,0,1,0,1], metavar='0', help='Cube bounds (default: %(default)s)')
+    parser_create_cube.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
     parser_create_cube.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
     parser_create_cube.set_defaults(func=create_cube)
     
-    
-    #parser.add_argument('input_filename', help='Input image file')
-    #parser.add_argument('output_filename', help='Output image file')
-    #parser.add_argument('-g', '--gaussian', type=float, default=0.7, help='Gaussian standard deviation (default: %(default)s)')
-    #parser.add_argument('-r', '--radius', type=float, default=1.0, help='Gaussian radius support (default: %(default)s)')
-    #parser.add_argument('-m', '--marching_cubes', type=float, default=50.0, help='Marching cubes threshold (default: %(default)s)')
-    #parser.add_argument('-d', '--decimation', type=float, default=0.85, help='Decimation 0 to 1. To skip set to 1 (default: %(default)s)')
-    #parser.add_argument('-v', '--visualize', action='store_false', help='Visualize the STL mesh (default: %(default)s)')
-    #parser.add_argument('-o', '--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
-
     # Parse and display
     args = parser.parse_args()
     print(echo_arguments('RapidPrototype', vars(args)))
