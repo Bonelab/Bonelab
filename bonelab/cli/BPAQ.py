@@ -347,13 +347,13 @@ def BPAQ(
     if (show_table):
         message("Show Table data.")
         print(df_table)
-        exit()
+        return
 
     if (print_template):
         message("Printing template for individual profile.")
         print_profile_template(ifile)
         message("Template printed:", ifile)
-        exit()
+        return
 
     # Get the redcap variables as lists
     redcap_base = df_table.index.tolist()
@@ -372,7 +372,7 @@ def BPAQ(
         message("Show REDCap variables.")
         for activity in redcap_base:
           print(activity)
-        exit()
+        return
     
     # Read input data
     if ifile.lower().endswith('.txt'):
@@ -396,7 +396,7 @@ def BPAQ(
     if 'age_enroll' not in df.columns:
         print('ERROR: Input data must include \'age_enroll\'')
         # print HELP
-        exit()
+        return
     
     # Initiate and calculate scores
     message("Calculating BPAQ scores.")
