@@ -46,19 +46,107 @@ def printMatrix4x4(m):
     print('[ {:8.4f}, {:8.4f}, {:8.4f}, {:8.4f} ]'.format(m.GetElement(3,0),m.GetElement(3,1),m.GetElement(3,2),m.GetElement(3,3)))
 
 def keypress(obj, ev):
-    renderer = obj.GetRenderWindow().GetRenderers().GetFirstRenderer()
+    interactor = obj
+    renderer = interactor.GetRenderWindow().GetRenderers().GetFirstRenderer()
     actorCollection = renderer.GetActors()
     actorCollection.InitTraversal()
     
     key = obj.GetKeySym()
+
     if key in 'h':
       print('Press the \'u\' key to see the actor transform matrix.')
+
     if key in 'u':
       for index in range(actorCollection.GetNumberOfItems()):
         nextActor = actorCollection.GetNextActor()
         if (nextActor.GetPickable()==1):
           printMatrix4x4(nextActor.GetMatrix())
-          #message('nextActor: {:.0f}'.format(index))
+
+    if key in 'p':
+      x, y = obj.GetEventPosition()
+
+      cellPicker = vtk.vtkCellPicker()
+      cellPicker.SetTolerance(0.0001)
+      cellPicker.Pick(x, y, 0, renderer)
+
+      points = cellPicker.GetPickedPositions()
+      numPoints = points.GetNumberOfPoints()
+      if numPoints < 1:
+        return()
+      i, j, k = points.GetPoint(0)
+      print('[{:8.4f} {:8.4f} {:8.4f}]'.format(i,j,k))
+      
+      # Get the size of the actor by measuring its diagonal
+      b = actorCollection.GetNextActor().GetBounds()
+      diag = math.sqrt((b[1]-b[0])*(b[1]-b[0]) + (b[3]-b[2])*(b[3]-b[2]) + (b[5]-b[4])*(b[5]-b[4]))
+      sphere_size = diag*0.005
+      
+      sphere = vtk.vtkSphereSource()
+      sphere.SetRadius(sphere_size)
+      sphere.SetThetaResolution(20)
+      sphere.SetPhiResolution(20)
+      sphere.SetCenter(i, j, k)
+      
+      mapper = vtk.vtkPolyDataMapper()
+      mapper.SetInputConnection(sphere.GetOutputPort())
+      
+      marker = vtk.vtkActor()
+      marker.SetMapper(mapper)
+      renderer.AddActor(marker)
+      marker.GetProperty().SetColor(1, 0, 0)
+      interactor.Render()
+      
+      # updates the dictionaries where the point coordinates are stored
+      if len(pointsDict.keys()) > 0:
+          pointNum = max(pointsDict.keys())
+      else:
+          pointNum = 0
+      
+      pointsDict.update({pointNum + 1:[i, j, k]})
+      actorDict.update({pointNum + 1:marker})
+      
+    if key in 'd':
+      x, y = interactor.GetEventPosition()
+      
+      cellPicker = vtk.vtkCellPicker()
+      cellPicker.SetTolerance(0.00001)
+      cellPicker.Pick(x, y, 0, renderer)
+      
+      points = cellPicker.GetPickedPositions()
+      numPoints = points.GetNumberOfPoints()
+      if numPoints < 1:
+        return()
+      i, j, k = points.GetPoint(0)
+      
+      for point, posn in pointsDict.items():
+        if round(i, 0) == round(posn[0], 0) or ( round(i, 0)-1 ) == round(posn[0], 0) or ( round(i, 0)+1 ) == round(posn[0], 0):
+          if round(j, 0) == round(posn[1], 0) or ( round(j, 0)-1 ) == round(posn[1], 0) or ( round(j, 0)+1 ) == round(posn[1], 0):
+                  
+            keyPoint = point
+                  
+            # remove the displayed sphere, and remove the point from the point dictionary
+            try:    
+                renderer.RemoveActor(actorDict[keyPoint])
+                interactor.Render()
+                
+                del pointsDict[keyPoint]
+                del actorDict[keyPoint]
+                
+                print("Deleted point #: ", keyPoint)
+                print("Number of points remaining: ", str(len(pointsDict.keys())) )
+                
+            except KeyError:
+                print("No point found at these coordinates")
+      
+    if key in 'o':
+      #result = input('Output filename \"{}\" as .txt filetype. \n'.format(output_dir))
+      #output_filename = str(output_dir) + str(result) + '.txt'
+      output_file = "tmp.txt"
+      
+      write_points(pointsDict.values(), output_filename, ',', precision)
+      
+            
+
 
 def visualize_actors( pd1, pd2 ):
 
@@ -504,7 +592,10 @@ def create_cube(output_file, bounds, visualize, overwrite, func):
     mat4x4 = vtk.vtkMatrix4x4()
 
   write_stl( cube.GetOutputPort(), output_file, mat4x4 )
-  
+
+pointsDict = {}
+actorDict = {}
+
 def main():
     # Setup description
     description='''
@@ -541,6 +632,8 @@ Visualization can be performed to view STL models. Some useful keys:
  's' - solid surface
  'u' – a user-defined function prints 4x4 transform.
  'p' – a user-defined function picks a point.
+ 'd' – a user-defined function deletes a point.
+ 'o' – a user-defined function outputs file of points.
  'q' - quits
  
 When you quit from the visualization the model will be printed with the new 
@@ -649,7 +742,6 @@ $ blRapidPrototype create_cube --help
     #print(args)
     args.func(**vars(args))
 
-    #CreateSTL(**vars(args))
-
+    print(pointsDict)
 if __name__ == '__main__':
     main()
