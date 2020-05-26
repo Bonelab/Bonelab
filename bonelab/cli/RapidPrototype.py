@@ -45,6 +45,9 @@ def printMatrix4x4(m):
     print('[ {:8.4f}, {:8.4f}, {:8.4f}, {:8.4f} ]'.format(m.GetElement(2,0),m.GetElement(2,1),m.GetElement(2,2),m.GetElement(2,3)))
     print('[ {:8.4f}, {:8.4f}, {:8.4f}, {:8.4f} ]'.format(m.GetElement(3,0),m.GetElement(3,1),m.GetElement(3,2),m.GetElement(3,3)))
 
+def diagonal(x, y, z):
+    return math.sqrt(math.pow(x,2)+math.pow(y,2)+math.pow(z,2))
+    
 def keypress(obj, ev):
     interactor = obj
     renderer = interactor.GetRenderWindow().GetRenderers().GetFirstRenderer()
@@ -74,12 +77,11 @@ def keypress(obj, ev):
       if numPoints < 1:
         return()
       i, j, k = points.GetPoint(0)
-      print('[{:8.4f} {:8.4f} {:8.4f}]'.format(i,j,k))
       
+
       # Get the size of the actor by measuring its diagonal
       b = actorCollection.GetNextActor().GetBounds()
-      diag = math.sqrt((b[1]-b[0])*(b[1]-b[0]) + (b[3]-b[2])*(b[3]-b[2]) + (b[5]-b[4])*(b[5]-b[4]))
-      sphere_size = diag*0.005
+      sphere_size = diagonal(b[1]-b[0],b[3]-b[2],b[5]-b[4]) * 0.005
       
       sphere = vtk.vtkSphereSource()
       sphere.SetRadius(sphere_size)
@@ -105,6 +107,9 @@ def keypress(obj, ev):
       pointsDict.update({pointNum + 1:[i, j, k]})
       actorDict.update({pointNum + 1:marker})
       
+      print_points_to_screen(pointsDict.values(),',',4)
+      
+      
     if key in 'd':
       x, y = interactor.GetEventPosition()
       
@@ -118,25 +123,28 @@ def keypress(obj, ev):
         return()
       i, j, k = points.GetPoint(0)
       
+      min_distance_to_point = 1e12
       for point, posn in pointsDict.items():
-        if round(i, 0) == round(posn[0], 0) or ( round(i, 0)-1 ) == round(posn[0], 0) or ( round(i, 0)+1 ) == round(posn[0], 0):
-          if round(j, 0) == round(posn[1], 0) or ( round(j, 0)-1 ) == round(posn[1], 0) or ( round(j, 0)+1 ) == round(posn[1], 0):
-                  
-            keyPoint = point
-                  
-            # remove the displayed sphere, and remove the point from the point dictionary
-            try:    
-                renderer.RemoveActor(actorDict[keyPoint])
-                interactor.Render()
-                
-                del pointsDict[keyPoint]
-                del actorDict[keyPoint]
-                
-                print("Deleted point #: ", keyPoint)
-                print("Number of points remaining: ", str(len(pointsDict.keys())) )
-                
-            except KeyError:
-                print("No point found at these coordinates")
+        distance_to_point = diagonal(posn[0]-i,posn[1]-j,posn[2]-k)
+        if (distance_to_point < min_distance_to_point):
+          min_distance_to_point = distance_to_point
+          keyPoint = point
+      
+      try:    
+         renderer.RemoveActor(actorDict[keyPoint])
+         interactor.Render()
+         
+         del pointsDict[keyPoint]
+         del actorDict[keyPoint]
+         
+         print("Deleted point #: ", keyPoint)
+         print("Number of points remaining: ", str(len(pointsDict.keys())) )
+         
+      except KeyError:
+         print("No point found at these coordinates")
+         
+      print_points_to_screen(pointsDict.values(),',',4)
+      
       
     if key in 'o':
       #result = input('Output filename \"{}\" as .txt filetype. \n'.format(output_dir))
@@ -153,8 +161,17 @@ def keypress(obj, ev):
               entry += os.linesep
               fp.write(entry)
       
+      message('Wrote output file ',output_file)
 
-
+def print_points_to_screen(points,delimiter,precision):
+  formatter = '{{:8.{}f}}'.format(precision)
+  print('|-------------------------')
+  for point in points:
+    entry = delimiter.join([formatter.format(float(x)) for x in point])
+    #entry += os.linesep
+    print(entry)
+  print('|-------------------------')
+  
 def visualize_actors( pd1, pd2 ):
 
   mapper = vtk.vtkDataSetMapper()
@@ -194,6 +211,9 @@ def visualize_actors( pd1, pd2 ):
   renderWindow.Render()
 
   message('Press the \'u\' key to see the actor transform matrix')
+  message('Press the \'p\' key to pick a point')
+  message('Press the \'d\' key to delete a point')
+  message('Press the \'o\' key to output points')
   renderWindowInteractor.AddObserver(vtk.vtkCommand.KeyPressEvent, keypress, 1.0)
   renderWindowInteractor.Initialize()
   renderWindowInteractor.Start()
