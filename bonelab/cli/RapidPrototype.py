@@ -141,11 +141,18 @@ def keypress(obj, ev):
     if key in 'o':
       #result = input('Output filename \"{}\" as .txt filetype. \n'.format(output_dir))
       #output_filename = str(output_dir) + str(result) + '.txt'
-      output_file = "tmp.txt"
+      output_file = "points.txt"
       
-      write_points(pointsDict.values(), output_filename, ',', precision)
+      precision = 4
+      delimiter=','
+      formatter = '{{:8.{}f}}'.format(precision)
       
-            
+      with open(output_file, 'w') as fp:
+          for point in pointsDict.values():
+              entry = delimiter.join([formatter.format(float(x)) for x in point])
+              entry += os.linesep
+              fp.write(entry)
+      
 
 
 def visualize_actors( pd1, pd2 ):
@@ -742,6 +749,5 @@ $ blRapidPrototype create_cube --help
     #print(args)
     args.func(**vars(args))
 
-    print(pointsDict)
 if __name__ == '__main__':
     main()
