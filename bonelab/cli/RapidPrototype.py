@@ -6,6 +6,7 @@ import time
 import math
 import vtk
 import vtkbone
+import numpy as np
 
 from bonelab.util.echo_arguments import echo_arguments
 from bonelab.util.time_stamp import message
@@ -40,13 +41,74 @@ class Range(object):
         return '[{0},{1}]'.format(self.start, self.end)
 
 def printMatrix4x4(m):
-    print('[ {:8.4f}, {:8.4f}, {:8.4f}, {:8.4f} ]'.format(m.GetElement(0,0),m.GetElement(0,1),m.GetElement(0,2),m.GetElement(0,3)))
-    print('[ {:8.4f}, {:8.4f}, {:8.4f}, {:8.4f} ]'.format(m.GetElement(1,0),m.GetElement(1,1),m.GetElement(1,2),m.GetElement(1,3)))
-    print('[ {:8.4f}, {:8.4f}, {:8.4f}, {:8.4f} ]'.format(m.GetElement(2,0),m.GetElement(2,1),m.GetElement(2,2),m.GetElement(2,3)))
-    print('[ {:8.4f}, {:8.4f}, {:8.4f}, {:8.4f} ]'.format(m.GetElement(3,0),m.GetElement(3,1),m.GetElement(3,2),m.GetElement(3,3)))
-
+    precision = 4
+    delimiter=','
+    formatter = '{{:8.{}f}}'.format(precision)
+        
+    for i in range(4):
+      row_data = delimiter.join([formatter.format(float(m.GetElement(i,j))) for j in range(4)])
+      print('[ '+row_data+' ]')
+        
 def diagonal(x, y, z):
     return math.sqrt(math.pow(x,2)+math.pow(y,2)+math.pow(z,2))
+
+def applyTransform(transform, polydata):
+    
+    if "None" in transform: # do nothing
+      return polydata
+    
+    try:    
+       mat4x4 = readTransform(transform)
+    except OSError:
+       print("ERROR: File could not be read: " + transform)
+       exit(0)
+    
+    message('User supplied transform applied')
+    printMatrix4x4(mat4x4)
+    
+    transform = vtk.vtkTransform()
+    transform.SetMatrix(mat4x4)
+
+    transformFilter = vtk.vtkTransformFilter()
+    transformFilter.SetInputConnection( polydata.GetOutputPort() )
+    transformFilter.SetTransform( transform )
+    transformFilter.Update()
+    
+    return transformFilter
+
+def readTransform(input_file):
+    
+    t_mat = np.loadtxt(fname=input_file, skiprows=2)
+    rotation = t_mat[:4, :4]
+    
+    matrix = vtk.vtkMatrix4x4()
+    for i in range(4):
+      for j in range(4):
+        matrix.SetElement(i,j,rotation[i,j])
+
+    return matrix
+
+def writeTransform(output_file,matrix,check_for_overwrite=True):
+  
+    if os.path.isfile(output_file) and check_for_overwrite:
+      result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
+      if result.lower() not in ['y', 'yes']:
+        print('Not overwriting. Exiting...')
+        printMatrix4x4(matrix)
+        os.sys.exit()
+    
+    precision = 7
+    delimiter=' '
+    formatter = '{{:14.{}e}}'.format(precision)
+    
+    with open(output_file, 'w') as fp:
+      fp.write('SCANCO TRANSFORMATION DATA VERSION:   10\n')
+      fp.write('R4_MAT:\n')
+      for i in range(4):
+        row_data = delimiter.join([formatter.format(float(matrix.GetElement(i,j))) for j in range(4)])
+        fp.write(row_data+'\n')
+    
+    return
     
 def keypress(obj, ev):
     interactor = obj
@@ -57,14 +119,21 @@ def keypress(obj, ev):
     key = obj.GetKeySym()
 
     if key in 'h':
-      print('Press the \'u\' key to see the actor transform matrix.')
+      print('Press the \'u\' key to output actor transform matrix')
+      print('Press the \'p\' key to pick a point')
+      print('Press the \'d\' key to delete a point')
+      print('Press the \'o\' key to output points')
+      print('Press the \'a\' key for actor control mode')
+      print('Press the \'c\' key for camera control mode')
+      print('Press the \'q\' key to quit')
 
     if key in 'u':
       for index in range(actorCollection.GetNumberOfItems()):
         nextActor = actorCollection.GetNextActor()
         if (nextActor.GetPickable()==1):
           printMatrix4x4(nextActor.GetMatrix())
-
+          writeTransform('transform.txt',nextActor.GetMatrix(),False)
+          
     if key in 'p':
       x, y = obj.GetEventPosition()
 
@@ -210,10 +279,7 @@ def visualize_actors( pd1, pd2 ):
   renderWindowInteractor.SetRenderWindow( renderWindow )
   renderWindow.Render()
 
-  message('Press the \'u\' key to see the actor transform matrix')
-  message('Press the \'p\' key to pick a point')
-  message('Press the \'d\' key to delete a point')
-  message('Press the \'o\' key to output points')
+  message('Press the \'h\' key to get help on keyboard options')
   renderWindowInteractor.AddObserver(vtk.vtkCommand.KeyPressEvent, keypress, 1.0)
   renderWindowInteractor.Initialize()
   renderWindowInteractor.Start()
@@ -254,7 +320,7 @@ def write_stl(model,output_file,mat4x4):
   writer.Write()
   message("Writing file " + output_file)
 
-def aim2stl(input_file, output_file, gaussian, radius, marching_cubes, decimation, visualize, overwrite, func):
+def aim2stl(input_file, output_file, transform_file, gaussian, radius, marching_cubes, decimation, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -314,6 +380,8 @@ def aim2stl(input_file, output_file, gaussian, radius, marching_cubes, decimatio
     message("No decimation of the isosurface")
     mesh = mcube
   
+  mesh = applyTransform(transform_file, mesh)
+  
   if (visualize):
     mat4x4 = visualize_actors( mesh.GetOutputPort(), None )
   else:
@@ -321,7 +389,7 @@ def aim2stl(input_file, output_file, gaussian, radius, marching_cubes, decimatio
   
   write_stl( mesh.GetOutputPort(), output_file, mat4x4 )
   
-def stl2aim(input_file, output_file, el_size_mm, visualize, overwrite, func):
+def stl2aim(input_file, output_file, transform_file, el_size_mm, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -333,7 +401,22 @@ def stl2aim(input_file, output_file, el_size_mm, visualize, overwrite, func):
   model.SetFileName(input_file)
   model.Update()
   
-  bounds = model.GetOutput().GetBounds()
+  model = applyTransform(transform_file, model)
+  
+  if (visualize):
+    mat4x4 = visualize_actors( model.GetOutputPort(), None )
+  else:
+    mat4x4 = vtk.vtkMatrix4x4()
+  
+  transform = vtk.vtkTransform()
+  transform.SetMatrix(mat4x4)
+
+  transformFilter = vtk.vtkTransformFilter()
+  transformFilter.SetInputConnection( model.GetOutputPort() )
+  transformFilter.SetTransform( transform )
+  transformFilter.Update()
+  
+  bounds = transformFilter.GetOutput().GetBounds()
   dim = [1,1,1]
   for i in range(3):
     dim[i] = (math.ceil((bounds[i*2+1]-bounds[i*2]) / el_size_mm[i]))
@@ -352,7 +435,7 @@ def stl2aim(input_file, output_file, el_size_mm, visualize, overwrite, func):
     whiteImage.GetPointData().GetScalars().SetTuple1(i, 127)
 
   pol2stenc = vtk.vtkPolyDataToImageStencil()
-  pol2stenc.SetInputData( model.GetOutput() )
+  pol2stenc.SetInputData( transformFilter.GetOutput() )
   pol2stenc.SetOutputOrigin( origin )
   pol2stenc.SetOutputSpacing( el_size_mm )
   pol2stenc.SetOutputWholeExtent( whiteImage.GetExtent() )
@@ -373,15 +456,17 @@ def stl2aim(input_file, output_file, el_size_mm, visualize, overwrite, func):
 
   message("Writing file " + output_file)
 
-def view_stl(input_file, func):
+def view_stl(input_file, transform_file, func):
 
   model = vtk.vtkSTLReader()
   model.SetFileName(input_file)
   model.Update()
   
+  model = applyTransform(transform_file, model)
+  
   mat4x4 = visualize_actors( model.GetOutputPort(), None )
   
-def add_stl(input_file1, input_file2, output_file, visualize, overwrite, func):
+def add_stl(input_file1, input_file2, output_file, transform_file, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -392,6 +477,8 @@ def add_stl(input_file1, input_file2, output_file, visualize, overwrite, func):
   im1 = vtk.vtkSTLReader()
   im1.SetFileName(input_file1)
   im1.Update()
+  
+  im1 = applyTransform(transform_file, im1)
   
   im2 = vtk.vtkSTLReader()
   im2.SetFileName(input_file2)
@@ -428,7 +515,7 @@ def subtract_stl(input_file1, input_file2, output_file):
   #writer.SetInputConnection( transformSignFilter.GetOutputPort() )
   #writer.Write()
 
-def create_sign(output_file, text, height, width, depth, nobacking, visualize, overwrite, func):
+def create_sign(output_file, transform_file, text, height, width, depth, nobacking, visualize, overwrite, func):
   
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -517,6 +604,8 @@ def create_sign(output_file, text, height, width, depth, nobacking, visualize, o
   else:
     sign = transformFilter
   
+  sign = applyTransform(transform_file, sign)
+  
   if (visualize):
     mat4x4 = visualize_actors( sign.GetOutputPort(), None )
   else:
@@ -526,7 +615,7 @@ def create_sign(output_file, text, height, width, depth, nobacking, visualize, o
   
   return
 
-def create_sphere(output_file, radius, phi, theta, phi_start, phi_end, theta_start, theta_end, center, visualize, overwrite, func):
+def create_sphere(output_file, transform_file, radius, phi, theta, phi_start, phi_end, theta_start, theta_end, center, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -544,6 +633,8 @@ def create_sphere(output_file, radius, phi, theta, phi_start, phi_end, theta_sta
   sphere.SetEndTheta( theta_end )
   sphere.SetCenter( center )
   sphere.Update()
+
+  sphere = applyTransform(transform_file, sphere)
   
   message('Sphere attributes:',
           '{:16s} = {:8.2f} mm'.format('radius',radius),
@@ -562,7 +653,7 @@ def create_sphere(output_file, radius, phi, theta, phi_start, phi_end, theta_sta
 
   write_stl( sphere.GetOutputPort(), output_file, mat4x4 )
   
-def create_cylinder(output_file, radius, height, resolution, capping, center, visualize, overwrite, func):
+def create_cylinder(output_file, transform_file, radius, height, resolution, capping, center, rotate, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -577,21 +668,34 @@ def create_cylinder(output_file, radius, height, resolution, capping, center, vi
   cylinder.SetCenter( center )
   cylinder.Update()
   
+  cylinder = applyTransform(transform_file, cylinder)
+  
+  transform = vtk.vtkTransform()
+  transform.RotateX(rotate[0])
+  transform.RotateY(rotate[1])
+  transform.RotateZ(rotate[2])
+  
+  transformFilter = vtk.vtkTransformFilter()
+  transformFilter.SetInputConnection( cylinder.GetOutputPort() )
+  transformFilter.SetTransform( transform )
+  transformFilter.Update()
+  
   message('Cylinder attributes:',
           '{:16s} = {:8.2f} mm'.format('radius',radius),
           '{:16s} = {:8.2f} mm'.format('height',height),
           '{:16s} = {:8d}'.format('resolution',resolution),
           '{:16s} = {:>8s}'.format('capping',('True' if capping else 'False')),
-          '{:16s} = {:8.2f}, {:8.2f}, {:8.2f} mm'.format('center',center[0],center[1],center[2]))
+          '{:16s} = {:8.2f}, {:8.2f}, {:8.2f} mm'.format('center',center[0],center[1],center[2]),
+          '{:16s} = {:8.2f}, {:8.2f}, {:8.2f} deg'.format('rotate',rotate[0],rotate[1],rotate[2]))
 
   if (visualize):
-    mat4x4 = visualize_actors( cylinder.GetOutputPort(), None )
+    mat4x4 = visualize_actors( transformFilter.GetOutputPort(), None )
   else:
     mat4x4 = vtk.vtkMatrix4x4()
 
-  write_stl( cylinder.GetOutputPort(), output_file, mat4x4 )
+  write_stl( transformFilter.GetOutputPort(), output_file, mat4x4 )
   
-def create_cube(output_file, bounds, visualize, overwrite, func):
+def create_cube(output_file, transform_file, bounds, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -602,6 +706,8 @@ def create_cube(output_file, bounds, visualize, overwrite, func):
   cube = vtk.vtkCubeSource()
   cube.SetBounds( bounds )
   cube.Update()
+  
+  cube = applyTransform(transform_file, cube)
   
   message('Cube attributes:',
           '{:16s}'.format('bounds'),
@@ -683,6 +789,7 @@ $ blRapidPrototype create_cube --help
     parser_aim2stl = subparsers.add_parser('aim2stl')
     parser_aim2stl.add_argument('input_file', action=CheckExt({'aim','AIM'}), help='Input AIM image file name')
     parser_aim2stl.add_argument('output_file', action=CheckExt({'stl','STL'}), help='Output STL image file name')
+    parser_aim2stl.add_argument('--transform_file', default="None", action=CheckExt({'txt','TXT'}), metavar='FILE', help='Apply a 4x4 transform from a file (default: %(default)s)')
     parser_aim2stl.add_argument('--gaussian', type=float, default=0.7, metavar='GAUSS', help='Gaussian standard deviation (default: %(default)s)')
     parser_aim2stl.add_argument('--radius', type=float, default=1.0, metavar='RADIUS', help='Gaussian radius support (default: %(default)s)')
     parser_aim2stl.add_argument('--marching_cubes', type=float, default=50.0, metavar='MC', help='Marching cubes threshold (default: %(default)s)')
@@ -695,6 +802,7 @@ $ blRapidPrototype create_cube --help
     parser_stl2aim = subparsers.add_parser('stl2aim')
     parser_stl2aim.add_argument('input_file', action=CheckExt({'stl','STL'}), help='Input STL image file name')
     parser_stl2aim.add_argument('output_file', action=CheckExt({'aim','AIM'}), help='Output AIM image file name')
+    parser_stl2aim.add_argument('--transform_file', default="None", action=CheckExt({'txt','TXT'}), metavar='FILE', help='Apply a 4x4 transform from a file (default: %(default)s)')
     parser_stl2aim.add_argument('--el_size_mm', type=float, nargs=3, default=[0.0607,0.0607,0.0607], metavar='0', help='Set element size (default: %(default)s)')
     parser_stl2aim.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
     parser_stl2aim.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
@@ -703,6 +811,7 @@ $ blRapidPrototype create_cube --help
     # parser for view_stl
     parser_view_stl = subparsers.add_parser('view_stl')
     parser_view_stl.add_argument('input_file', action=CheckExt({'stl','STL'}), help='Input STL image file name')
+    parser_view_stl.add_argument('--transform_file', default="None", action=CheckExt({'txt','TXT'}), metavar='FILE', help='Apply a 4x4 transform from a file (default: %(default)s)')
     parser_view_stl.set_defaults(func=view_stl)
 
     # parser for add_stl
@@ -710,6 +819,7 @@ $ blRapidPrototype create_cube --help
     parser_add_stl.add_argument('input_file1', action=CheckExt({'stl','STL'}), help='Input STL image file name (edit position if necessary)')
     parser_add_stl.add_argument('input_file2', action=CheckExt({'stl','STL'}), help='Input STL image file name')
     parser_add_stl.add_argument('output_file', action=CheckExt({'stl','STL'}), help='Output STL image file name')
+    parser_add_stl.add_argument('--transform_file', default="None", action=CheckExt({'txt','TXT'}), metavar='FILE', help='Apply a 4x4 transform from a file to input_file1 (default: %(default)s)')
     parser_add_stl.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
     parser_add_stl.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
     parser_add_stl.set_defaults(func=add_stl)
@@ -717,6 +827,7 @@ $ blRapidPrototype create_cube --help
     # parser for create_sign
     parser_create_sign = subparsers.add_parser('create_sign')
     parser_create_sign.add_argument('output_file', action=CheckExt({'stl','STL'}), help='Output STL image file name')
+    parser_create_sign.add_argument('--transform_file', default="None", action=CheckExt({'txt','TXT'}), metavar='FILE', help='Apply a 4x4 transform from a file (default: %(default)s)')
     parser_create_sign.add_argument('--text', default="Hello!", help='Letters for 3D rendering (default: %(default)s)')
     parser_create_sign.add_argument('--width', type=float, help='Set width of text')
     parser_create_sign.add_argument('--height', type=float, help='Set height of text')
@@ -729,6 +840,7 @@ $ blRapidPrototype create_cube --help
     # parser for create_sphere
     parser_create_sphere = subparsers.add_parser('create_sphere')
     parser_create_sphere.add_argument('output_file', action=CheckExt({'stl','STL'}), help='Output STL image file name')
+    parser_create_sphere.add_argument('--transform_file', default="None", action=CheckExt({'txt','TXT'}), metavar='FILE', help='Apply a 4x4 transform from a file (default: %(default)s)')
     parser_create_sphere.add_argument('--radius', type=float, default=0.5, help='Sphere radius (default: %(default)s)')
     parser_create_sphere.add_argument('--phi', type=int, default=8, metavar='RES', help='Sphere phi_resolution (default: %(default)s)')
     parser_create_sphere.add_argument('--theta', type=int, default=8, metavar='RES', help='Sphere theta_resolution (default: %(default)s)')
@@ -744,11 +856,13 @@ $ blRapidPrototype create_cube --help
     # parser for create_cylinder
     parser_create_cylinder = subparsers.add_parser('create_cylinder')
     parser_create_cylinder.add_argument('output_file', action=CheckExt({'stl','STL'}), help='Output STL image file name')
+    parser_create_cylinder.add_argument('--transform_file', default="None", action=CheckExt({'txt','TXT'}), metavar='FILE', help='Apply a 4x4 transform from a file (default: %(default)s)')
     parser_create_cylinder.add_argument('--radius', type=float, default=0.5, help='Cylinder radius (default: %(default)s)')
     parser_create_cylinder.add_argument('--height', type=float, default=1.0, help='Cylinder height (default: %(default)s)')
     parser_create_cylinder.add_argument('--resolution', type=int, default=6, metavar='RES', help='Cylinder resolution (default: %(default)s)')
     parser_create_cylinder.add_argument('--capping', action='store_false', help='Cylinder capping (default: %(default)s)')
     parser_create_cylinder.add_argument('--center', type=float, nargs=3, default=[0,0,0], metavar='0', help='Cylinder center (default: %(default)s)')
+    parser_create_cylinder.add_argument('--rotate', type=float, nargs=3, default=[0,0,0], metavar='0', help='Rotation angle about X, Y and Z axes (default: %(default)s)')
     parser_create_cylinder.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
     parser_create_cylinder.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
     parser_create_cylinder.set_defaults(func=create_cylinder)
@@ -756,7 +870,8 @@ $ blRapidPrototype create_cube --help
     # parser for create_cube
     parser_create_cube = subparsers.add_parser('create_cube')
     parser_create_cube.add_argument('output_file', action=CheckExt({'stl','STL'}), help='Output STL image file name')
-    parser_create_cube.add_argument('--bounds', type=float, nargs=6, default=[0,1,0,1,0,1], metavar='0', help='Cube bounds (default: %(default)s)')
+    parser_create_cube.add_argument('--transform_file', default="None", action=CheckExt({'txt','TXT'}), metavar='FILE', help='Apply a 4x4 transform from a file (default: %(default)s)')
+    parser_create_cube.add_argument('--bounds', type=float, nargs=6, default=[0,1,0,1,0,1], metavar='0', help='Cube bounds in units mm (default: %(default)s)')
     parser_create_cube.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
     parser_create_cube.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
     parser_create_cube.set_defaults(func=create_cube)
