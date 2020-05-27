@@ -132,6 +132,7 @@ def keypress(obj, ev):
         nextActor = actorCollection.GetNextActor()
         if (nextActor.GetPickable()==1):
           printMatrix4x4(nextActor.GetMatrix())
+          message('File written: transform.txt')
           writeTransform('transform.txt',nextActor.GetMatrix(),False)
           
     if key in 'p':
