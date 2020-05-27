@@ -670,14 +670,14 @@ def create_cylinder(output_file, transform_file, radius, height, resolution, cap
   
   cylinder = applyTransform(transform_file, cylinder)
   
-  transform = vtk.vtkTransform()
-  transform.RotateX(rotate[0])
-  transform.RotateY(rotate[1])
-  transform.RotateZ(rotate[2])
+  rotateTransform = vtk.vtkTransform()
+  rotateTransform.RotateX(rotate[0])
+  rotateTransform.RotateY(rotate[1])
+  rotateTransform.RotateZ(rotate[2])
   
   transformFilter = vtk.vtkTransformFilter()
   transformFilter.SetInputConnection( cylinder.GetOutputPort() )
-  transformFilter.SetTransform( transform )
+  transformFilter.SetTransform( rotateTransform )
   transformFilter.Update()
   
   message('Cylinder attributes:',
@@ -695,7 +695,7 @@ def create_cylinder(output_file, transform_file, radius, height, resolution, cap
 
   write_stl( transformFilter.GetOutputPort(), output_file, mat4x4 )
   
-def create_cube(output_file, transform_file, bounds, visualize, overwrite, func):
+def create_cube(output_file, transform_file, bounds, rotate, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -709,6 +709,16 @@ def create_cube(output_file, transform_file, bounds, visualize, overwrite, func)
   
   cube = applyTransform(transform_file, cube)
   
+  rotateTransform = vtk.vtkTransform()
+  rotateTransform.RotateX(rotate[0])
+  rotateTransform.RotateY(rotate[1])
+  rotateTransform.RotateZ(rotate[2])
+  
+  transformFilter = vtk.vtkTransformFilter()
+  transformFilter.SetInputConnection( cube.GetOutputPort() )
+  transformFilter.SetTransform( rotateTransform )
+  transformFilter.Update()
+  
   message('Cube attributes:',
           '{:16s}'.format('bounds'),
           '{:16s} = {:8.2f}, {:8.2f} mm'.format('  X  min, max',bounds[0],bounds[1]),
@@ -720,11 +730,11 @@ def create_cube(output_file, transform_file, bounds, visualize, overwrite, func)
           '{:16s} = {:8.2f} mm'.format('  Z',(bounds[5]-bounds[4])))
   
   if (visualize):
-    mat4x4 = visualize_actors( cube.GetOutputPort(), None )
+    mat4x4 = visualize_actors( transformFilter.GetOutputPort(), None )
   else:
     mat4x4 = vtk.vtkMatrix4x4()
 
-  write_stl( cube.GetOutputPort(), output_file, mat4x4 )
+  write_stl( transformFilter.GetOutputPort(), output_file, mat4x4 )
 
 pointsDict = {}
 actorDict = {}
@@ -872,6 +882,7 @@ $ blRapidPrototype create_cube --help
     parser_create_cube.add_argument('output_file', action=CheckExt({'stl','STL'}), help='Output STL image file name')
     parser_create_cube.add_argument('--transform_file', default="None", action=CheckExt({'txt','TXT'}), metavar='FILE', help='Apply a 4x4 transform from a file (default: %(default)s)')
     parser_create_cube.add_argument('--bounds', type=float, nargs=6, default=[0,1,0,1,0,1], metavar='0', help='Cube bounds in units mm (default: %(default)s)')
+    parser_create_cube.add_argument('--rotate', type=float, nargs=3, default=[0,0,0], metavar='0', help='Rotation angle about X, Y and Z axes (default: %(default)s)')
     parser_create_cube.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
     parser_create_cube.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
     parser_create_cube.set_defaults(func=create_cube)
