@@ -298,12 +298,21 @@ def joinPolyData(pd1,pd2):
   appendFilter.AddInputData( input1 )
   appendFilter.AddInputData( input2 )
   
+  return appendFilter
+
+def cleanPolyData(pd):
+  input = vtk.vtkPolyData()
+  input.ShallowCopy( pd )
+  
+  tri = vtk.vtkTriangleFilter()
+  tri.SetInputData( input )
+  
   cleanFilter = vtk.vtkCleanPolyData()
-  cleanFilter.SetInputConnection( appendFilter.GetOutputPort() )
+  cleanFilter.SetInputConnection( tri.GetOutputPort() )
   cleanFilter.Update()
   
   return cleanFilter
-
+    
 def write_stl(model,output_file,mat4x4):
   
   transform = vtk.vtkTransform()
@@ -479,14 +488,14 @@ def add_stl(input_file1, input_file2, output_file, transform_file, visualize, ov
   im1.SetFileName(input_file1)
   im1.Update()
   
-  im1 = applyTransform(transform_file, im1)
-  
   im2 = vtk.vtkSTLReader()
   im2.SetFileName(input_file2)
   im2.Update()
+
+  im2 = applyTransform(transform_file, im2)
   
   if (visualize):
-    mat4x4 = visualize_actors( im1.GetOutputPort(), im2.GetOutputPort() )
+    mat4x4 = visualize_actors( im2.GetOutputPort(), im1.GetOutputPort() )
   else:
     mat4x4 = vtk.vtkMatrix4x4()
 
@@ -494,15 +503,15 @@ def add_stl(input_file1, input_file2, output_file, transform_file, visualize, ov
   transform.SetMatrix(mat4x4)
   
   transformFilter = vtk.vtkTransformFilter()
-  transformFilter.SetInputConnection( im1.GetOutputPort() )
+  transformFilter.SetInputConnection( im2.GetOutputPort() )
   transformFilter.SetTransform( transform )
   transformFilter.Update()
   
-  final_image = joinPolyData( transformFilter.GetOutput(), im2.GetOutput() )
+  final_image = joinPolyData( transformFilter.GetOutput(), im1.GetOutput() )
   
   write_stl( final_image.GetOutputPort(), output_file, vtk.vtkMatrix4x4() )
   
-def subtract_stl(input_file1, input_file2, output_file):
+def boolean_stl(input_file1, input_file2, output_file, transform_file, operation, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -510,11 +519,46 @@ def subtract_stl(input_file1, input_file2, output_file):
       print('Not overwriting. Exiting...')
       os.sys.exit()
   
-  writer = vtk.vtkSTLWriter()
-  writer.SetFileName(output_file)
-  writer.SetFileTypeToASCII()
-  #writer.SetInputConnection( transformSignFilter.GetOutputPort() )
-  #writer.Write()
+  im1 = vtk.vtkSTLReader()
+  im1.SetFileName(input_file1)
+  im1.Update()
+  im1 = cleanPolyData( im1.GetOutput() )
+  
+  im2 = vtk.vtkSTLReader()
+  im2.SetFileName(input_file2)
+  im2.Update()
+  im2 = cleanPolyData( im2.GetOutput() )
+  
+  im2 = applyTransform(transform_file, im2)
+  
+  if (visualize):
+    mat4x4 = visualize_actors( im2.GetOutputPort(), im1.GetOutputPort() )
+  else:
+    mat4x4 = vtk.vtkMatrix4x4()
+
+  transform = vtk.vtkTransform()
+  transform.SetMatrix(mat4x4)
+  
+  transformFilter = vtk.vtkTransformFilter()
+  transformFilter.SetInputConnection( im2.GetOutputPort() )
+  transformFilter.SetTransform( transform )
+  transformFilter.Update()
+
+  booleanOperation = vtk.vtkBooleanOperationPolyDataFilter()
+  booleanOperation.SetInputData( 0, im1.GetOutput() )
+  booleanOperation.SetInputData( 1, transformFilter.GetOutput() )
+  if "union" in operation:
+    booleanOperation.SetOperationToUnion()
+  elif "intersection" in operation:
+    booleanOperation.SetOperationToIntersection()
+  elif "difference" in operation:
+    booleanOperation.SetOperationToDifference()
+  else:
+    message("ERROR: Invalid boolean operation.")
+    exit()
+  booleanOperation.Update()
+    
+  write_stl( booleanOperation.GetOutputPort(), output_file, vtk.vtkMatrix4x4() )
 
 def create_sign(output_file, transform_file, text, height, width, depth, nobacking, visualize, overwrite, func):
   
@@ -779,8 +823,8 @@ aim2stl         : takes a thresholded AIM file and applies isosurface for STL
 stl2aim         : takes an STL model and converts to a thresholded AIM
 
 view_stl        : view an STL model
-add_stl         : add two STL models together
-subtract_stl    : subtract one STL model from another [NOT IMPLEMENTED]
+boolean_stl     : join, intersect or difference of two STL models
+add_stl         : add two STL models (an alternative to 'join' boolean_stl)
 
 create_sign     : make a sign with text
 create_sphere   : make a sphere
@@ -852,13 +896,24 @@ $ blRapidPrototype create_cube --help
 
     # parser for add_stl
     parser_add_stl = subparsers.add_parser('add_stl')
-    parser_add_stl.add_argument('input_file1', action=CheckExt({'stl','STL'}), help='Input STL image file name (edit position if necessary)')
-    parser_add_stl.add_argument('input_file2', action=CheckExt({'stl','STL'}), help='Input STL image file name')
+    parser_add_stl.add_argument('input_file1', action=CheckExt({'stl','STL'}), help='Input STL image file name')
+    parser_add_stl.add_argument('input_file2', action=CheckExt({'stl','STL'}), help='Input STL image file name (allows transform)')
     parser_add_stl.add_argument('output_file', action=CheckExt({'stl','STL'}), help='Output STL image file name')
     parser_add_stl.add_argument('--transform_file', default="None", action=CheckExt({'txt','TXT'}), metavar='FILE', help='Apply a 4x4 transform from a file to input_file1 (default: %(default)s)')
     parser_add_stl.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
     parser_add_stl.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
     parser_add_stl.set_defaults(func=add_stl)
+    
+    # parser for boolean_stl
+    parser_boolean_stl = subparsers.add_parser('boolean_stl')
+    parser_boolean_stl.add_argument('input_file1', action=CheckExt({'stl','STL'}), help='Input STL image file name')
+    parser_boolean_stl.add_argument('input_file2', action=CheckExt({'stl','STL'}), help='Input STL image file name (allows transform)')
+    parser_boolean_stl.add_argument('output_file', action=CheckExt({'stl','STL'}), help='Output STL image file name')
+    parser_boolean_stl.add_argument('--operation', default="union", choices=['union', 'intersection', 'difference'], metavar='OP', help='Valid operations are union, intersection or difference (default: %(default)s)')
+    parser_boolean_stl.add_argument('--transform_file', default="None", action=CheckExt({'txt','TXT'}), metavar='FILE', help='Apply a 4x4 transform from a file to input_file1 (default: %(default)s)')
+    parser_boolean_stl.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
+    parser_boolean_stl.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
+    parser_boolean_stl.set_defaults(func=boolean_stl)
     
     # parser for create_sign
     parser_create_sign = subparsers.add_parser('create_sign')
