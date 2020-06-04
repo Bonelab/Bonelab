@@ -740,6 +740,31 @@ def create_cube(output_file, transform_file, bounds, rotate, visualize, overwrit
 pointsDict = {}
 actorDict = {}
 
+# Here are some other VTK Source objects that may be of interest:
+# vtkArcSource
+# vtkArrowSource
+# vtkBoundedPointSource
+# vtkButtonSource
+# vtkCapsuleSource
+# vtkConeSource
+# vtkDiskSource
+# vtkEarthSource
+# vtkEllipseArcSource
+# vtkFrustumSource
+# vtkLineSource
+# vtkOutlineSource
+# vtkParametricFunctionSource
+# vtkPlaneSource
+# vtkPlatonicSolidSource
+# vtkPointSource
+# vtkPolyPointSource
+# vtkRegularPolygonSource
+# vtkSectorSource
+# vtkSuperquadricSource
+# vtkTextSource
+# vtkVolumeOutlineSource
+
+
 def main():
     # Setup description
     description='''
