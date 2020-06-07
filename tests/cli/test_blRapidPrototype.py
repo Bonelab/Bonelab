@@ -14,7 +14,7 @@ from bonelab.cli.RapidPrototype import aim2stl
 from bonelab.cli.RapidPrototype import create_sign
 
 # I should add tests that check boolean_stl and add_stl, but ran out
-# of steam for now.
+# of steam for now. June 7, 2020
 
 class TestblRapidPrototype(unittest.TestCase):
     '''Test blRapidPrototype'''
