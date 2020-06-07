@@ -97,5 +97,13 @@ class TestCommandLineInterfaceRun(unittest.TestCase):
         self.runner(command)
         self.assertTrue(os.path.join(self.test_dir, 'test.aim'))
 
+    def test_blRapidPrototype(self):
+        '''Can run `blRapidPrototype`'''
+        aim = os.path.join(self.test_dir, 'test25a.aim')
+        stl = os.path.join(self.test_dir, 'test25a.stl')
+        command = ['blRapidPrototype', 'aim2stl', aim, stl]
+        self.runner(command)
+        self.assertTrue(os.path.isfile(stl), 'Cannot find file ' + stl)
+
 if __name__ == '__main__':
     unittest.main()

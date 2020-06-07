@@ -60,8 +60,7 @@ def applyTransform(transform, polydata):
     try:    
        mat4x4 = readTransform(transform)
     except OSError:
-       print("ERROR: File could not be read: " + transform)
-       exit(0)
+       raise SystemError('File could not be read: ' + transform)
     
     message('User supplied transform applied')
     printMatrix4x4(mat4x4)
@@ -554,8 +553,7 @@ def boolean_stl(input_file1, input_file2, output_file, transform_file, operation
   elif "difference" in operation:
     booleanOperation.SetOperationToDifference()
   else:
-    message("ERROR: Invalid boolean operation.")
-    exit()
+    raise ValueError('Invalid boolean operation: ' + operation)
   booleanOperation.Update()
     
   write_stl( booleanOperation.GetOutputPort(), output_file, vtk.vtkMatrix4x4() )
@@ -973,7 +971,6 @@ $ blRapidPrototype create_cube --help
     print(echo_arguments('RapidPrototype', vars(args)))
         
     # Run program
-    #print(args)
     args.func(**vars(args))
 
 if __name__ == '__main__':
