@@ -10,6 +10,9 @@
 #     pyqt                      5.12.3           py38hf180056_3    conda-forge
 #     vtk                       8.2.0           py38h19d254c_206    conda-forge
 #     python                    3.8.1                h5c2c468_1    conda-forge
+#   Try something like this:
+#     conda create -n bl -c numerics88 -c conda-forge python=3.8 n88tools pyqt=5 vtk=8
+#
 #   - Download QtDesigner to edit the .ui file
 #     https://build-system.fman.io/qt-designer-download
 #   - Some useful references:
