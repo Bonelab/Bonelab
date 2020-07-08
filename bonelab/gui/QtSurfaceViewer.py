@@ -27,6 +27,7 @@
 import os
 import math
 import vtk
+from bonelab.util.time_stamp import message
 from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 try:
     from PyQt5 import QtCore, QtGui, QtWidgets, uic
@@ -37,6 +38,8 @@ except ImportError:
         raise ImportError("Cannot load either PyQt5 or PySide2")
 
 Ui_MainWindow, QtBaseClass = uic.loadUiType("QtSurfaceViewer.ui")
+pointsDict = {}
+actorDict = {}
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, 
@@ -155,11 +158,45 @@ class VisualizationWindow(QtWidgets.QMainWindow):
         self.show()
         self.iren.Initialize()
 
-    def keypress(obj, ev, dummy):
-        print('---------------dummy is:\n',dummy)
-        print('---------------Object is:\n',obj)
-        interactor = obj.vtkWidget
-        print('---------------interactor is:\n',interactor)
+    def printMatrix4x4(self, m):
+        precision = 4
+        delimiter=','
+        formatter = '{{:8.{}f}}'.format(precision)
+            
+        for i in range(4):
+          row_data = delimiter.join([formatter.format(float(m.GetElement(i,j))) for j in range(4)])
+          print('[ '+row_data+' ]')
+
+    def printPoints(self,points,delimiter,precision):
+        formatter = '{{:8.{}f}}'.format(precision)
+        print('|-------------------------')
+        for point in points:
+          entry = delimiter.join([formatter.format(float(x)) for x in point])
+          #entry += os.linesep
+          print(entry)
+        print('|-------------------------')
+
+    def writeTransform(self,output_file,matrix,check_for_overwrite=True):
+        if os.path.isfile(output_file) and check_for_overwrite:
+          result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
+          if result.lower() not in ['y', 'yes']:
+            print('Not overwriting. Exiting...')
+            self.printMatrix4x4(matrix)
+            os.sys.exit()
+        
+        precision = 7
+        delimiter=' '
+        formatter = '{{:14.{}e}}'.format(precision)
+        
+        with open(output_file, 'w') as fp:
+          fp.write('SCANCO TRANSFORMATION DATA VERSION:   10\n')
+          fp.write('R4_MAT:\n')
+          for i in range(4):
+            row_data = delimiter.join([formatter.format(float(matrix.GetElement(i,j))) for j in range(4)])
+            fp.write(row_data+'\n')
+
+    def keypress(self, obj, event):
+        interactor = obj
         renderer = interactor.GetRenderWindow().GetRenderers().GetFirstRenderer()
         actorCollection = renderer.GetActors()
         actorCollection.InitTraversal()
@@ -174,7 +211,120 @@ class VisualizationWindow(QtWidgets.QMainWindow):
           print('Press the \'a\' key for actor control mode')
           print('Press the \'c\' key for camera control mode')
           print('Press the \'q\' key to quit')
+
+        if key in 'u':
+         for index in range(actorCollection.GetNumberOfItems()):
+           nextActor = actorCollection.GetNextActor()
+           if (nextActor.GetPickable()==1):
+             self.printMatrix4x4(nextActor.GetMatrix())
+             message('File written: transform.txt')
+             # output filename shouldn't be hard coded. Should use a file dialog.
+             self.writeTransform('transform.txt',nextActor.GetMatrix(),False)
+             
+        if key in 'p':
+          x, y = obj.GetEventPosition()
+      
+          cellPicker = vtk.vtkCellPicker()
+          cellPicker.SetTolerance(0.0001)
+          cellPicker.Pick(x, y, 0, renderer)
+      
+          points = cellPicker.GetPickedPositions()
+          numPoints = points.GetNumberOfPoints()
+          if numPoints < 1:
+            return()
+          i, j, k = points.GetPoint(0)
+          
+      
+          # Get the size of the actor by measuring its diagonal
+          b = actorCollection.GetNextActor().GetBounds()
+          sphere_size = math.sqrt(math.pow((b[1]-b[0]),2)+
+                                  math.pow((b[3]-b[2]),2)+
+                                  math.pow((b[5]-b[4]),2)) * 0.005
+          
+          sphere = vtk.vtkSphereSource()
+          sphere.SetRadius(sphere_size)
+          sphere.SetThetaResolution(20)
+          sphere.SetPhiResolution(20)
+          sphere.SetCenter(i, j, k)
+          
+          mapper = vtk.vtkPolyDataMapper()
+          mapper.SetInputConnection(sphere.GetOutputPort())
+          
+          marker = vtk.vtkActor()
+          marker.SetMapper(mapper)
+          renderer.AddActor(marker)
+          marker.GetProperty().SetColor(1, 0, 0)
+          marker.PickableOff()
+          interactor.Render()
+          
+          # updates the dictionaries where the point coordinates are stored
+          if len(pointsDict.keys()) > 0:
+              pointNum = max(pointsDict.keys())
+          else:
+              pointNum = 0
+          
+          pointsDict.update({pointNum + 1:[i, j, k]})
+          actorDict.update({pointNum + 1:marker})
+          
+          self.printPoints(pointsDict.values(),',',4)
     
+        if key in 'd':
+          x, y = interactor.GetEventPosition()
+          
+          cellPicker = vtk.vtkCellPicker()
+          cellPicker.SetTolerance(0.00001)
+          cellPicker.Pick(x, y, 0, renderer)
+          
+          points = cellPicker.GetPickedPositions()
+          numPoints = points.GetNumberOfPoints()
+          if numPoints < 1:
+            return()
+          i, j, k = points.GetPoint(0)
+          
+          min_distance_to_point = 1e12
+          keyPoint = -1
+          for point, posn in pointsDict.items():
+            distance_to_point = math.sqrt(math.pow((posn[0]-i),2)+
+                                          math.pow((posn[1]-j),2)+
+                                          math.pow((posn[2]-k),2))
+            
+            if (distance_to_point < min_distance_to_point):
+              min_distance_to_point = distance_to_point
+              keyPoint = point
+          
+          if (keyPoint != -1):
+            try:    
+               renderer.RemoveActor(actorDict[keyPoint])
+               interactor.Render()
+               
+               del pointsDict[keyPoint]
+               del actorDict[keyPoint]
+               
+               print("Deleted point #: ", keyPoint)
+               print("Number of points remaining: ", str(len(pointsDict.keys())) )
+               
+            except KeyError:
+               print("No point found at these coordinates")
+               
+            self.printPoints(pointsDict.values(),',',4)
+    
+        if key in 'o':
+          # This shouldn't be hard coded. It should use a file dialog
+          output_file = "points.txt"
+          
+          precision = 4
+          delimiter=','
+          formatter = '{{:8.{}f}}'.format(precision)
+          
+          with open(output_file, 'w') as fp:
+              for point in pointsDict.values():
+                  entry = delimiter.join([formatter.format(float(x)) for x in point])
+                  entry += os.linesep
+                  fp.write(entry)
+          
+          message('Wrote output file ',output_file)
+    
+        
     def setupImageProcessingPipeline(self):
         # Gaussian Smooth the image first
         # http://www.vtk.org/doc/nightly/html/classvtkImageGaussianSmooth.html
@@ -211,7 +361,7 @@ class VisualizationWindow(QtWidgets.QMainWindow):
     def loadButtonClicked(self):
         reply = QtWidgets.QMessageBox.question(self, 'Message',
             "Are you loading a file? The alternative is a directory",
-            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.Yes)
 
         if reply == QtWidgets.QMessageBox.Yes:
             # Ask use for input file
