@@ -21,7 +21,10 @@ Install
 .. code-block:: bash
 
     # Clone the repository onto your computer and change into the directory.
+    # ... with SSH authentication
     git clone git@github.com:Bonelab/Bonelab.git
+    # ... or straight HTML
+    git clone https://github.com/Bonelab/Bonelab.git
 
     # It is recommended to use anaconda and install from the environment file
     conda env create -f environment.yml
