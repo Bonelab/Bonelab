@@ -18,6 +18,9 @@
 #   - Some useful references:
 #     http://www.vtk.org/Wiki/VTK/Examples/Python/Widgets/EmbedPyQt
 #     http://stackoverflow.com/questions/18897695/pyqt4-difference-between-qwidget-and-qmainwindow
+#
+#   - To convert a .ui file to .py do the following
+#     pyuic5 -x QtSurfaceViewer.ui -o widget.py
 #   - The save tiff button is not fully worked out.
 #
 # Usage:
@@ -52,12 +55,12 @@ class MainWindow(QtWidgets.QMainWindow):
     def initUI(self,min_size):
         self.setWindowTitle('Bone Imaging Laboratory - Surface Viewer')
         self.centralWidget = VisualizationWindow()
-        self.setCentralWidget(self.centralWidget)
+        #self.setCentralWidget(self.centralWidget) # If I uncomment this the GUI placement is messed up...
         
         self.setMinimumSize(QtCore.QSize(*min_size))
         
-        self.resize(1400, 1110)
-        self.center()
+        self.resize(1641, 1005)
+        self.center_on_screen()
         
         # Tool bar
         self.createToolBar()
@@ -77,7 +80,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.exitAction.triggered.connect(self.exitButtonClicked)
         self.saveAction.triggered.connect(self.saveButtonClicked)
                 
-    def center(self):
+    def center_on_screen(self):
         qr = self.frameGeometry()
         cp = QtWidgets.QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
@@ -166,8 +169,8 @@ class VisualizationWindow(QtWidgets.QMainWindow):
         for i in range(4):
           row_data = delimiter.join([formatter.format(float(m.GetElement(i,j))) for j in range(4)])
           print('[ '+row_data+' ]')
-
-    def printPoints(self,points,delimiter,precision):
+    
+    def print_points_to_screen(self,points,delimiter,precision):
         formatter = '{{:8.{}f}}'.format(precision)
         print('|-------------------------')
         for point in points:
@@ -266,7 +269,7 @@ class VisualizationWindow(QtWidgets.QMainWindow):
           pointsDict.update({pointNum + 1:[i, j, k]})
           actorDict.update({pointNum + 1:marker})
           
-          self.printPoints(pointsDict.values(),',',4)
+          self.print_points_to_screen(pointsDict.values(),',',4)
     
         if key in 'd':
           x, y = interactor.GetEventPosition()
@@ -282,31 +285,28 @@ class VisualizationWindow(QtWidgets.QMainWindow):
           i, j, k = points.GetPoint(0)
           
           min_distance_to_point = 1e12
-          keyPoint = -1
           for point, posn in pointsDict.items():
             distance_to_point = math.sqrt(math.pow((posn[0]-i),2)+
                                           math.pow((posn[1]-j),2)+
                                           math.pow((posn[2]-k),2))
-            
             if (distance_to_point < min_distance_to_point):
               min_distance_to_point = distance_to_point
               keyPoint = point
           
-          if (keyPoint != -1):
-            try:    
-               renderer.RemoveActor(actorDict[keyPoint])
-               interactor.Render()
-               
-               del pointsDict[keyPoint]
-               del actorDict[keyPoint]
-               
-               print("Deleted point #: ", keyPoint)
-               print("Number of points remaining: ", str(len(pointsDict.keys())) )
-               
-            except KeyError:
-               print("No point found at these coordinates")
-               
-            self.printPoints(pointsDict.values(),',',4)
+          try:    
+             renderer.RemoveActor(actorDict[keyPoint])
+             interactor.Render()
+             
+             del pointsDict[keyPoint]
+             del actorDict[keyPoint]
+             
+             print("Deleted point #: ", keyPoint)
+             print("Number of points remaining: ", str(len(pointsDict.keys())) )
+             
+          except KeyError:
+             print("No point found at these coordinates")
+             
+          self.print_points_to_screen(pointsDict.values(),',',4)
     
         if key in 'o':
           # This shouldn't be hard coded. It should use a file dialog
