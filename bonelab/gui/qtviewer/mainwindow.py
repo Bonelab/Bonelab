@@ -48,8 +48,8 @@ class MainWindow(qtw.QMainWindow):
     # Window setup
     self.resize(window_size[0],window_size[1])
     self.title = "Bone Imaging Laboratory – Viewer"
-    self.iconPath = os.path.join(os.getcwd(), "src")
-    self.iconPath = os.path.abspath(os.path.join(self.iconPath, "bonelab_logo.png"))
+    self.iconPath = os.path.join(os.getcwd(), "qtviewer")
+    self.iconPath = os.path.abspath(os.path.join(self.iconPath, "icon.png"))
 
     self.statusBar().showMessage("Welcome.",8000)
     
@@ -476,6 +476,7 @@ class MainWindow(qtw.QMainWindow):
     
     self.setWindowTitle(self.title)
     self.centreWindow()
+    print(self.iconPath)
     self.setWindowIcon(qtg.QIcon(self.iconPath))       
     
     self.cp = ColourPalette()
