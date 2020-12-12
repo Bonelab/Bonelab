@@ -382,7 +382,7 @@ def BPAQ(
 
     else:
         message("Reading excel input file:", ifile)
-        df = pd.read_excel(ifile)
+        df = pd.read_excel(ifile, engine="openpyxl")
         df.set_index('record_id',inplace=True) # Assign the record ID as the table index
         
     df.fillna(0,inplace=True) # Fill NANs with zeros
