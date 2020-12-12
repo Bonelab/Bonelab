@@ -28,6 +28,7 @@ from bonelab.gui.qtviewer.interactor import MyInteractorStyle
 from bonelab.gui.qtviewer.pipeline import Pipeline
 from bonelab.gui.qtviewer.colourpalette import ColourPalette
 from bonelab.gui.qtviewer.scancomatrixconverter import ScancoMatrixConverter
+from bonelab.gui.qtviewer.resources import *
 
 from PyQt5 import QtWidgets as qtw
 from PyQt5 import QtCore as qtc
@@ -449,6 +450,11 @@ class MainWindow(qtw.QMainWindow):
     self.log_window.setTextColor(qtg.QColor("blue"))
     self.log_window.setCurrentFont(font)
     
+    # Add logo -----------------------------------------------------------------------------------
+    logo = qtg.QPixmap(':/bonelab/icon.png')
+    self.logoLabel = qtw.QLabel("",self)
+    self.logoLabel.setPixmap(logo)
+    
     # Assemble the side control panel and put it in a QPanel widget ------------------------------
     self.panel = qtw.QVBoxLayout()
     self.panel.addWidget(self.in1_mainGroupBox)
@@ -456,6 +462,7 @@ class MainWindow(qtw.QMainWindow):
     self.panel.addWidget(self.cameraControlsGroupBox)
     self.panel.addWidget(self.transformPanelGroupBox)
     self.panel.addWidget(self.log_window)
+    self.panel.addWidget(self.logoLabel)
     self.panelWidget = qtw.QFrame()
     self.panelWidget.setLayout(self.panel)    
     
@@ -476,7 +483,7 @@ class MainWindow(qtw.QMainWindow):
     
     self.setWindowTitle(self.title)
     self.centreWindow()
-    print(self.iconPath)
+    #print(self.iconPath)
     self.setWindowIcon(qtg.QIcon(self.iconPath))       
     
     self.cp = ColourPalette()
