@@ -14,4 +14,4 @@ matplotlib
 
 # Data
 pandas
-xlrd
+openpyxl
