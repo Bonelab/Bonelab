@@ -114,7 +114,8 @@ class MainWindow(qtw.QMainWindow):
       decimals=1, 
       maximum=20.0, 
       minimum=0.1, 
-      singleStep=0.1
+      singleStep=0.1,
+      keyboardTracking=False
     )
     self.in1_radiusSpinBox = qtw.QSpinBox(
       self, 
@@ -122,15 +123,17 @@ class MainWindow(qtw.QMainWindow):
       value=2, 
       maximum=20, 
       minimum=1, 
-      singleStep=1
+      singleStep=1,
+      keyboardTracking=False
     )
     self.in1_isosurfaceSpinBox = qtw.QSpinBox(
       self, 
       objectName = "in1_isosurfaceSpinBox",
-      value=1, 
+      value=0, 
       maximum=32768, 
       minimum=0, 
-      singleStep=1
+      singleStep=1,
+      keyboardTracking=False
     )
     
     # Moving image (in2)    
@@ -166,7 +169,8 @@ class MainWindow(qtw.QMainWindow):
       decimals=1, 
       maximum=20.0, 
       minimum=0.1, 
-      singleStep=0.1
+      singleStep=0.1,
+      keyboardTracking=False
     ) 
     self.in2_radiusSpinBox = qtw.QSpinBox(
       self, 
@@ -174,15 +178,17 @@ class MainWindow(qtw.QMainWindow):
       value=2, 
       maximum=20, 
       minimum=1, 
-      singleStep=1
+      singleStep=1,
+      keyboardTracking=False
     )    
     self.in2_isosurfaceSpinBox = qtw.QSpinBox(
       self, 
       objectName = "in2_isosurfaceSpinBox",
-      value=1, 
+      value=0, 
       maximum=32768, 
       minimum=0, 
-      singleStep=1
+      singleStep=1,
+      keyboardTracking=False
     ) 
     
     # Camera controls
@@ -462,7 +468,7 @@ class MainWindow(qtw.QMainWindow):
     self.panel.addWidget(self.cameraControlsGroupBox)
     self.panel.addWidget(self.transformPanelGroupBox)
     self.panel.addWidget(self.log_window)
-    self.panel.addWidget(self.logoLabel)
+    self.panel.addWidget(self.logoLabel, alignment=qtc.Qt.AlignRight)
     self.panelWidget = qtw.QFrame()
     self.panelWidget.setLayout(self.panel)    
     
