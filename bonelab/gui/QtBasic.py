@@ -44,7 +44,7 @@ $ blQtBasic --window_size 1536 1024
   # Setup argument parsing
   parser = argparse.ArgumentParser(
       formatter_class=argparse.RawTextHelpFormatter,
-      prog="blQtViewer",
+      prog="blQtBasic",
       description=description,
       epilog=epilog
   )
