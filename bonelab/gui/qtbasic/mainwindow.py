@@ -59,10 +59,10 @@ class MainWindow(qtw.QMainWindow):
         qtw.QMessageBox.warning(self, "Error", "Invalid input file.")
         return
         
-      _,ext = os.path.splitext(input_file)
-      if not (self.validExtension(ext.lower())):
-        qtw.QMessageBox.warning(self, "Error", "Invalid file type.")
-        return
+      #_,ext = os.path.splitext(input_file)
+      #if not (self.validExtension(ext.lower())):
+      #  qtw.QMessageBox.warning(self, "Error", "Invalid file type.")
+      #  return
       
       self.createPipeline(input_file)
       self.statusBar().showMessage("Loading file " + input_file,4000)
@@ -221,23 +221,23 @@ class MainWindow(qtw.QMainWindow):
     self.iren.Initialize()
     self.iren.Start()
 
-  def refreshRenderWindow(self):
-    self.renWin.Render()
-    self.renderer.ResetCamera()
-    self.iren.Render()
-    
   def createPipeline(self, _filename):
     # Read in the file
     if _filename.lower().endswith('.nii'):
       self.reader = vtk.vtkNIFTIImageReader()
+      self.reader.SetFileName(_filename)
     elif _filename.lower().endswith('.nii.gz'):
       self.reader = vtk.vtkNIFTIImageReader()
+      self.reader.SetFileName(_filename)
     elif _filename.lower().endswith('.dcm'):
       self.reader = vtk.vtkDICOMImageReader()
-
+      self.reader.SetDirectoryName(os.path.dirname(_filename))
+    elif os.path.isdir(_filename):
+      self.reader = vtk.vtkDICOMImageReader()
+      self.reader.SetDirectoryName(_filename)
+      
     if self.reader is None:
         os.sys.exit("[ERROR] Cannot find reader for file \"{}\"".format(self.filename))
-    self.reader.SetFileName(_filename)
     self.reader.Update()
     
     # Gaussian smoothing
