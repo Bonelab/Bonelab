@@ -23,7 +23,7 @@ Install
     # Clone the repository onto your computer and change into the directory.
     # ... with SSH authentication
     git clone git@github.com:Bonelab/Bonelab.git
-    # ... or straight HTML
+    # ... or straight HTTPS
     git clone https://github.com/Bonelab/Bonelab.git
 
     # It is recommended to use anaconda and install from the environment file
