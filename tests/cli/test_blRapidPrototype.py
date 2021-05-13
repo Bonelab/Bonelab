@@ -10,7 +10,7 @@ from tests.config_cli import cfg
 from bonelab.cli.RapidPrototype import create_cube
 from bonelab.cli.RapidPrototype import create_cylinder
 from bonelab.cli.RapidPrototype import create_sphere
-from bonelab.cli.RapidPrototype import aim2stl
+from bonelab.cli.RapidPrototype import img2stl
 from bonelab.cli.RapidPrototype import create_sign
 
 # I should add tests that check boolean_stl and add_stl, but ran out
@@ -53,8 +53,8 @@ class TestblRapidPrototype(unittest.TestCase):
           create_cylinder(**args)
         elif type in "create_sphere":
           create_sphere(**args)
-        elif type in "aim2stl":
-          aim2stl(**args)
+        elif type in "img2stl":
+          img2stl(**args)
         elif type in "create_sign":
           create_sign(**args)
         else:
@@ -157,14 +157,14 @@ class TestblRapidPrototype(unittest.TestCase):
 
         self.runner(args, stl_file_expected, stl_file_produced, "create_sign")
 
-    def test_blRapidPrototype_aim2stl(self):
+    def test_blRapidPrototype_img2stl(self):
         '''`blRapidPrototype` creates an STL file from AIM'''
         aim = os.path.join(self.test_dir, 'test25a.aim')
         stl_file_expected = os.path.join(self.test_dir, 'test25a_expected.stl')
         stl_file_produced = os.path.join(self.test_dir, 'test25a.stl')
     
         args = {
-            'func':           aim2stl,
+            'func':           img2stl,
             'input_file':     aim,
             'output_file':    stl_file_produced,
             'transform_file': "None",
@@ -176,7 +176,7 @@ class TestblRapidPrototype(unittest.TestCase):
             'overwrite':      False
         }
     
-        self.runner(args, stl_file_expected, stl_file_produced, "aim2stl")
+        self.runner(args, stl_file_expected, stl_file_produced, "img2stl")
 
     #def test_blRapidPrototype_stl2aim(self):
     #    '''`blRapidPrototype` creates an AIM file from STL'''
