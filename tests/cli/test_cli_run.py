@@ -101,7 +101,7 @@ class TestCommandLineInterfaceRun(unittest.TestCase):
         '''Can run `blRapidPrototype`'''
         aim = os.path.join(self.test_dir, 'test25a.aim')
         stl = os.path.join(self.test_dir, 'test25a.stl')
-        command = ['blRapidPrototype', 'aim2stl', aim, stl]
+        command = ['blRapidPrototype', 'img2stl', aim, stl]
         self.runner(command)
         self.assertTrue(os.path.isfile(stl), 'Cannot find file ' + stl)
 
