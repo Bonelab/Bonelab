@@ -171,10 +171,10 @@ the description but some differences are bound to arise.
 '''
     )
     parser.add_argument('aim_file', help='Input aim')
-    parser.add_argument('-log', '-l', action='store_true', help='show processing log')
-    parser.add_argument('-stat', '-s', action='store_true', help='show statistics on data')
-    parser.add_argument('-verbose', '-v', action='store_true', help='show data values')
-    parser.add_argument('-meta', '-m', action='store_true', help='show basic scan meta data')
+    parser.add_argument('--log', '--l', action='store_true', help='show processing log')
+    parser.add_argument('--stat', '--s', action='store_true', help='show statistics on data')
+    parser.add_argument('--verbose', '--v', action='store_true', help='show data values')
+    parser.add_argument('--meta', '--m', action='store_true', help='show basic scan meta data')
 
     # Parse and display
     args = parser.parse_args()
