@@ -10,6 +10,7 @@ import numpy as np
 
 from bonelab.util.echo_arguments import echo_arguments
 from bonelab.util.time_stamp import message
+from bonelab.io.vtk_helpers import get_vtk_reader, get_vtk_writer, handle_filetype_writing_special_cases
 
 def CheckExt(choices):
     class Act(argparse.Action):
@@ -329,7 +330,7 @@ def write_stl(model,output_file,mat4x4):
   writer.Write()
   message("Writing file " + output_file)
 
-def aim2stl(input_file, output_file, transform_file, gaussian, radius, marching_cubes, decimation, visualize, overwrite, func):
+def img2stl(input_file, output_file, transform_file, gaussian, radius, marching_cubes, decimation, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -337,12 +338,18 @@ def aim2stl(input_file, output_file, transform_file, gaussian, radius, marching_
       print('Not overwriting. Exiting...')
       os.sys.exit()
   
-  message("Reading AIM file " + input_file)
-  reader = vtkbone.vtkboneAIMReader()
-  reader.SetFileName(input_file)
-  reader.DataOnCellsOff()
-  reader.Update()
+  # We don't use CheckExt to check valid extensions prior to calling this function because it can't handle the .nii.gz
+  # format. So, we rely on get_vtk_reader() to return a valid reader, and we check whether the file exists here. 
+  if not os.path.isfile(input_file):
+      os.sys.exit('[ERROR] Cannot find file \"{}\"'.format(input_file))
+  reader = get_vtk_reader(input_file)
+  if reader is None:
+      os.sys.exit('[ERROR] Cannot find reader for file \"{}\"'.format(input_file))
 
+  print('Reading input image ' + input_file)
+  reader.SetFileName(input_file)
+  reader.Update()
+  
   image = reader.GetOutput()
   message("Read %d points from AIM file" % image.GetNumberOfPoints())
   image_bounds = image.GetBounds()
@@ -398,7 +405,7 @@ def aim2stl(input_file, output_file, transform_file, gaussian, radius, marching_
   
   write_stl( mesh.GetOutputPort(), output_file, mat4x4 )
   
-def stl2aim(input_file, output_file, transform_file, el_size_mm, visualize, overwrite, func):
+def stl2img(input_file, output_file, transform_file, el_size_mm, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -457,13 +464,33 @@ def stl2aim(input_file, output_file, transform_file, el_size_mm, visualize, over
   imgstenc.SetBackgroundValue(0)
   imgstenc.Update()
   
-  writer = vtkbone.vtkboneAIMWriter()
-  writer.SetInputData( imgstenc.GetOutput() )
+  # We don't use CheckExt to check valid extensions prior to calling this function because it can't handle the .nii.gz
+  # format. So, we rely on get_vtk_writer() to return a valid writer. 
+  # Create writer
+  writer = get_vtk_writer(output_file)
+  if writer is None:
+      os.sys.exit('[ERROR] Cannot find writer for file \"{}\"'.format(output_file))
+  #writer.SetInputConnection(reader.GetOutputPort())
+  writer.SetInputData(imgstenc.GetOutput())
   writer.SetFileName(output_file)
-  writer.SetProcessingLog('!-------------------------------------------------------------------------------\n'+'Written by blRapidPrototype.')
-  writer.Update()
-
+  
+  # Setup processing log if writing an AIM file.
+  final_processing_log = '!-------------------------------------------------------------------------------\n'+'Written by blRapidPrototype.'
+  handle_filetype_writing_special_cases(
+      writer,
+      processing_log=final_processing_log
+  )
+  
   message("Writing file " + output_file)
+  writer.Update()
+  
+  #writer = vtkbone.vtkboneAIMWriter()
+  #writer.SetInputData( imgstenc.GetOutput() )
+  #writer.SetFileName(output_file)
+  #writer.SetProcessingLog('!-------------------------------------------------------------------------------\n'+'Written by blRapidPrototype.')
+  #writer.Update()
+
+  #message("Writing file " + output_file)
 
 def view_stl(input_file, transform_file, func):
 
@@ -811,14 +838,15 @@ def main():
     # Setup description
     description='''
 A general utility for creating STL files used for rapid prototyping from 
-AIMs and back again.
+AIMs or NIFTI and back again.
 
 This is a collection of utilities that together provide significant 
-opportunities for creating complex STL files from input AIMs as well
-as conversion back to an AIM format. 
+opportunities for creating complex STL files from input images such as 
+AIM or NIFTI and conversion back to image format.
 
-aim2stl         : takes a thresholded AIM file and applies isosurface for STL
-stl2aim         : takes an STL model and converts to a thresholded AIM
+(The following two functions were previously aim2stl and stl2aim)
+img2stl         : takes a thresholded AIM or NIFTI file and creates STL
+stl2img         : takes an STL model and converts to a thresholded AIM or NIFTI
 
 view_stl        : view an STL model
 boolean_stl     : join, intersect or difference of two STL models
@@ -863,28 +891,28 @@ $ blRapidPrototype create_cube --help
     )
     subparsers = parser.add_subparsers()
     
-    # parser for aim2stl
-    parser_aim2stl = subparsers.add_parser('aim2stl')
-    parser_aim2stl.add_argument('input_file', action=CheckExt({'aim','AIM'}), help='Input AIM image file name')
-    parser_aim2stl.add_argument('output_file', action=CheckExt({'stl','STL'}), help='Output STL image file name')
-    parser_aim2stl.add_argument('--transform_file', default="None", action=CheckExt({'txt','TXT'}), metavar='FILE', help='Apply a 4x4 transform from a file (default: %(default)s)')
-    parser_aim2stl.add_argument('--gaussian', type=float, default=0.7, metavar='GAUSS', help='Gaussian standard deviation (default: %(default)s)')
-    parser_aim2stl.add_argument('--radius', type=float, default=1.0, metavar='RADIUS', help='Gaussian radius support (default: %(default)s)')
-    parser_aim2stl.add_argument('--marching_cubes', type=float, default=50.0, metavar='MC', help='Marching cubes threshold (default: %(default)s)')
-    parser_aim2stl.add_argument('--decimation', type=float, default=0.0, metavar='DEC', choices=Range(0.0,1.0), help='Decimation is 0 (none) to 1 (max) (default: %(default)s)')
-    parser_aim2stl.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
-    parser_aim2stl.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
-    parser_aim2stl.set_defaults(func=aim2stl)
+    # parser for img2stl
+    parser_img2stl = subparsers.add_parser('img2stl')
+    parser_img2stl.add_argument('input_file', help='Input AIM/NIFTI image file name')
+    parser_img2stl.add_argument('output_file', action=CheckExt({'stl','STL'}), help='Output STL image file name')
+    parser_img2stl.add_argument('--transform_file', default="None", action=CheckExt({'txt','TXT'}), metavar='FILE', help='Apply a 4x4 transform from a file (default: %(default)s)')
+    parser_img2stl.add_argument('--gaussian', type=float, default=0.7, metavar='GAUSS', help='Gaussian standard deviation (default: %(default)s)')
+    parser_img2stl.add_argument('--radius', type=float, default=1.0, metavar='RADIUS', help='Gaussian radius support (default: %(default)s)')
+    parser_img2stl.add_argument('--marching_cubes', type=float, default=50.0, metavar='MC', help='Marching cubes threshold (default: %(default)s)')
+    parser_img2stl.add_argument('--decimation', type=float, default=0.0, metavar='DEC', choices=Range(0.0,1.0), help='Decimation is 0 (none) to 1 (max) (default: %(default)s)')
+    parser_img2stl.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
+    parser_img2stl.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
+    parser_img2stl.set_defaults(func=img2stl)
     
-    # parser for stl2aim
-    parser_stl2aim = subparsers.add_parser('stl2aim')
-    parser_stl2aim.add_argument('input_file', action=CheckExt({'stl','STL'}), help='Input STL image file name')
-    parser_stl2aim.add_argument('output_file', action=CheckExt({'aim','AIM'}), help='Output AIM image file name')
-    parser_stl2aim.add_argument('--transform_file', default="None", action=CheckExt({'txt','TXT'}), metavar='FILE', help='Apply a 4x4 transform from a file (default: %(default)s)')
-    parser_stl2aim.add_argument('--el_size_mm', type=float, nargs=3, default=[0.0607,0.0607,0.0607], metavar='0', help='Set element size (default: %(default)s)')
-    parser_stl2aim.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
-    parser_stl2aim.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
-    parser_stl2aim.set_defaults(func=stl2aim)
+    # parser for stl2img
+    parser_stl2img = subparsers.add_parser('stl2img')
+    parser_stl2img.add_argument('input_file', action=CheckExt({'stl','STL'}), help='Input STL image file name')
+    parser_stl2img.add_argument('output_file', help='Output AIM/NIFTI image file name')
+    parser_stl2img.add_argument('--transform_file', default="None", action=CheckExt({'txt','TXT'}), metavar='FILE', help='Apply a 4x4 transform from a file (default: %(default)s)')
+    parser_stl2img.add_argument('--el_size_mm', type=float, nargs=3, default=[0.0607,0.0607,0.0607], metavar='0', help='Set element size (default: %(default)s)')
+    parser_stl2img.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
+    parser_stl2img.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
+    parser_stl2img.set_defaults(func=stl2img)
     
     # parser for view_stl
     parser_view_stl = subparsers.add_parser('view_stl')
