@@ -7,7 +7,7 @@ from vtk.util.numpy_support import vtk_to_numpy
 import numpy as np
 import re
 
-def aix(aim_file, log, stat, verbose, meta):
+def aix(aim_file, log, stat, histo, verbose, meta):
     # Python 2/3 compatible input
     from six.moves import input
 
@@ -137,6 +137,22 @@ def aix(aim_file, log, stat, verbose, meta):
             print(formatter.format(measure, outcome, unit))
         print(guard)
 
+    # Print Histogram
+    if histo:
+        array = vtk_to_numpy(image.GetPointData().GetScalars()).ravel()
+        # https://numpy.org/doc/stable/reference/generated/numpy.histogram.html
+        nSpan = 128
+        nBuckets = 128
+        nWidth = 60
+        fill,bins = np.histogram(array,nBuckets,[0,127],None,None,True)
+        print('!>  {:4s} ({:.3s}) : {:s}'.format('IND','QTY','Size'))
+        for index in range(nBuckets):
+          normalized_scale = fill[index]*nSpan/nBuckets
+          nStars = int(normalized_scale*nWidth)
+          factor = nSpan/nBuckets
+          print('!> {:4d} ({:.3f}): {:s}'.format(index,normalized_scale,nStars*'*'))
+        print(guard)
+        
     # Print verbose
     if verbose:
         half_slice_size = image.GetDimensions()[0] * image.GetDimensions()[1] * 0.5
@@ -173,6 +189,7 @@ the description but some differences are bound to arise.
     parser.add_argument('aim_file', help='Input aim')
     parser.add_argument('--log', '--l', action='store_true', help='show processing log')
     parser.add_argument('--stat', '--s', action='store_true', help='show statistics on data')
+    parser.add_argument('--histo', action='store_true', help='show histogram of data')
     parser.add_argument('--verbose', '--v', action='store_true', help='show data values')
     parser.add_argument('--meta', '--m', action='store_true', help='show basic scan meta data')
 
