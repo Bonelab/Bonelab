@@ -168,6 +168,7 @@ class TestblRapidPrototype(unittest.TestCase):
             'input_file':     aim,
             'output_file':    stl_file_produced,
             'transform_file': "None",
+            'threshold':      False,
             'gaussian':       0.7,
             'radius':         1.0,
             'marching_cubes': 50.0,
