@@ -10,6 +10,7 @@ import numpy as np
 
 from bonelab.util.echo_arguments import echo_arguments
 from bonelab.util.time_stamp import message
+from vtk.util.numpy_support import vtk_to_numpy
 from bonelab.io.vtk_helpers import get_vtk_reader, get_vtk_writer, handle_filetype_writing_special_cases
 
 def CheckExt(choices):
@@ -52,6 +53,44 @@ def printMatrix4x4(m):
         
 def diagonal(x, y, z):
     return math.sqrt(math.pow(x,2)+math.pow(y,2)+math.pow(z,2))
+
+def histogram(image):
+    array = vtk_to_numpy(image.GetPointData().GetScalars()).ravel()
+    guard = '!-------------------------------------------------------------------------------'
+
+    if (array.min() < -128):
+      range_min = -32768
+    elif (array.min() < 0):
+      range_min = -128
+    else:
+      range_min = 0
+    
+    if (array.max() > 255):
+      range_max = 32767
+    elif (array.max() > 127):
+      range_max = 255
+    else:
+      range_max = 127
+
+    nRange = [range_min, range_max]
+    nBins = 128
+    
+    # https://numpy.org/doc/stable/reference/generated/numpy.histogram.html
+    hist,bin_edges = np.histogram(array,nBins,nRange,None,None,False)
+    nValues = sum(hist)
+
+    print(guard)
+    print('!>  {:4s} ({:.3s}) : Showing {:d} histogram bins over range of {:d} to {:d}.'.format('IND','QTY',nBins,*nRange))
+    for bin in range(nBins):
+      index = nRange[0] + int(bin * (nRange[1]-nRange[0])/(nBins-1))
+      count = hist[bin]/nValues # We normalize so total count = 1
+      nStars = int(count*100)
+      if (count>0 and nStars==0): # Ensures at least one * if the histogram bin is not zero
+        nStars = 1
+      if (nStars > 60):
+        nStars = 60 # just prevents it from wrapping in the terminal
+      print('!> {:4d} ({:.3f}): {:s}'.format(index,count,nStars*'*'))
+    print(guard)
 
 def applyTransform(transform, polydata):
     
@@ -330,7 +369,7 @@ def write_stl(model,output_file,mat4x4):
   writer.Write()
   message("Writing file " + output_file)
 
-def img2stl(input_file, output_file, transform_file, gaussian, radius, marching_cubes, decimation, visualize, overwrite, func):
+def img2stl(input_file, output_file, transform_file, threshold, gaussian, radius, marching_cubes, decimation, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -357,11 +396,29 @@ def img2stl(input_file, output_file, transform_file, gaussian, radius, marching_
   image_extent = image.GetExtent()
   message("Image extent:", (" %d"*6) % image_extent)
 
+  message("Histogram of input data:")
+  histogram(image)
+  
+  # Apply threshold if requested
+  if (threshold):
+    message("Thresholding")
+    thres = vtk.vtkImageThreshold()
+    thres.SetInValue(127)
+    thres.SetOutValue(0)
+    thres.SetInputConnection(reader.GetOutputPort())
+    thres.ThresholdByUpper(1) # Any values at or above 1 are in
+    thres.Update()
+    message("Histogram of thresholded data:")
+    histogram(thres.GetOutput())
+  
   message("Gaussian smoothing")
   gauss = vtk.vtkImageGaussianSmooth()
   gauss.SetStandardDeviation(gaussian)
   gauss.SetRadiusFactor(radius)
-  gauss.SetInputConnection(reader.GetOutputPort())
+  if (not threshold):
+    gauss.SetInputConnection(reader.GetOutputPort())
+  else:
+    gauss.SetInputConnection(thres.GetOutputPort())
   gauss.Update()
   message("Total of %d voxels" % gauss.GetOutput().GetNumberOfCells())
   
@@ -733,6 +790,7 @@ def create_cylinder(output_file, transform_file, radius, height, resolution, cap
 
   cylinder = vtk.vtkCylinderSource()
   cylinder.SetHeight( height )
+  cylinder.SetRadius( radius )
   cylinder.SetResolution( resolution )
   cylinder.SetCapping( capping )
   cylinder.SetCenter( center )
@@ -896,6 +954,7 @@ $ blRapidPrototype create_cube --help
     parser_img2stl.add_argument('input_file', help='Input AIM/NIFTI image file name')
     parser_img2stl.add_argument('output_file', action=CheckExt({'stl','STL'}), help='Output STL image file name')
     parser_img2stl.add_argument('--transform_file', default="None", action=CheckExt({'txt','TXT'}), metavar='FILE', help='Apply a 4x4 transform from a file (default: %(default)s)')
+    parser_img2stl.add_argument('--threshold', action='store_true', help='Set all image values to 127 (default: %(default)s)')
     parser_img2stl.add_argument('--gaussian', type=float, default=0.7, metavar='GAUSS', help='Gaussian standard deviation (default: %(default)s)')
     parser_img2stl.add_argument('--radius', type=float, default=1.0, metavar='RADIUS', help='Gaussian radius support (default: %(default)s)')
     parser_img2stl.add_argument('--marching_cubes', type=float, default=50.0, metavar='MC', help='Marching cubes threshold (default: %(default)s)')
