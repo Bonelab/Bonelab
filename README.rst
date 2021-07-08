@@ -33,7 +33,7 @@ Install
     conda create -n bl -c numerics88 -c simpleitk -c conda-forge python=3.7 n88tools pbr nose six simpleitk pydicom gdcm
 
     # ... or start fresh
-    conda create -n bl -c numerics88 python=3.7 n88tools pbr nose
+    conda create -n bl -c numerics88 -c conda-forge python=3.7 n88tools pbr nose
 
     # Activate the environemnt
     conda activate bl
