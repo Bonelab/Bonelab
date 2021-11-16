@@ -761,8 +761,12 @@ def create_sphere(output_file, transform_file, radius, phi, theta, phi_start, ph
   sphere.SetCenter( center )
   sphere.Update()
 
-  sphere = applyTransform(transform_file, sphere)
+  triangleFilter = vtk.vtkTriangleFilter()
+  triangleFilter.SetInputConnection( sphere.GetOutputPort() )
+  triangleFilter.Update()
   
+  triangleFilter = applyTransform(transform_file, triangleFilter)
+
   message('Sphere attributes:',
           '{:16s} = {:8.2f} mm'.format('radius',radius),
           '{:16s} = {:8d}'.format('phi resolution',phi),
@@ -774,11 +778,11 @@ def create_sphere(output_file, transform_file, radius, phi, theta, phi_start, ph
           '{:16s} = {:8.2f}, {:8.2f}, {:8.2f} mm'.format('center',center[0],center[1],center[2]))
   
   if (visualize):
-    mat4x4 = visualize_actors( sphere.GetOutputPort(), None )
+    mat4x4 = visualize_actors( triangleFilter.GetOutputPort(), None )
   else:
     mat4x4 = vtk.vtkMatrix4x4()
 
-  write_stl( sphere.GetOutputPort(), output_file, mat4x4 )
+  write_stl( triangleFilter.GetOutputPort(), output_file, mat4x4 )
   
 def create_cylinder(output_file, transform_file, radius, height, resolution, capping, center, rotate, visualize, overwrite, func):
 
@@ -796,7 +800,11 @@ def create_cylinder(output_file, transform_file, radius, height, resolution, cap
   cylinder.SetCenter( center )
   cylinder.Update()
   
-  cylinder = applyTransform(transform_file, cylinder)
+  triangleFilter = vtk.vtkTriangleFilter()
+  triangleFilter.SetInputConnection( cylinder.GetOutputPort() )
+  triangleFilter.Update()
+  
+  triangleFilter = applyTransform(transform_file, triangleFilter)
   
   rotateTransform = vtk.vtkTransform()
   rotateTransform.RotateX(rotate[0])
@@ -804,7 +812,7 @@ def create_cylinder(output_file, transform_file, radius, height, resolution, cap
   rotateTransform.RotateZ(rotate[2])
   
   transformFilter = vtk.vtkTransformFilter()
-  transformFilter.SetInputConnection( cylinder.GetOutputPort() )
+  transformFilter.SetInputConnection( triangleFilter.GetOutputPort() )
   transformFilter.SetTransform( rotateTransform )
   transformFilter.Update()
   
@@ -822,7 +830,58 @@ def create_cylinder(output_file, transform_file, radius, height, resolution, cap
     mat4x4 = vtk.vtkMatrix4x4()
 
   write_stl( transformFilter.GetOutputPort(), output_file, mat4x4 )
+
+def create_tube(output_file, transform_file, inner_radius, outer_radius, height, resolution, rotate, visualize, overwrite, func):
+
+  if os.path.isfile(output_file) and not overwrite:
+    result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
+    if result.lower() not in ['y', 'yes']:
+      print('Not overwriting. Exiting...')
+      os.sys.exit()
+
+  disk = vtk.vtkDiskSource()
+  disk.SetInnerRadius( inner_radius )
+  disk.SetOuterRadius( outer_radius )
+  disk.SetRadialResolution( resolution )
+  disk.SetCircumferentialResolution( resolution )
+  disk.Update()
   
+  extrude = vtk.vtkLinearExtrusionFilter()
+  extrude.SetInputConnection( disk.GetOutputPort() )
+  extrude.SetExtrusionTypeToNormalExtrusion()
+  extrude.SetVector(0, 0, 1 )
+  extrude.SetScaleFactor( height )
+  
+  triangleFilter = vtk.vtkTriangleFilter()
+  triangleFilter.SetInputConnection( extrude.GetOutputPort() )
+  triangleFilter.Update()
+
+  triangleFilter = applyTransform(transform_file, triangleFilter)
+  
+  rotateTransform = vtk.vtkTransform()
+  rotateTransform.RotateX(rotate[0])
+  rotateTransform.RotateY(rotate[1])
+  rotateTransform.RotateZ(rotate[2])
+  
+  transformFilter = vtk.vtkTransformFilter()
+  transformFilter.SetInputConnection( triangleFilter.GetOutputPort() )
+  transformFilter.SetTransform( rotateTransform )
+  transformFilter.Update()
+  
+  message('Tube attributes:',
+          '{:16s} = {:8.2f} mm'.format('inner_radius',inner_radius),
+          '{:16s} = {:8.2f} mm'.format('outer_radius',outer_radius),
+          '{:16s} = {:8.2f} mm'.format('height',height),
+          '{:16s} = {:8d}'.format('resolution',resolution),
+          '{:16s} = {:8.2f}, {:8.2f}, {:8.2f} deg'.format('rotate',rotate[0],rotate[1],rotate[2]))
+
+  if (visualize):
+    mat4x4 = visualize_actors( transformFilter.GetOutputPort(), None )
+  else:
+    mat4x4 = vtk.vtkMatrix4x4()
+
+  write_stl( transformFilter.GetOutputPort(), output_file, mat4x4 )
+
 def create_cube(output_file, transform_file, bounds, rotate, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
@@ -835,7 +894,11 @@ def create_cube(output_file, transform_file, bounds, rotate, visualize, overwrit
   cube.SetBounds( bounds )
   cube.Update()
   
-  cube = applyTransform(transform_file, cube)
+  triangleFilter = vtk.vtkTriangleFilter()
+  triangleFilter.SetInputConnection( cube.GetOutputPort() )
+  triangleFilter.Update()
+
+  triangleFilter = applyTransform(transform_file, triangleFilter)
   
   rotateTransform = vtk.vtkTransform()
   rotateTransform.RotateX(rotate[0])
@@ -843,7 +906,7 @@ def create_cube(output_file, transform_file, bounds, rotate, visualize, overwrit
   rotateTransform.RotateZ(rotate[2])
   
   transformFilter = vtk.vtkTransformFilter()
-  transformFilter.SetInputConnection( cube.GetOutputPort() )
+  transformFilter.SetInputConnection( triangleFilter.GetOutputPort() )
   transformFilter.SetTransform( rotateTransform )
   transformFilter.Update()
   
@@ -907,12 +970,13 @@ img2stl         : takes a thresholded AIM or NIFTI file and creates STL
 stl2img         : takes an STL model and converts to a thresholded AIM or NIFTI
 
 view_stl        : view an STL model
-boolean_stl     : join, intersect or difference of two STL models
-add_stl         : add two STL models (an alternative to 'join' boolean_stl)
+boolean_stl     : union, intersect or difference of two STL models
+add_stl         : add two STL models (an alternative to 'union' boolean_stl)
 
 create_sign     : make a sign with text
 create_sphere   : make a sphere
 create_cylinder : make a cylinder
+create_tube     : make a tube
 create_cube     : make a cube
 
 Input AIM must be type 'char'. STL model mesh properties can be controlled 
@@ -1043,6 +1107,19 @@ $ blRapidPrototype create_cube --help
     parser_create_cylinder.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
     parser_create_cylinder.set_defaults(func=create_cylinder)
     
+    # parser for create_tube
+    parser_create_tube = subparsers.add_parser('create_tube')
+    parser_create_tube.add_argument('output_file', action=CheckExt({'stl','STL'}), help='Output STL image file name')
+    parser_create_tube.add_argument('--transform_file', default="None", action=CheckExt({'txt','TXT'}), metavar='FILE', help='Apply a 4x4 transform from a file (default: %(default)s)')
+    parser_create_tube.add_argument('--inner_radius', type=float, default=0.5, help='Inner radius (default: %(default)s)')
+    parser_create_tube.add_argument('--outer_radius', type=float, default=1.0, help='Outer radius (default: %(default)s)')
+    parser_create_tube.add_argument('--height', type=float, default=1.0, help='Tube height (default: %(default)s)')
+    parser_create_tube.add_argument('--resolution', type=int, default=6, metavar='RES', help='Tube resolution (default: %(default)s)')
+    parser_create_tube.add_argument('--rotate', type=float, nargs=3, default=[0,0,0], metavar='0', help='Rotation angle about X, Y and Z axes (default: %(default)s)')
+    parser_create_tube.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
+    parser_create_tube.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
+    parser_create_tube.set_defaults(func=create_tube)
+
     # parser for create_cube
     parser_create_cube = subparsers.add_parser('create_cube')
     parser_create_cube.add_argument('output_file', action=CheckExt({'stl','STL'}), help='Output STL image file name')

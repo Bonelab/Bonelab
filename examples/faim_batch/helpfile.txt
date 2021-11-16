@@ -1,0 +1,57 @@
+----------------------------------------------
+ACTIVATING FAIM
+----------------------------------------------
+
+cd /home/skboyd/example
+source activate faim-8.1
+
+----------------------------------------------
+GATHERING RESULTS
+----------------------------------------------
+
+n88tabulate -H -o results_example_03_NOV_2021.txt ./models/*_HOM_LS_analysis.txt
+n88tabulate -H -V "pis_fz_fail" -o results_pistoia_example_03_NOV_2021.txt ./models/*_HOM_LS_pistoia.txt
+
+----------------------------------------------
+GATHERING INFO FROM AIM FILES
+----------------------------------------------
+
+source ~/Numerics88/Faim\ 8.1/setenv
+cd /home/skboyd/example/models
+~/aix_info.sh *.AIM >> info.txt
+scp arc.ucalgary.ca:/home/skboyd/example/models/info.txt .
+
+----------------------------------------------
+MOVING FILES ONTO MY LAPTOP
+----------------------------------------------
+
+scp arc.ucalgary.ca:/home/skboyd/example/results*03_NOV_2021* .
+
+----------------------------------------------
+OPEN FILES WITH EXCEL ON MY LAPTOP
+----------------------------------------------
+
+open results_example_03_NOV_2021.txt -a /Applications/Microsoft\ Excel.app/Contents/MacOS/Microsoft\ Excel 
+open results_pistoia_example_03_NOV_2021.txt -a /Applications/Microsoft\ Excel.app/Contents/MacOS/Microsoft\ Excel 
+open info.txt -a /Applications/Microsoft\ Excel.app/Contents/MacOS/Microsoft\ Excel 
+
+----------------------------------------------
+SEARCHING FOR KEYWORDS WITHIN FILES.
+----------------------------------------------
+
+grep -r -l "error" TBONE.e*
+grep -r -l "Trace" TBONE.e*
+
+----------------------------------------------
+SLURM:
+----------------------------------------------
+
+squeue -u $USER
+squeue -u skboyd -t RUNNING
+squeue -u skboyd -t PENDING
+
+scontrol show job -dd <jobid>
+
+scancel <jobid>
+scancel -u $USER
+scancel -t PENDING -u $USER
