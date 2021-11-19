@@ -1,0 +1,6 @@
+record_id,redcap_event_name,bpaq_current_activity,bpaq_current_num_activity,bpaq_curr_res,bpaq_past_child_activity,bpaq_past_adult_activity,bpaq_past_res,bpaq_tot_res
+NORMXTII_0001,baseline_arm_1,1.69,3,0.563333,48.11,54.17,102.28,51.4217
+NORMXTII_0009,baseline_arm_1,7.658,5,1.5316,21.36,16.686,38.046,19.7888
+NORMXTII_0028,baseline_arm_1,0.594,2,0.297,142.115,28.516,170.631,85.464
+NORMXTII_0036,baseline_arm_1,1.36,2,0.68,6.3375,11.376,17.7135,9.19675
+NORMXTII_0037,baseline_arm_1,0,0,0,0,0,0,0

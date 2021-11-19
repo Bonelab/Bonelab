@@ -1,0 +1,12 @@
+MaterialDefinitions:
+    CorticalBone:
+        Type: LinearIsotropic
+        E: 8748
+        nu: 0.3
+    TrabecularBone:
+        Type: LinearIsotropic
+        E: 8748
+        nu: 0.3
+MaterialTable:
+    126: TrabecularBone
+    127: CorticalBone

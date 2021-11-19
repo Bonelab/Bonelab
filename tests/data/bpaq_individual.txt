@@ -1,0 +1,182 @@
+Parameter,                                                                           Sport/Activity,            past_year, before_15yrs,  after_15yrs
+redcap,                                                                                       units,            [per_wk],    [num_yrs],    [num_yrs]
+record_id,                                                                                     name,            JOHN_DOE,,
+age_enroll,                                                                                   years,            75.62,,
+bpaq_grp_ath,                                                                       ATHLETICS/TRACK,,,            
+bpaq_ath_jump,                                                                                Jumps,            0,            0,            0
+bpaq_ath_mid,                                                                       Middle Distance,            0,            0,            0
+bpaq_ath_throw,                                                                              Throws,            0,            0,            0
+bpaq_ath_hurd,                                                                      Sprints/Hurdles,            0,            0,            0
+bpaq_ath_junior,                                                            Junior/Little athletics,            0,            3,            2
+bpaq_grp_ball,                                                           BALL/STICK AND BALL SPORTS,,,            
+bpaq_ball_baseball,                                                                        Baseball,            0,            0,            0
+bpaq_ball_cric,                                                                             Cricket,            0,            0,            0
+bpaq_ball_f_hoc,                                                                       Field Hockey,            0,            0,            0
+bpaq_ball_golf_walk,                                                                 Golf (Walking),            0,            0,            0
+bpaq_ball_golf_car,                                                             Golf (electric car),            0,            0,            0
+bpaq_ball_ice_hoc,                                                                       Ice hockey,            0,            0,            0
+bpaq_ball_lacr,                                                                            Lacrosse,            0,            0,            0
+bpaq_ball_soft,                                                                            Softball,            0,            3,            2
+bpaq_ball_tball,                                                                             T-ball,            0,            0,            0
+bpaq_grp_bowl,                                                                              BOWLING,,,            
+bpaq_lawn_bowl,                                                                        Lawn bowling,            0,            0,            0
+bpaq_10pin,                                                                         Ten-pin bowling,            0,            0,            0
+bpaq_grp_climb,                                                                            CLIMBING,,,            
+bpaq_rock,                                                                       Rock/wall climbing,            0,            0,            0
+bpaq_gym_climb,                                                                  Gym based climbing,            0,            0,            0
+bpaq_boulder,                                                                            Bouldering,            0,            0,            0
+bpaq_grp_cycle,                                                                             CYCLING,,,            
+bpaq_cycle_rec,                                                     Recreational/transport purposes,            0,            0,           61
+bpaq_cycle_sprint,                                                                           Sprint,            0,            0,            0
+bpaq_cycle_end,                                                                           Endurance,            0,            0,            0
+bpaq_grp_dance,                                                                             DANCING,,,            
+bpaq_ballet,                                                                                 Ballet,            0,            0,            0
+bpaq_ballroom,                                                                             Ballroom,            0,            0,            0
+bpaq_cheer,                                                                            Cheerleading,            0,            0,            0
+bpaq_cont,                                                                             Contemporary,            0,            0,            0
+bpaq_high,                                                                                 Highland,            0,            0,            0
+bpaq_hiphop,                                                                                Hip Hop,            0,            0,            0
+bpaq_jazz,                                                                                     Jazz,            0,            0,            0
+bpaq_line,                                                              Line dancing/square dancing,            0,            0,            0
+bpaq_tap,                                                                                       Tap,            0,            0,            0
+bpaq_grp_football,                                                                         FOOTBALL,,,            
+bpaq_au_foot,                                                             Australian Rules Football,            0,            0,            0
+bpaq_flag_foot,                                                                       Flag football,            0,            0,            0
+bpaq_oz_tag,                                                                                 Oz Tag,            0,            0,            0
+bpaq_rugby,                                                                            Rugby League,            0,            0,            0
+bpaq_rugby_un,                                                                          Rugby Union,            0,            0,            0
+bpaq_soccer,                                                                                 Soccer,            0,            0,            0
+bpaq_foot,                                                                           Touch Football,            0,            0,            0
+bpaq_grp_gymnastics,                                                                     GYMNASTICS,,,            
+bpaq_acro,                                                                               Acrobatics,            0,            0,            0
+bpaq_art,                                                                     Gymnastics - Artistic,            0,            0,            0
+bpaq_dev,                                                                Gymnastics - Developmental,            0,            0,            0
+bpaq_rhyt,                                                                    Gymnastics - Rhythmic,            0,            0,            0
+bpaq_tramp,                                                                            Trampolining,            0,            0,            0
+bpaq_grp_gym,                                                                  GYM/EXERCISE WORKOUT,,,            
+bpaq_aero_high,                                                              Aerobics (high impact),            0,            0,            0
+bpaq_aero_low,                                                                Aerobics (low impact),            0,            0,            0
+bpaq_boot,                                                                                Boot Camp,            0,            0,            0
+bpaq_cross,                                                                               Cross-Fit,            0,            0,            0
+bpaq_elip,                                                                        Eliptical trainer,            0,            0,            0
+bpaq_high_train,                                                    High Intensity Personal Trainer,            0,            0,            0
+bpaq_pilates,                                                                               Pilates,            0,            0,            0
+bpaq_res_upp_low,                                  Resistance training - Heavy upper and lower body,            0,            0,            0
+bpaq_res_upp,                                                Resistance training - Heavy upper body,            0,            0,            0
+bpaq_res_low,                                                Resistance training - Heavy lower body,            0,            0,            0
+bpaq_res_light,                                                         Resistance training - Light,            7,            0,            1
+bpaq_res_body,                            Resistance training - Bodyweight (e.g. push ups/dips etc),            0,            0,            0
+bpaq_skip,                                                                                 Skipping,            0,            0,            0
+bpaq_spin,                                                                               Spin Class,            0,            0,            0
+bpaq_stair,                                                                             Stairmaster,            0,            0,            0
+bpaq_tread_run,                                                                 Treadmill - Running,            0,            0,            0
+bpaq_tread_walk,                                                                Treadmill - Walking,            0,            0,            0
+bpaq_yoga,                                                                                     Yoga,            7,            0,            1
+bpaq_zumba,                                                                                   Zumba,            0,            0,            0
+bpaq_grp_house,                                                                HOUSEHOLD ACTIVITIES,,,            
+bpaq_house,                            Heavy indoor housework (lifting furniture/carry buckets etc),            0,            0,            0
+bpaq_gard,                                                                          Heavy gardening,            0,            0,            0
+bpaq_grp_jump,                                                                              JUMPING,,,            
+bpaq_jumprope,                                                                   Jump-rope/skipping,            0,            0,            0
+bpaq_plyo,                                                                              Plyometrics,            0,            0,            0
+bpaq_grp_lifting,                                                                           LIFTING,,,            
+bpaq_power_lift,                                                                      Power Lifting,            0,            0,            0
+bpaq_res_heavy,                                                         Resistance training - heavy,            0,            0,            0
+bpaq_res_light1,                                                        Resistance training - light,            0,            0,            0
+bpaq_body_wt,                               Body weight exercises (e.g. push ups/chin ups/dips etc),            0,            0,            0
+bpaq_grp_ma,                                                                           MARTIAL ARTS,,,            
+bpaq_aikido,                                                                                 Aikido,            0,            0,            0
+bpaq_box,                                                                                    Boxing,            0,            0,            0
+bpaq_hapk,                                                                                  Hapkido,            0,            0,            0
+bpaq_judo,                                                                                     Judo,            0,            0,            0
+bpaq_karate,                                                                                 Karate,            0,            0,            0
+bpaq_kick,                                                                              Kick boxing,            0,            0,            0
+bpaq_kungfu,                                                                                Kung Fu,            0,            0,            0
+bpaq_taekwondo,                                                                         Tae Kwon Do,            0,            0,            0
+bpaq_taichi,                                                                                Tai Chi,            0,            0,            0
+bpaq_wrest,                                                                               Wrestling,            0,            0,            0
+bpaq_grp_occ_act,                                                             OCCUPATIONAL ACTIVITY,,,            
+bpaq_occ_light,        Light-moderate occupational activity (e.g. on feet for at least 5 hours/day),            0,            0,            0
+bpaq_occ_heavy,               Heavy occupational work (e.g. landscaping/constructions/chopping etc),            0,            0,            0
+bpaq_grp_rac_sport,                                                                   RACQUET SPORT,,,            
+bpaq_bad,                                                                                 Badminton,            0,            0,            0
+bpaq_ping,                                                                   Ping pong/table tennis,            0,            9,           25
+bpaq_rac_ball,                                                                         Racquet ball,            0,            0,            0
+bpaq_squash,                                                                                 Squash,            0,            0,            0
+bpaq_tennis,                                                                                 Tennis,            0,            0,            0
+bpaq_grp_riding,                                                                             RIDING,,,            
+bpaq_horse,                                                                            Horse Riding,            0,            0,           11
+bpaq_motor,                                                                             Motor Cross,            0,            0,            0
+bpaq_grp_run,                                                                       RUNNING/JOGGING,,,            
+bpaq_beach_spr,                                                                        Beach sprint,            0,            0,            0
+bpaq_cross_count,                                                                     Cross Country,            0,            0,            0
+bpaq_marat,                                                                  Long distance/marathon,            0,            0,            0
+bpaq_mid_dist,                                                                      Middle distance,            0,            0,            0
+bpaq_jog,                                                               RecreRecreational (jogging),            0,            0,           11
+bpaq_sprint,                                                                                 Sprint,            0,            0,            0
+bpaq_grp_skate,                                                                             SKATING,,,            
+bpaq_hock,                                                                               Ice hockey,            0,            0,           71
+bpaq_ice_skate,                                                          Ice skating (recreational),            0,           10,            0
+bpaq_fig_skate,                                                          Figure skating/ice dancing,            0,            0,            0
+bpaq_roll_blade,                                                                     Roller blading,            0,            0,            0
+bpaq_roll_derby,                                                                       Roller derby,            0,            0,            0
+bpaq_roll_skate,                                                                     Roller skating,            0,            0,            0
+bpaq_scoot,                                                                     Scootering (active),            0,            0,            0
+bpaq_skateboard,                                                                      Skateboarding,            0,            0,            0
+bpaq_grp_snow,                                                                          SNOW SPORTS,,,            
+bpaq_cross_ski,                                                       Cross-country skiing/Biathlon,            0,            0,           59
+bpaq_snowshoe,                                                                          Snowshoeing,            0,            0,            0
+bpaq_ski,                                                                                    Skiing,            0,            0,           59
+bpaq_sled,                                                                     Sledding/tobogganing,            0,            0,            0
+bpaq_snowboard,                                                                        Snowboarding,            0,            0,            0
+bpaq_grp_surf,                                                                              SURFING,,,            
+bpaq_kite_surf,                                                                        Kite surfing,            0,            0,            0
+bpaq_surf,                                                           Surfing (board) - recreational,            0,            0,            0
+bpaq_surf_comp,                                                       Surfing (board) - competitive,            0,            0,            0
+bpaq_windsurf,                                                                          Windsurfing,            0,            0,            0
+bpaq_grp_swim,                                                                  SWIMMING/POOL-BASED,,,            
+bpaq_dive,                                                                                   Diving,            0,            0,            0
+bpaq_swim_rec,                                                         Swimming (recreational/play),            0,           11,           72
+bpaq_swim_sprint,                                                     Swimming (sprint/competitive),            0,            0,            0
+bpaq_swim_lap,                                                             Swimming (training/laps),            0,            0,            0
+bpaq_scuba,                                                                                   Scuba,            0,            0,            0
+bpaq_snorkel,                                                                            Snorkeling,            0,            0,            0
+bpaq_syn_swim,                                                                Synchronised swimming,            0,            0,            0
+bpaq_water_aerob,                                                                    Water aerobics,            0,            0,            0
+bpaq_water_polo,                                                                         Water polo,            0,            0,            0
+bpaq_grp_throw,                                                          THROWING & CATCHING SPORTS,,,            
+bpaq_bball,                                                                              Basketball,            0,            0,            0
+bpaq_beachvol,                                                                     Beach volleyball,            0,            0,            0
+bpaq_handball,                                                             Handball (international),            0,            0,            0
+bpaq_netball,                                                                               Netball,            0,            0,            0
+bpaq_ult_fris,                                                                     Ultimate Frisbee,            0,            0,            0
+bpaq_volley,                                                                             Volleyball,            0,            3,            2
+bpaq_grp_tri,                                                                            TRIATHALON,,,            
+bpaq_tri_rec,                                                         Junior/recreational triathlon,            0,            0,            0
+bpaq_tri_comp,                                               Competitive triathlon (incl. training),            0,            0,            0
+bpaq_grp_walk,                                                                              WALKING,,,            
+bpaq_hike,                                                                                   Hiking,            0,            0,           71
+bpaq_walk,                                 Pedestrian/walking for leisure/walking to work or school,            2,            0,            0
+bpaq_mount,                                                             Mountaineering/orienteering,            0,            0,           43
+bpaq_pow_walk,                                                                        Power walking,            0,            0,            0
+bpaq_race_walk,                                                                        Race walking,            0,            0,            0
+bpaq_stair_cl,                                       Stair climbing (i.e. for exercise/competition),            0,            0,            0
+bpaq_grp_water_sport,                                                                  WATER SPORTS,,,            
+bpaq_body_board,                                                                      Body boarding,            0,            0,            0
+bpaq_canoe,                                                                                Canoeing,            0,            0,           15
+bpaq_dragon,                                                                            Dragon boat,            0,            0,            0
+bpaq_kayak,                                                                                Kayaking,            0,            0,           15
+bpaq_kite_surf1,                                                                       Kite surfing,            0,            0,            0
+bpaq_paddle,                                                                Paddle board (standing),            0,            0,            0
+bpaq_row,                                                                                    Rowing,            0,            0,            0
+bpaq_sail,                                                                                  Sailing,            0,            0,            0
+bpaq_skull,                                                                                Skulling,            0,            0,            0
+bpaq_surf1,                                                          Surfing (board) - recreational,            0,            0,            0
+bpaq_surf_comp1,                                                      Surfing (board) - competitive,            0,            0,            0
+bpaq_wake,                                                                            Wake boarding,            0,            0,            0
+bpaq_water_ski,                                                                        Water skiing,            0,            0,            0
+bpaq_windsurf1,                                                                         Windsurfing,            0,            0,            0
+bpaq_grp_other,                                                                               OTHER,,,            
+bpaq_low_imp,                                 Low impact (e.g. impact/intensity similar to walking),            0,            0,            0
+bpaq_mod_imp,                                        Moderate impact (e.g. jumping/running/cutting),            0,            0,            0
+bpaq_high_imp,                     High impact (e.g. near max aerobic intensity/max impact landing),            0,            0,            0

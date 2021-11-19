@@ -21,7 +21,14 @@ See running tests for more examples.
 cfg = {}
 
 cfg['REGRESSION_FILES'] = [
-     'test25a.aim'
+     'test25a.aim',
+    'test25a.nii',
+    'dicom',
+    'test25a_uniaxial_solved.n88model',
+    'test25a_uniaxial.n88model',
+    'COR_PD_3',
+    'bpaq_data.xlsx',
+    'bpaq_output.csv'
 ]
 
 cfg['REGRESSION_DATA_URL'] = "https://github.com/Bonelab/BonelabData/trunk/data/"

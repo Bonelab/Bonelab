@@ -5,7 +5,7 @@ import subprocess
 import shutil, tempfile
 import os
 
-from .config_cli import cfg
+from tests.config_cli import cfg
 
 
 class TestCommandLineInterfaceRun(unittest.TestCase):
@@ -17,7 +17,8 @@ class TestCommandLineInterfaceRun(unittest.TestCase):
     filenames = [
         'test25a.aim',
         'test25a.nii',
-        'dicom'
+        'dicom',
+        'test25a_uniaxial_solved.n88model'
     ]
 
     def runner(self, command, stdin=None):
@@ -65,6 +66,14 @@ class TestCommandLineInterfaceRun(unittest.TestCase):
         command = ['aix', os.path.join(self.test_dir, 'test25a.aim')]
         self.runner(command)
 
+    def test_blExtractFields(self):
+        '''Can run `blExtractFields`'''
+        n88 = os.path.join(self.test_dir, 'test25a_uniaxial_solved.n88model')
+        aim = os.path.join(self.test_dir, 'output.aim')
+        command = ['blExtractFields', n88, aim]
+        self.runner(command)
+        self.assertTrue(os.path.isfile(aim), 'Cannot find file ' + aim)
+
     def test_blImage2ImageSeries(self):
         '''Can run `blImage2ImageSeries`'''
         name = os.path.join(self.test_dir, 'test25a')
@@ -88,6 +97,13 @@ class TestCommandLineInterfaceRun(unittest.TestCase):
         self.runner(command)
         self.assertTrue(os.path.join(self.test_dir, 'test.aim'))
 
+    def test_blRapidPrototype(self):
+        '''Can run `blRapidPrototype`'''
+        aim = os.path.join(self.test_dir, 'test25a.aim')
+        stl = os.path.join(self.test_dir, 'test25a.stl')
+        command = ['blRapidPrototype', 'img2stl', aim, stl]
+        self.runner(command)
+        self.assertTrue(os.path.isfile(stl), 'Cannot find file ' + stl)
 
 if __name__ == '__main__':
     unittest.main()

@@ -5,8 +5,8 @@ Collection of scripts used in the `Bone Imaging Laboratory`_.
 |Build Status|_
 
 .. _Bone Imaging Laboratory: https://bonelab.ucalgary.ca/
-.. |Build Status| image:: https://dev.azure.com/babesler/Bone%20Imaging%20Laboratory/_apis/build/status/Bonelab.Bonelab?branchName=master
-.. _Build Status: https://dev.azure.com/babesler/Bone%20Imaging%20Laboratory/_build/latest?definitionId=12&branchName=master
+.. |Build Status| image:: https://github.com/Bonelab/Bonelab/actions/workflows/pyci.yml/badge.svg
+.. _Build Status: https://github.com/Bonelab/Bonelab/actions
 
 Guiding Principles
 ==================
@@ -21,13 +21,19 @@ Install
 .. code-block:: bash
 
     # Clone the repository onto your computer and change into the directory.
+    # ... with SSH authentication
     git clone git@github.com:Bonelab/Bonelab.git
+    # ... or straight HTTPS
+    git clone https://github.com/Bonelab/Bonelab.git
 
     # It is recommended to use anaconda and install from the environment file
     conda env create -f environment.yml
 
     # ... alternatively, you can setup the environment directly
-    conda create -n bl -c numerics88 -c simpleitk -c conda-forge python=3.7 n88tools pbr nose six simpleitk
+    conda create -n bl -c numerics88 -c simpleitk -c conda-forge python=3.7 n88tools pbr nose six simpleitk pydicom gdcm
+
+    # ... or start fresh
+    conda create -n bl -c numerics88 -c conda-forge python=3.7 n88tools pbr nose
 
     # Activate the environemnt
     conda activate bl

@@ -6,7 +6,12 @@ six
 # Image processing
 vtk
 simpleitk
+pydicom
 
 # Numerics
 numpy
 matplotlib
+
+# Data
+pandas
+openpyxl

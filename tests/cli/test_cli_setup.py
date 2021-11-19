@@ -3,7 +3,7 @@
 import unittest
 import subprocess
 
-from .config_cli import cfg
+from tests.config_cli import cfg
 
 class TestCommandLineInterfeceSetup(unittest.TestCase):
     '''Test command line interface setup
@@ -30,6 +30,10 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
     def test_blDownloadData(self):
         '''Can run `blDownloadData`'''
         self.runner('blDownloadData')
+
+    def test_blExtractFields(self):
+        '''Can run `blExtractFields`'''
+        self.runner('blExtractFields')
 
     def test_blImage2ImageSeries(self):
         '''Can run `blImage2ImageSeries`'''
@@ -59,6 +63,19 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
         '''Can run `blRapidPrototype`'''
         self.runner('blRapidPrototype')
 
+    def test_scrub_vms_extension(self):
+        '''Can run `scrub_vms_extension`'''
+        self.runner('scrub_vms_extension')
+
+# Removed because of a dependency problem with GDCM. Since we
+# don't really need this CLI anymore anyways, testing is cancelled.
+#    def test_blPseudoCT(self):
+#        '''Can run `blPseudoCT`'''
+#        self.runner('blPseudoCT')
+
+    def test_blBPAQ(self):
+        '''Can run `blBPAQ`'''
+        self.runner('blBPAQ')
 
 if __name__ == '__main__':
     unittest.main()
