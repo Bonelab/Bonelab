@@ -76,6 +76,14 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
     def test_blBPAQ(self):
         '''Can run `blBPAQ`'''
         self.runner('blBPAQ')
+        
+    def test_blRegBCn88modelgenerator(self):
+        '''Can run `blRegBCn88modelgenerator`'''
+        self.runner('blRegBCn88modelgenerator')
+        
+    def test_blRegBCtransformresults(self):
+        '''Can run `blRegBCtransformresults`'''
+        self.runner('blRegBCtransformresults')
 
 if __name__ == '__main__':
     unittest.main()
