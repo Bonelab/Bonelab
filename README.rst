@@ -37,6 +37,9 @@ Install
 
     # Activate the environemnt
     conda activate bl
+    
+    # change directory into the Bonelab repo
+    cd Bonelab
 
     # Install in an 'editable' format
     pip install -e .
