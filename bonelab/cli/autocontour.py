@@ -11,19 +11,6 @@ import matplotlib.pyplot as plt
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from datetime import datetime
 from glob import glob
-'''
-Written by Nathan Neeteson
-Python / VTK Implementation of Buie's autocontour algorithm.
-https://doi.org/10.1016/j.bone.2007.07.007
-v0.1: (2022/04/13, Nathan Neeteson) First complete implementation
-'''
-import os
-import vtk
-import vtkbone
-import matplotlib.pyplot as plt
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from datetime import datetime
-from glob import glob
 
 from bonelab.util.aim_calibration_header import get_aim_density_equation
 from bonelab.util.vtk_util import vtkImageData_to_numpy
