@@ -7,7 +7,6 @@ v0.1: (2022/04/13, Nathan Neeteson) First complete implementation
 import os
 import vtk
 import vtkbone
-import matplotlib.pyplot as plt
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from datetime import datetime
 from glob import glob
