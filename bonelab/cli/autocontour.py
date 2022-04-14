@@ -219,7 +219,7 @@ def write_mask(reader,mask,mask_fn,label,software,version):
 
     writer = get_vtk_writer(mask_fn)
     if writer is None:
-        raise RunTimeError(f'Cannot find writer for file {mask_fn}')
+        raise RuntimeError(f'Cannot find writer for file {mask_fn}')
 
     writer.SetFileName(mask_fn)
     writer.SetInputData(mask)
