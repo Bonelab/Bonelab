@@ -1,4 +1,4 @@
-args.step_13threshold'''
+'''
 Written by Nathan Neeteson
 Python / VTK Implementation of Buie's autocontour algorithm.
 https://doi.org/10.1016/j.bone.2007.07.007
@@ -275,7 +275,7 @@ def write_mask(reader,mask,mask_fn,label,software,version):
 def main():
 
     SOFTWARE = 'Buie-Burghardt-Scanco Autocontour VTK Implemention'
-    VERSION = 0.1
+    VERSION = 0.2
 
     args = create_parser().parse_args()
 
