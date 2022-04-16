@@ -7,7 +7,7 @@ from tests.config_cli import cfg
 
 class TestCommandLineInterfeceSetup(unittest.TestCase):
     '''Test command line interface setup
-    
+
     The help section of all expected command line tools are ran here
     to guarantee they were exported by setup.cfg using pbr
     '''
@@ -67,23 +67,26 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
         '''Can run `scrub_vms_extension`'''
         self.runner('scrub_vms_extension')
 
-# Removed because of a dependency problem with GDCM. Since we
-# don't really need this CLI anymore anyways, testing is cancelled.
-#    def test_blPseudoCT(self):
-#        '''Can run `blPseudoCT`'''
-#        self.runner('blPseudoCT')
+    @unittest.skip('`gdcm` dependency problem')
+    def test_blPseudoCT(self):
+        '''Can run `blPseudoCT`'''
+        self.runner('blPseudoCT')
 
     def test_blBPAQ(self):
         '''Can run `blBPAQ`'''
         self.runner('blBPAQ')
-        
+
     def test_blRegBCn88modelgenerator(self):
         '''Can run `blRegBCn88modelgenerator`'''
         self.runner('blRegBCn88modelgenerator')
-        
+
     def test_blRegBCtransformresults(self):
         '''Can run `blRegBCtransformresults`'''
         self.runner('blRegBCtransformresults')
+
+    def test_blAtocontour(self):
+        ''' Can run `blAutocontour` '''
+        self.runner('blAutocontour')
 
 if __name__ == '__main__':
     unittest.main()
