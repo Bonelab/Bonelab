@@ -93,11 +93,6 @@ def create_parser():
         help = 'threshold for rebinarizing after gaussian in step 13'
     )
 
-    parser.add_argument(
-        '--micro-ct', '-uct', action='store_true', default=False,
-        help = 'switch all the defaults from XTII to uCT'
-    )
-
     return parser
 
 def convert_aim_to_density(img, m, b):
