@@ -9,7 +9,7 @@ import numpy.testing as npt
 from tests.config_cli import cfg
 from bonelab.cli.PseudoCT import PseudoCT
 
-
+@unittest.skip('`gdcm` dependency issue')
 class TestblPseudoCT(unittest.TestCase):
     '''Test blPseudoCT'''
     filenames = [

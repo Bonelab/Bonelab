@@ -10,7 +10,7 @@ from tests.config_cli import cfg
 
 class TestCommandLineInterfaceRun(unittest.TestCase):
     '''Test command line interface run
-    
+
     For non-visualization scripts, test that each command line functionality
     can be ran
     '''
