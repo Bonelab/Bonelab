@@ -20,7 +20,7 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "video_name", type=str, metavar="VIDEO_NAME",
-        help="Filename to save the video to, without an extension (.mp4 will be appended)."
+        help="Filename to save the video to, without an extension (.mp4 or .gif will be appended)."
     )
     parser.add_argument(
         "--directory", "-dir", action="store_true", default=False,
@@ -51,8 +51,16 @@ def create_parser() -> ArgumentParser:
         help="Dimension to pan over. Must be between 0 and 2 - if another value is given, 2 will be used."
     )
     parser.add_argument(
+        "--animation-interval", "-ai", type=int, default=20, metavar="N",
+        help="Interval between frames in the animation, in milliseconds."
+    )
+    parser.add_argument(
         "--mp4-fps", "-fps", type=int, default=60, metavar="N",
         help="Frames per second for the mp4 video."
+    )
+    parser.add_argument(
+        "--preview", "-p", action="store_true", default=False,
+        help="Enable this flag to see your animation in a pyplot window before it's saved to file."
     )
     return parser
 
@@ -115,8 +123,9 @@ def main() -> None:
     else:
         raise ValueError("panning_dimension arg is somehow a value it cannot be")
 
-    anim = FuncAnimation(fig, animate, frames=animation_frames, interval=20)
-    plt.show()
+    anim = FuncAnimation(fig, animate, frames=animation_frames, interval=args.animation_interval)
+    if args.preview:
+        plt.show()
     try:
         ffmpeg_writer = FFMpegWriter(fps=args.mp4_fps)
         anim.save(f"{args.video_name}.mp4", writer=ffmpeg_writer)

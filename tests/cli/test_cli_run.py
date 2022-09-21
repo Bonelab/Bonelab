@@ -108,11 +108,11 @@ class TestCommandLineInterfaceRun(unittest.TestCase):
     def test_blPanningVideo(self):
         """Can run `blPanningVideo`"""
         aim = os.path.join(self.test_dir, 'test25a.aim')
-        video = os.path.join(self.test_dir, 'test25a.mp4')
-        command = ['blPanningVideo', aim, video]
+        out = os.path.join(self.test_dir, 'test25a')
+        command = ['blPanningVideo', aim, out]
         self.runner(command)
-        self.assertTrue(os.path.exists(video))
-        
+        self.assertTrue(os.path.exists(f"{out}.mp4") or os.path.exists(f"{out}.gif"))
+
 
 if __name__ == '__main__':
     unittest.main()
