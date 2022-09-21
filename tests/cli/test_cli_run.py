@@ -105,5 +105,14 @@ class TestCommandLineInterfaceRun(unittest.TestCase):
         self.runner(command)
         self.assertTrue(os.path.isfile(stl), 'Cannot find file ' + stl)
 
+    def test_blPanningVideo(self):
+        """Can run `blPanningVideo`"""
+        aim = os.path.join(self.test_dir, 'test25a.aim')
+        video = os.path.join(self.test_dir, 'test25a.mp4')
+        command = ['blPanningVideo', aim, video]
+        self.runner(command)
+        self.assertTrue(os.path.exists(video))
+        
+
 if __name__ == '__main__':
     unittest.main()
