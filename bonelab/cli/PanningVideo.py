@@ -59,6 +59,11 @@ def create_parser() -> ArgumentParser:
         help="Frames per second for the mp4 video."
     )
     parser.add_argument(
+        "--figure-width", "-fw", type=int, default=10, metavar="N",
+        help="Width of the animation figure. The height will be automatically determined based on the aspect ratio of "
+             "the image."
+    )
+    parser.add_argument(
         "--preview", "-p", action="store_true", default=False,
         help="Enable this flag to see your animation in a pyplot window before it's saved to file."
     )
@@ -81,8 +86,10 @@ def main() -> None:
     if args.scanco_aim:
         calib_m, calib_b = get_aim_density_equation(reader.GetProcessingLog())
         image = calib_m * image + calib_b
+
     if args.intensity_bounds is None:
         args.intensity_bounds = [image.min(), image.max()]
+
     if args.x_bounds is None:
         args.x_bounds = [0, image.shape[0]]
     else:
@@ -99,7 +106,11 @@ def main() -> None:
         args.z_bounds[0] = max(args.z_bounds[0], 0)
         args.z_bounds[1] = min(args.z_bounds[1], image.shape[2])
 
-    fig = plt.figure()
+    bounds = [args.x_bounds, args.y_bounds, args.z_bounds]
+    figsize = np.array([b[1]-b[0] for i, b in enumerate(bounds) if i is not args.panning_dimension])
+    figsize = tuple(figsize * (args.figure_width / figsize[0]))
+
+    fig = plt.figure(figsize=figsize)
     ax = plt.axes()
 
     def animate(i: int) -> None:
@@ -113,15 +124,9 @@ def main() -> None:
         ax.set_frame_on(False)
         ax.axes.get_xaxis().set_visible(False)
         ax.axes.get_yaxis().set_visible(False)
+        fig.tight_layout()
 
-    if args.panning_dimension == 0:
-        animation_frames = np.arange(*args.x_bounds)
-    elif args.panning_dimension == 1:
-        animation_frames = np.arange(*args.y_bounds)
-    elif args.panning_dimension == 2:
-        animation_frames = np.arange(*args.z_bounds)
-    else:
-        raise ValueError("panning_dimension arg is somehow a value it cannot be")
+    animation_frames = np.arange(*bounds[args.panning_dimension])
 
     anim = FuncAnimation(fig, animate, frames=animation_frames, interval=args.animation_interval)
     if args.preview:
