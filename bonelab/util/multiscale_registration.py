@@ -99,9 +99,10 @@ def multiscale_registration(
     # If we are doing this with a multiscale progression, work through this progression in order first
     if multiscale_progression is not None:
         for (shrink_factor, smoothing_sigma) in multiscale_progression:
+            resampled_fixed_image = smooth_and_resample(fixed_image, shrink_factor, smoothing_sigma)
+            resampled_moving_image = smooth_and_resample(moving_image, shrink_factor, smoothing_sigma)
             displacement_field = registration_algorithm.Execute(
-                smooth_and_resample(fixed_image, shrink_factor, smoothing_sigma),
-                smooth_and_resample(moving_image, shrink_factor, smoothing_sigma),
+                resampled_fixed_image, resampled_moving_image,
                 sitk.Resample(displacement_field, resampled_fixed_image)
             )
 
