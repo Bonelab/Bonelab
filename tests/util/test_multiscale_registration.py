@@ -41,13 +41,13 @@ class TestMultiscaleRegistration(unittest.TestCase):
     def test_normal_registration(self):
         shape = (50, 50, 50)
         fixed, moving = generate_sitk_image(shape), generate_sitk_image(shape)
-        ddf = multiscale_registration(self.registration_filter, fixed, moving)
+        multiscale_registration(self.registration_filter, fixed, moving)
 
     def test_one_multiscale_level(self):
         shape = (50, 50, 50)
         multiscale_progression = ((2.0, 1.0),)
         fixed, moving = generate_sitk_image(shape), generate_sitk_image(shape)
-        ddf = multiscale_registration(
+        multiscale_registration(
             self.registration_filter, fixed, moving, multiscale_progression=multiscale_progression
         )
 
@@ -55,9 +55,24 @@ class TestMultiscaleRegistration(unittest.TestCase):
         shape = (50, 50, 50)
         multiscale_progression = ((2.0, 1.0), (4.0, 2.0), (8.0, 4.0))
         fixed, moving = generate_sitk_image(shape), generate_sitk_image(shape)
-        ddf = multiscale_registration(
+        multiscale_registration(
             self.registration_filter, fixed, moving, multiscale_progression=multiscale_progression
         )
+
+
+class TestMultiscaleDemons(unittest.TestCase):
+
+    def test_demons(self):
+        pass
+
+    def test_diffeomorphic(self):
+        pass
+
+    def test_symmetric(self):
+        pass
+
+    def test_fast_symmetric(self):
+        pass
 
 
 if __name__ == '__main__':

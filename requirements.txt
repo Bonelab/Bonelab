@@ -2,6 +2,7 @@
 pbr
 nose
 six
+hypothesis
 
 # Image processing
 vtk
