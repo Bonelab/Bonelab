@@ -116,5 +116,6 @@ Standard data deviation                    1315.35596
 
         self.assertAlmostEqual(b, -3.91209015e+02)
 
+
 if __name__ == '__main__':
     unittest.main()
