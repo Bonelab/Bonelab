@@ -176,11 +176,11 @@ def multiscale_demons(
     sitk.DisplacementFieldTransform
         The final transform output by the final registration at full resolution.
     """
-    demons = DEMONS_FILTERS[demons_type]
+    demons = DEMONS_FILTERS[demons_type]()
     demons.SetNumberOfIterations(demons_iterations)
     if demons_displacement_field_smooth_std is not None:
         demons.SetSmoothDisplacementField(True)
-        demons.SetStandardDeviations(demons_std)
+        demons.SetStandardDeviations(demons_displacement_field_smooth_std)
     else:
         demons.SetSmoothDisplacementField(False)
     if demons_update_field_smooth_std is not None:
