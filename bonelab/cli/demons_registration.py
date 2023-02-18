@@ -28,19 +28,19 @@ def demons_type_checker(s: str) -> str:
 def create_parser() -> ArgumentParser:
 
     parser = ArgumentParser(
-        description='blDemonsRegister: Demons Registration Tool',
+        description='blDemonsRegistration: Demons Registration Tool',
         formatter_class=ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
         "fixed_image", type=str, metavar="FIXED",
-        help="path to the fixed image (don't use DICOMs, AIM  or NIfTI should work)"
+        help="path to the fixed image (don't use DICOMs; AIM  or NIfTI should work)"
     )
     parser.add_argument(
         "moving_image", type=str, metavar="MOVING",
-        help="path to the moving image (don't use DICOMs, AIM  or NIfTI should work)"
+        help="path to the moving image (don't use DICOMs; AIM  or NIfTI should work)"
     )
     parser.add_argument(
-        "output", type=str, metavar="DISPLACEMENT",
+        "output", type=str, metavar="OUTPUT",
         help="path to where you want the final displacement transform saved to, with no extension (will be added)"
     )
     parser.add_argument(
@@ -48,16 +48,16 @@ def create_parser() -> ArgumentParser:
         help="format to save the output in, must be `transform`, `image`, or `compressed-image`"
     )
     parser.add_argument(
-        "--downsampling-shrink-factor", "-dsf", type=float, default=None, metvar="X",
+        "--downsampling-shrink-factor", "-dsf", type=float, default=None, metavar="X",
         help="the shrink factor to apply to the fixed and moving image before starting the registration"
     )
     parser.add_argument(
-        "--downsampling-smoothing-sigma", "-dss", type=float, default=None, metvar="X",
+        "--downsampling-smoothing-sigma", "-dss", type=float, default=None, metavar="X",
         help="the smoothing sigma to apply to the fixed and moving image before starting the registration"
     )
     parser.add_argument(
         "--initial-transform", "-it", default=None, type=str, metavar="FN",
-        help="the path to a file that can be read by sitk.ReadTransform and that contains the transform you want"
+        help="the path to a file that can be read by sitk.ReadTransform and that contains the transform you want "
              "to initialize the registration process with (e.g. can obtain using blRegister)"
     )
     parser.add_argument(
