@@ -2,13 +2,22 @@ from __future__ import annotations
 
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import SimpleITK as sitk
+from pathlib import Path
 
 from bonelab.util.vtk_util import vtkImageData_to_numpy
 from bonelab.io.vtk_helpers import get_vtk_reader
-from bonelab.util.multiscale_registration import multiscale_demons, DEMONS_FILTERS
+from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_resample, DEMONS_FILTERS
 
 
-def demons_type_checker(s: str) -> s:
+def output_format_checker(s: str) -> str:
+    s = str(s)
+    if s in ["transform", "image", "compressed-image"]:
+        return s
+    else:
+        raise ValueError(f"output-format must be `transform`, `image`, or `compressed-image`. got {s}")
+
+
+def demons_type_checker(s: str) -> str:
     s = str(s)
     if s in DEMONS_FILTERS.keys():
         return s
@@ -31,9 +40,20 @@ def create_parser() -> ArgumentParser:
         help="path to the moving image (don't use DICOMs, AIM  or NIfTI should work)"
     )
     parser.add_argument(
-        "displacement_field", type=str, metavar="DISPLACEMENT",
-        help="path to where you want the final displacement field saved to, "
-             "use a sitk.WriteImage compatible extension"
+        "output", type=str, metavar="DISPLACEMENT",
+        help="path to where you want the final displacement transform saved to, with no extension (will be added)"
+    )
+    parser.add_argument(
+        "--output-format", "-of", default="image", type=output_format_checker, metavar="STR",
+        help="format to save the output in, must be `transform`, `image`, or `compressed-image`"
+    )
+    parser.add_argument(
+        "--downsampling-shrink-factor", "-dsf", type=float, default=None, metvar="X",
+        help="the shrink factor to apply to the fixed and moving image before starting the registration"
+    )
+    parser.add_argument(
+        "--downsampling-smoothing-sigma", "-dss", type=float, default=None, metvar="X",
+        help="the smoothing sigma to apply to the fixed and moving image before starting the registration"
     )
     parser.add_argument(
         "--initial-transform", "-it", default=None, type=str, metavar="FN",
@@ -75,8 +95,9 @@ def read_image(fn: str) -> sitk.Image:
     try:
         return sitk.ReadImage(fn)
     except RuntimeError as err:
+        # if that gave an error, check if it's the error to do with not being able to find an appropriate ImageIO
         if "Unable to determine ImageIO reader" in err:
-            # now let's see if the vtk helpers in Bonelab can handle it
+            # if so, let's see if the vtk helpers in Bonelab can handle it
             reader = get_vtk_reader(fn)
             if reader is None:
                 raise ValueError(f"Could not find a reader for {fn}")
@@ -86,19 +107,10 @@ def read_image(fn: str) -> sitk.Image:
             image = sitk.GetImageFromArray(vtkImageData_to_numpy(vtk_image))
             image.SetSpacing(vtk_image.GetSpacing())
             image.SetOrigin(vtk_image.GetOrigin())
+            # vtk image data doesn't seem to store direction data -- problem??
             return image
         else:
             raise err
-
-
-def align_images(data: List[Tuple[sitk.Image, List[int]]]) -> List[sitk.Image]:
-    min_position = np.asarray([p for _, p in data]).min(axis=0)
-    pad_lower = [p - min_position for _, p in data]
-    max_shape = np.asarray([(img.GetSize() + pl) for (img, _), pl in zip(data, pad_lower)]).max(axis=0)
-    pad_upper = [(max_shape - (img.GetSize() + pl)) for (img, _), pl in zip(data, pad_lower)]
-    pad_lower = [[int(l) for l in pl] for pl in pad_lower]
-    pad_upper = [[int(u) for u in pu] for pu in pad_upper]
-    return [sitk.ConstantPad(img, tuple(pl), tuple(pu)) for (img, _), pl, pu in zip(data, pad_lower, pad_upper)]
 
 
 def main():
@@ -106,6 +118,33 @@ def main():
     # load images, cast to single precision float
     fixed_image = sitk.Cast(read_image(args.fixed_image), sitk.sitkFloat32)
     moving_image = sitk.Cast(read_image(args.moving_image), sitk.sitkFloat32)
+    # optionally, downsample the fixed and moving images
+    if (args.downsampling_shrink_factor is not None) and (arg.downsampling_smoothing_sigma is not None):
+        fixed_image = smooth_and_resample(
+            fixed_image, args.downsampling_shrink_factor, args.downsampling_smoothing_sigma
+        )
+        moving_image = smooth_and_resample(
+            moving_image, args.downsampling_shrink_factor, args.downsampling_smoothing_sigma
+        )
+    elif (args.downsampling_shrink_factor is None) and (arg.downsampling_smoothing_sigma is None):
+        # do not downsample fixed and moving images
+        pass
+    else:
+        raise ValueError("one of `downsampling-shrink-factor` or `downsampling-smoothing-sigma` have not been specified"
+                         "you must either leave both as the default `None` or specify both")
+    # now, we have to pad the images, so they are the same size - just a requirement of the Demons algorithms
+    size_difference = [fs - ms for (fs, ms) in zip(fixed_image.GetSize(), moving_image.GetSize())]
+    for i, sd in enumerate(size_difference):
+        pad_lower = [0, 0, 0]
+        pad_upper = [0, 0, 0]
+        pad_lower[i] = sd//2
+        pad_upper[i] = sd - sd//2
+        if sd > 0:
+            # fixed image is bigger, so pad the moving image
+            moving_image = sitk.ConstantPad(moving_image, pad_lower, pad_upper)
+        if sd < 0:
+            # fixed image is smaller, so pad the fixed image
+            fixed_image = sitk.ConstantPad(fixed_image, pad_lower, pad_upper)
     # optionally load the initial transform
     if args.initial_transform is not None:
         initial_transform = sitk.ReadTransform(args.initial_transform)
@@ -117,13 +156,12 @@ def main():
             multiscale_progression = list(zip(args.shrink_factors, args.smoothing_sigmas))
         else:
             return ValueError("`shrink-factors` and `smoothing-sigmas` must have same length")
+    elif (args.shrink_factors is None) and (args.smoothing_sigmas is None):
+        multiscale_progression = None
     else:
-        if (args.shrink_factors is None) and (args.smoothing_sigmas is None):
-            multiscale_progression = None
-        else:
-            raise ValueError("one of `shrink-factors` or `smoothing-sigmas` have not been specified. you must "
-                             "either leave both as the default `None` or specify both (with equal length)")
-
+        raise ValueError("one of `shrink-factors` or `smoothing-sigmas` have not been specified. you must "
+                         "either leave both as the default `None` or specify both (with equal length)")
+    # do the registration
     displacement_field = multiscale_demons(
         fixed_image, moving_image, args.demons_type, args.max_iterations,
         demons_displacement_field_smooth_std=args.displacement_smoothing_std,
@@ -131,6 +169,19 @@ def main():
         initial_transform=initial_transform,
         multiscale_progression=multiscale_progression
     )
+    # finally, save the displacement transform or field
+    if args.output_format == "transform":
+        sitk.WriteTransform(sitk.DisplacementFieldTransform(displacement_field), f"{args.output}.mat")
+    elif args.output_format == "image":
+        sitk.WriteImage(
+            displacement_field, f"{args.output}.nii"
+        )
+    elif args.output_format == "compressed-image":
+        sitk.WriteImage(
+            displacement_field, f"{args.output}.nii.gz"
+        )
+    else:
+        raise ValueError(f"value given for `output-format`, {args.output_format}, is invalid and was not caught")
 
 
 if __name__ == "__main__":
