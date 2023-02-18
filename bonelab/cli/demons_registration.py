@@ -9,7 +9,9 @@ import yaml
 
 # internal imports
 from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_resample, DEMONS_FILTERS
-from bonelab.cli.registration import read_image, create_and_save_metrics_plot, output_format_checker
+from bonelab.cli.registration import (
+    read_image, create_and_save_metrics_plot, output_format_checker, write_metrics_to_csv
+)
 
 
 def demons_type_checker(s: str) -> str:
@@ -177,9 +179,7 @@ def main():
     else:
         raise ValueError(f"value given for `output-format`, {args.output_format}, is invalid and was not caught")
     # save the metric history
-    with open(f"{args.output}_metric_history.csv", "w") as f:
-        csv_writer = csv.writer(f)
-        csv_writer.writerow(metric_history)
+    write_metrics_to_csv(metric_history, f"{args.output}_metric_history.csv")
     # optionally, create a plot of the metric history and save it
     if args.plot_metric_history:
         create_and_save_metrics_plot(metric_history, f"{args.output}_metric_history.png")

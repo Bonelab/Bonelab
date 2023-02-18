@@ -4,11 +4,13 @@ from __future__ import annotations
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import SimpleITK as sitk
 from matplotlib import pyplot as plt
+import csv
+import yaml
 
 # internal imports
 from bonelab.util.vtk_util import vtkImageData_to_numpy
 from bonelab.io.vtk_helpers import get_vtk_reader
-from bonelab.util.multiscale_registration import create_metric_tracking_callback
+from bonelab.util.multiscale_registration import smooth_and_resample, create_metric_tracking_callback
 
 
 def output_format_checker(s: str) -> str:
@@ -43,6 +45,31 @@ def create_parser() -> ArgumentParser:
              "`image` -> .nii,"
              "`compressed-image` -> .nii.gz"
     )
+    parser.add_argument(
+        "--downsampling-shrink-factor", "-dsf", type=float, default=None, metavar="X",
+        help="the shrink factor to apply to the fixed and moving image before starting the registration"
+    )
+    parser.add_argument(
+        "--downsampling-smoothing-sigma", "-dss", type=float, default=None, metavar="X",
+        help="the smoothing sigma to apply to the fixed and moving image before starting the registration"
+    )
+    parser.add_argument(
+        "--initial-transform", "-it", default=None, type=str, metavar="FN",
+        help="the path to a file that can be read by sitk.ReadTransform and that contains the transform you want "
+             "to initialize the registration process with (e.g. can obtain using blRegister)"
+    )
+    parser.add_argument(
+        "--max-iterations", "-mi", default=100, type=int, metavar="N",
+        help="number of iterations to run registration algorithm for at each stage"
+    )
+    parser.add_argument(
+        "--plot-metric-history", "-pmh", default=False, action="store_true",
+        help="enable this flag to save a plot of the metric history to file in addition to the raw data"
+    )
+    parser.add_argument(
+        "--verbose", "-v", default=False, action="store_true",
+        help="enable this flag to print a lot of stuff to the terminal about how the registration is proceeding"
+    )
 
     return parser
 
@@ -69,6 +96,12 @@ def read_image(fn: str) -> sitk.Image:
             return image
         else:
             raise err
+
+
+def write_metrics_to_csv(metric_history: List[float], fn: str) -> None:
+    with open(fn, "w") as f:
+        csv_writer = csv.writer(f)
+        csv_writer.writerow(metric_history)
 
 
 def create_and_save_metrics_plot(metrics_history: List[float], fn: str) -> None:
