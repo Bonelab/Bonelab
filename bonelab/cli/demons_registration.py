@@ -10,7 +10,7 @@ import yaml
 # internal imports
 from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_resample, DEMONS_FILTERS
 from bonelab.cli.registration import (
-    read_image, create_and_save_metrics_plot, output_format_checker, write_metrics_to_csv
+    read_and_downsample_images, create_and_save_metrics_plot, output_format_checker, write_metrics_to_csv
 )
 
 
@@ -70,11 +70,13 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "--displacement-smoothing-std", "-ds", default=1.0, type=float, metavar="X",
-        help="standard deviation for the Gaussian smoothing applied to the displacement field at each step"
+        help="standard deviation for the Gaussian smoothing applied to the displacement field at each step."
+             "this is how you control the elasticity of the smoothing of the deformation"
     )
     parser.add_argument(
         "--update-smoothing-std", "-us", default=1.0, type=float, metavar="X",
-        help="standard deviation for the Gaussian smoothing applied to the update field at each step"
+        help="standard deviation for the Gaussian smoothing applied to the update field at each step."
+             "this is how you control the viscosity of the smoothing of the deformation"
     )
     parser.add_argument(
         "--shrink-factors", "-sf", default=None, type=float, nargs="+", metavar="X",
@@ -98,6 +100,14 @@ def create_parser() -> ArgumentParser:
     return parser
 
 
+def read_transform(args: Namespace) -> Optional[sitk.Transform]:
+    if args.initial_transform is not None:
+        initial_transform = sitk.ReadTransform(args.initial_transform)
+    else:
+        initial_transform = None
+    return initial_transform
+
+
 def pad_images_to_same_extent(fixed_image: sitk.Image, moving_image: sitk.Image) -> Tuple[sitk.Image, sitk.Image]:
     size_difference = [fs - ms for (fs, ms) in zip(fixed_image.GetSize(), moving_image.GetSize())]
     for i, sd in enumerate(size_difference):
@@ -114,48 +124,30 @@ def pad_images_to_same_extent(fixed_image: sitk.Image, moving_image: sitk.Image)
     return fixed_image, moving_image
 
 
+def construct_multiscale_progression(args: Namespace) -> Optional[List[Tuple[float]]]:
+    if (args.shrink_factors is not None) and (args.smoothing_sigmas is not None):
+        if len(args.shrink_factors) == len(args.smoothing_sigmas):
+            return list(zip(args.shrink_factors, args.smoothing_sigmas))
+        else:
+            raise ValueError("`shrink-factors` and `smoothing-sigmas` must have same length")
+    elif (args.shrink_factors is None) and (args.smoothing_sigmas is None):
+        return None
+    else:
+        raise ValueError("one of `shrink-factors` or `smoothing-sigmas` have not been specified. you must "
+                         "either leave both as the default `None` or specify both (with equal length)")
+
+
 def main():
     args = create_parser().parse_args()
     # save the arguments of this registration to a yaml file
     # this has the added benefit of ensuring up-front that we can write files to the "output" that was provided,
     # so we do not waste a lot of time doing the registration and then crashing at the end because of write permissions
-    with open(f"{args.output}.yaml", "w") as f:
-        yaml.dump(vars(args), f)
-    # load images, cast to single precision float
-    fixed_image = sitk.Cast(read_image(args.fixed_image), sitk.sitkFloat32)
-    moving_image = sitk.Cast(read_image(args.moving_image), sitk.sitkFloat32)
-    # optionally, downsample the fixed and moving images
-    if (args.downsampling_shrink_factor is not None) and (args.downsampling_smoothing_sigma is not None):
-        fixed_image = smooth_and_resample(
-            fixed_image, args.downsampling_shrink_factor, args.downsampling_smoothing_sigma
-        )
-        moving_image = smooth_and_resample(
-            moving_image, args.downsampling_shrink_factor, args.downsampling_smoothing_sigma
-        )
-    elif (args.downsampling_shrink_factor is None) and (arg.downsampling_smoothing_sigma is None):
-        # do not downsample fixed and moving images
-        pass
-    else:
-        raise ValueError("one of `downsampling-shrink-factor` or `downsampling-smoothing-sigma` have not been specified"
-                         "you must either leave both as the default `None` or specify both")
-    # now, we have to pad the images, so they are the same size - just a requirement of the Demons algorithms
+    write_args_to_yaml(args, f"{args.output}.yaml")
+    fixed_image, moving_image = read_and_downsample_images(args)
+    # we have to pad the images to be the same size - just a requirement of the Demons algorithms
     fixed_image, moving_image = pad_images_to_same_extent(fixed_image, moving_image)
-    # optionally load the initial transform
-    if args.initial_transform is not None:
-        initial_transform = sitk.ReadTransform(args.initial_transform)
-    else:
-        initial_transform = None
-    # construct multiscale progression
-    if (args.shrink_factors is not None) and (args.smoothing_sigmas is not None):
-        if len(args.shrink_factors) == len(args.smoothing_sigmas):
-            multiscale_progression = list(zip(args.shrink_factors, args.smoothing_sigmas))
-        else:
-            return ValueError("`shrink-factors` and `smoothing-sigmas` must have same length")
-    elif (args.shrink_factors is None) and (args.smoothing_sigmas is None):
-        multiscale_progression = None
-    else:
-        raise ValueError("one of `shrink-factors` or `smoothing-sigmas` have not been specified. you must "
-                         "either leave both as the default `None` or specify both (with equal length)")
+    initial_transform = read_transform(args)
+    multiscale_progression = construct_multiscale_progression(args)
     # do the registration
     displacement_field, metric_history = multiscale_demons(
         fixed_image, moving_image, args.demons_type, args.max_iterations,

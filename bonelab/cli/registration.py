@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 # external imports
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace
 import SimpleITK as sitk
 from matplotlib import pyplot as plt
 import csv
@@ -21,9 +21,19 @@ def output_format_checker(s: str) -> str:
         raise ValueError(f"output-format must be `transform`, `image`, or `compressed-image`. got {s}")
 
 
+# TODO: The plan is to have several options for optimizer, metric, interpolator, and initialization
+# TODO: Optimizers - GradientDescent, L-BFGS2
+# TODO: Metrics - MeanSquares, Correlation, JointHistogramMutualInformation, MattesMutualInformation
+# TODO: Interpolators - NN, Linear, Gaussian
+# TODO: Initialization - GEOMETRY, MOMENTS
 def create_parser() -> ArgumentParser:
     parser = ArgumentParser(
-        description='blRegistration: SimpleITK Registration Tool',
+        description="blRegistration: SimpleITK Registration Tool.",
+        epilog="This tool provides limited access to the full functionality of SimpleITK's registration framework. "
+               "If you want to do something more advanced, consult the following resources: "
+               "(1)https://simpleitk.org/SPIE2019_COURSE/04_basic_registration.html  --------- "
+               "(2)https://simpleitk.org/doxygen/latest/html/classitk_1_1simple_1_1ImageRegistrationMethod.html - "
+               "Alternately, feel free to extend this tool to add more flexibility if you want to.",
         formatter_class=ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
@@ -54,11 +64,6 @@ def create_parser() -> ArgumentParser:
         help="the smoothing sigma to apply to the fixed and moving image before starting the registration"
     )
     parser.add_argument(
-        "--initial-transform", "-it", default=None, type=str, metavar="FN",
-        help="the path to a file that can be read by sitk.ReadTransform and that contains the transform you want "
-             "to initialize the registration process with (e.g. can obtain using blRegister)"
-    )
-    parser.add_argument(
         "--max-iterations", "-mi", default=100, type=int, metavar="N",
         help="number of iterations to run registration algorithm for at each stage"
     )
@@ -72,6 +77,11 @@ def create_parser() -> ArgumentParser:
     )
 
     return parser
+
+
+def write_args_to_yaml(args: Namespace, fn: str) -> None:
+    with open(fn, "w") as f:
+        yaml.dump(vars(args), f)
 
 
 def read_image(fn: str) -> sitk.Image:
@@ -114,8 +124,34 @@ def create_and_save_metrics_plot(metrics_history: List[float], fn: str) -> None:
     plt.savefig(fn)
 
 
+def read_and_downsample_images(args: Namespace) -> Tuple[sitk.Image, sitk.Image]:
+    # load images, cast to single precision float
+    fixed_image = sitk.Cast(read_image(args.fixed_image), sitk.sitkFloat32)
+    moving_image = sitk.Cast(read_image(args.moving_image), sitk.sitkFloat32)
+    # optionally, downsample the fixed and moving images
+    if (args.downsampling_shrink_factor is not None) and (args.downsampling_smoothing_sigma is not None):
+        fixed_image = smooth_and_resample(
+            fixed_image, args.downsampling_shrink_factor, args.downsampling_smoothing_sigma
+        )
+        moving_image = smooth_and_resample(
+            moving_image, args.downsampling_shrink_factor, args.downsampling_smoothing_sigma
+        )
+    elif (args.downsampling_shrink_factor is None) and (arg.downsampling_smoothing_sigma is None):
+        # do not downsample fixed and moving images
+        pass
+    else:
+        raise ValueError("one of `downsampling-shrink-factor` or `downsampling-smoothing-sigma` have not been specified"
+                         "you must either leave both as the default `None` or specify both")
+    return fixed_image, moving_image
+
+
 def main():
     args = create_parser().parse_args()
+    # save the arguments of this registration to a yaml file
+    # this has the added benefit of ensuring up-front that we can write files to the "output" that was provided,
+    # so we do not waste a lot of time doing the registration and then crashing at the end because of write permissions
+    write_args_to_yaml(args, f"{args.output}.yaml")
+    fixed_image, moving_image = read_and_downsample_images(args)
 
 
 if __name__ == "__main__":
