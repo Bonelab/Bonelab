@@ -4,22 +4,12 @@ from __future__ import annotations
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import SimpleITK as sitk
 from pathlib import Path
-from matplotlib import pyplot as plt
 import csv
 import yaml
 
 # internal imports
-from bonelab.util.vtk_util import vtkImageData_to_numpy
-from bonelab.io.vtk_helpers import get_vtk_reader
 from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_resample, DEMONS_FILTERS
-
-
-def output_format_checker(s: str) -> str:
-    s = str(s)
-    if s in ["transform", "image", "compressed-image"]:
-        return s
-    else:
-        raise ValueError(f"output-format must be `transform`, `image`, or `compressed-image`. got {s}")
+from bonelab.cli.registration import read_image, create_and_save_metrics_plot, output_format_checker
 
 
 def demons_type_checker(s: str) -> str:
@@ -46,7 +36,7 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "output", type=str, metavar="OUTPUT",
-        help="path to where you want the final displacement transform saved to, with no extension (will be added)"
+        help="path to where you want outputs saved to, with no extension (will be added)"
     )
     parser.add_argument(
         "--output-format", "-of", default="image", type=output_format_checker, metavar="STR",
@@ -106,30 +96,6 @@ def create_parser() -> ArgumentParser:
     return parser
 
 
-def read_image(fn: str) -> sitk.Image:
-    # first let's see if SimpleITK can do it
-    try:
-        return sitk.ReadImage(fn)
-    except RuntimeError as err:
-        # if that gave an error, check if it's the error to do with not being able to find an appropriate ImageIO
-        if "Unable to determine ImageIO reader" in str(err):
-            # if so, let's see if the vtk helpers in Bonelab can handle it
-            reader = get_vtk_reader(fn)
-            if reader is None:
-                raise ValueError(f"Could not find a reader for {fn}")
-            reader.SetFileName(fn)
-            reader.Update()
-            vtk_image = reader.GetOutput()
-            image = sitk.GetImageFromArray(vtkImageData_to_numpy(vtk_image))
-            image.SetSpacing(vtk_image.GetSpacing())
-            image.SetOrigin(vtk_image.GetOrigin())
-            # vtk image data doesn't seem to store direction data -- problem??
-            # just be sure to apply the transform that gets derived consistently later on I guess
-            return image
-        else:
-            raise err
-
-
 def pad_images_to_same_extent(fixed_image: sitk.Image, moving_image: sitk.Image) -> Tuple[sitk.Image, sitk.Image]:
     size_difference = [fs - ms for (fs, ms) in zip(fixed_image.GetSize(), moving_image.GetSize())]
     for i, sd in enumerate(size_difference):
@@ -144,16 +110,6 @@ def pad_images_to_same_extent(fixed_image: sitk.Image, moving_image: sitk.Image)
             # fixed image is smaller, so pad the fixed image
             fixed_image = sitk.ConstantPad(fixed_image, pad_lower, pad_upper)
     return fixed_image, moving_image
-
-
-def create_and_save_metrics_plot(metrics_history: List[float], fn: str) -> None:
-    plt.figure()
-    plt.plot(metrics_history)
-    plt.xlabel('iteration')
-    plt.ylabel('metric')
-    plt.yscale('log')
-    plt.grid()
-    plt.savefig(fn)
 
 
 def main():
