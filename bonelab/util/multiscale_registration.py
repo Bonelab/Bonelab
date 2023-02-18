@@ -7,7 +7,7 @@ Modified slightly but mechanically the same as the source. Also some extra stuff
 from __future__ import annotations
 
 import SimpleITK as sitk
-from typing import Optional, List
+from typing import Callable, Optional, List
 
 
 # a list of Demons registration filters available in SimpleITK
@@ -17,6 +17,22 @@ DEMONS_FILTERS = {
     "symmetric": sitk.SymmetricForcesDemonsRegistrationFilter,
     "fast_symmetric": sitk.FastSymmetricForcesDemonsRegistrationFilter
 }
+
+
+def create_metric_tracking_callback(
+        registration_filter: sitk.ImageFilter,
+        metric_history: List[float],
+        verbose: bool = False
+) -> Callable:
+
+    def metric_tracking_callback() -> None:
+        metric = registration_filter.GetMetric()
+        metric_history.append(metric)
+        if verbose:
+            iteration = registration_filter.GetElapsedIterations()
+            print(f"Iteration: {iteration:d}, Metric: {metric:0.3f}")
+
+    return metric_tracking_callback
 
 
 def smooth_and_resample(image: sitk.Image, shrink_factor: float, smoothing_sigma: float) -> sitk.Image:
@@ -60,7 +76,8 @@ def multiscale_registration(
     fixed_image: sitk.Image,
     moving_image: sitk.Image,
     initial_transform: Optional[sitk.Transform] = None,
-    multiscale_progression: Optional[List[Tuple[float, float]]] = None
+    multiscale_progression: Optional[List[Tuple[float, float]]] = None,
+    verbose: bool = False
 ) -> sitk.DisplacementFieldTransform:
     """
     Perform a multiscale registration using a given registration algorithm and fixed/moving image pair. You can
@@ -107,7 +124,11 @@ def multiscale_registration(
 
     # If we are doing this with a multiscale progression, work through this progression in order first
     if multiscale_progression is not None:
-        for (shrink_factor, smoothing_sigma) in multiscale_progression:
+        print(f"Multiscale progression starting | There will be {len(multiscale_progression):d} steps.")
+        for (i, (shrink_factor, smoothing_sigma)) in enumerate(multiscale_progression):
+            if verbose:
+                print(f"Step {i+1:d} of {len(multiscale_progression):d} "
+                      f"| Shrink factor: {shrink_factor:0.2f}, Sigma: {smoothing_sigma:0.2f} | Starting:")
             resampled_fixed_image = smooth_and_resample(fixed_image, shrink_factor, smoothing_sigma)
             resampled_moving_image = smooth_and_resample(moving_image, shrink_factor, smoothing_sigma)
             displacement_field = registration_algorithm.Execute(
@@ -116,6 +137,8 @@ def multiscale_registration(
             )
 
     # Finish off by doing one registration at full resolution
+    if verbose:
+        print("Final registration at full resolution:")
     return registration_algorithm.Execute(fixed_image, moving_image, sitk.Resample(displacement_field, fixed_image))
 
 
@@ -127,8 +150,9 @@ def multiscale_demons(
     demons_displacement_field_smooth_std: Optional[float] = 1.0,
     demons_update_field_smooth_std: Optional[float] = 1.0,
     initial_transform: Optional[sitk.Transform] = None,
-    multiscale_progression: Optional[List[Tuple[float, float]]] = None
-) -> sitk.DisplacementFieldTransform:
+    multiscale_progression: Optional[List[Tuple[float, float]]] = None,
+    verbose: bool = False
+) -> Tuple[sitk.DisplacementFieldTransform, List[float]]:
     """
     Perform a multiscale registration using a given registration algorithm and fixed/moving image pair. You can
     optionally pass in an initial transform and the multiscale progression.
@@ -175,7 +199,11 @@ def multiscale_demons(
     -------
     sitk.DisplacementFieldTransform
         The final transform output by the final registration at full resolution.
+
+    List[float]
+        A list of floats containing the value of the metric at each iteration of the registration.
     """
+    # create the registration filter
     demons = DEMONS_FILTERS[demons_type]()
     demons.SetNumberOfIterations(demons_iterations)
     if demons_displacement_field_smooth_std is not None:
@@ -188,4 +216,9 @@ def multiscale_demons(
         demons.SetUpdateFieldStandardDeviations(demons_update_field_smooth_std)
     else:
         demons.SetSmoothUpdateField(False)
-    return multiscale_registration(demons, fixed_image, moving_image, initial_transform, multiscale_progression)
+    metric_history = []
+    demons.AddCommand(sitk.sitkIterationEvent, create_metric_tracking_callback(demons, metric_history, verbose))
+    deformation_field = multiscale_registration(
+        demons, fixed_image, moving_image, initial_transform, multiscale_progression, verbose
+    )
+    return deformation_field, metric_history

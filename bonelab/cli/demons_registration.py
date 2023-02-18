@@ -3,6 +3,8 @@ from __future__ import annotations
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import SimpleITK as sitk
 from pathlib import Path
+import csv
+import yaml
 
 from bonelab.util.vtk_util import vtkImageData_to_numpy
 from bonelab.io.vtk_helpers import get_vtk_reader
@@ -45,7 +47,10 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "--output-format", "-of", default="image", type=output_format_checker, metavar="STR",
-        help="format to save the output in, must be `transform`, `image`, or `compressed-image`"
+        help="format to save the output in, must be `transform`, `image`, or `compressed-image`."
+             "`transform` -> .mat,"
+             "`image` -> .nii,"
+             "`compressed-image` -> .nii.gz"
     )
     parser.add_argument(
         "--downsampling-shrink-factor", "-dsf", type=float, default=None, metavar="X",
@@ -62,7 +67,7 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "--demons-type", "-dt", default="demons", type=demons_type_checker, metavar="STR",
-        help=f"type of demons algorithm to use, options: {list(DEMONS_FILTERS.keys())}"
+        help=f"type of demons algorithm to use. options: {list(DEMONS_FILTERS.keys())}"
     )
     parser.add_argument(
         "--max-iterations", "-mi", default=100, type=int, metavar="N",
@@ -85,6 +90,14 @@ def create_parser() -> ArgumentParser:
         "--smoothing-sigmas", "-ss", default=None, type=float, nargs="+", metavar="X",
         help="sigmas for the Gaussians used to smooth the fixed and moving image at each stage of the multiscale "
              "progression. you must give the same number of arguments here as you do for `shrink-factors`"
+    )
+    parser.add_argument(
+        "--plot-metric-history", "-pmh", default=False, action="store_true",
+        help="enable this flag to save a plot of the metric history to file in addition to the raw data"
+    )
+    parser.add_argument(
+        "--verbose", "-v", default=False, action="store_true",
+        help="enable this flag to print a lot of stuff to the terminal about how the registration is proceeding"
     )
 
     return parser
@@ -113,8 +126,29 @@ def read_image(fn: str) -> sitk.Image:
             raise err
 
 
+def pad_images_to_same_extent(fixed_image: sitk.Image, moving_image: sitk.Image) -> Tuple[sitk.Image, sitk.Image]:
+    size_difference = [fs - ms for (fs, ms) in zip(fixed_image.GetSize(), moving_image.GetSize())]
+    for i, sd in enumerate(size_difference):
+        pad_lower = [0, 0, 0]
+        pad_upper = [0, 0, 0]
+        pad_lower[i] = sd // 2
+        pad_upper[i] = sd - (sd // 2)
+        if sd > 0:
+            # fixed image is bigger, so pad the moving image
+            moving_image = sitk.ConstantPad(moving_image, pad_lower, pad_upper)
+        if sd < 0:
+            # fixed image is smaller, so pad the fixed image
+            fixed_image = sitk.ConstantPad(fixed_image, pad_lower, pad_upper)
+        return fixed_image, moving_image
+
+
 def main():
     args = create_parser().parse_args()
+    # save the arguments of this registration to a yaml file
+    # this has the added benefit of ensuring up-front that we can write files to the "output" that was provided,
+    # so we do not waste a lot of time doing the registration and then crashing at the end because of write permissions
+    with open(f"{args.output}.yaml", "w") as f:
+        yaml.dump(vars(args), f)
     # load images, cast to single precision float
     fixed_image = sitk.Cast(read_image(args.fixed_image), sitk.sitkFloat32)
     moving_image = sitk.Cast(read_image(args.moving_image), sitk.sitkFloat32)
@@ -133,18 +167,7 @@ def main():
         raise ValueError("one of `downsampling-shrink-factor` or `downsampling-smoothing-sigma` have not been specified"
                          "you must either leave both as the default `None` or specify both")
     # now, we have to pad the images, so they are the same size - just a requirement of the Demons algorithms
-    size_difference = [fs - ms for (fs, ms) in zip(fixed_image.GetSize(), moving_image.GetSize())]
-    for i, sd in enumerate(size_difference):
-        pad_lower = [0, 0, 0]
-        pad_upper = [0, 0, 0]
-        pad_lower[i] = sd//2
-        pad_upper[i] = sd - sd//2
-        if sd > 0:
-            # fixed image is bigger, so pad the moving image
-            moving_image = sitk.ConstantPad(moving_image, pad_lower, pad_upper)
-        if sd < 0:
-            # fixed image is smaller, so pad the fixed image
-            fixed_image = sitk.ConstantPad(fixed_image, pad_lower, pad_upper)
+    fixed_image, moving_image = pad_images_to_same_extent(fixed_image, moving_image)
     # optionally load the initial transform
     if args.initial_transform is not None:
         initial_transform = sitk.ReadTransform(args.initial_transform)
@@ -162,14 +185,14 @@ def main():
         raise ValueError("one of `shrink-factors` or `smoothing-sigmas` have not been specified. you must "
                          "either leave both as the default `None` or specify both (with equal length)")
     # do the registration
-    displacement_field = multiscale_demons(
+    displacement_field, metric_history = multiscale_demons(
         fixed_image, moving_image, args.demons_type, args.max_iterations,
         demons_displacement_field_smooth_std=args.displacement_smoothing_std,
         demons_update_field_smooth_std=args.update_smoothing_std,
         initial_transform=initial_transform,
         multiscale_progression=multiscale_progression
     )
-    # finally, save the displacement transform or field
+    # save the displacement transform or field
     if args.output_format == "transform":
         sitk.WriteTransform(sitk.DisplacementFieldTransform(displacement_field), f"{args.output}.mat")
     elif args.output_format == "image":
@@ -182,6 +205,13 @@ def main():
         )
     else:
         raise ValueError(f"value given for `output-format`, {args.output_format}, is invalid and was not caught")
+    # save the metric history
+    with open(f"{args.output}_metric_history.csv", "w") as f:
+        csv_writer = csv.writer(f)
+        csv_writer.writerow(metric_history)
+    # optionally, create a plot of the metric history and save it
+    if args.plot_metric_history:
+        pass
 
 
 if __name__ == "__main__":
