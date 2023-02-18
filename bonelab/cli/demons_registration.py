@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+# external imports
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import SimpleITK as sitk
 from pathlib import Path
+from matplotlib import pyplot as plt
 import csv
 import yaml
 
+# internal imports
 from bonelab.util.vtk_util import vtkImageData_to_numpy
 from bonelab.io.vtk_helpers import get_vtk_reader
 from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_resample, DEMONS_FILTERS
@@ -109,7 +112,7 @@ def read_image(fn: str) -> sitk.Image:
         return sitk.ReadImage(fn)
     except RuntimeError as err:
         # if that gave an error, check if it's the error to do with not being able to find an appropriate ImageIO
-        if "Unable to determine ImageIO reader" in err:
+        if "Unable to determine ImageIO reader" in str(err):
             # if so, let's see if the vtk helpers in Bonelab can handle it
             reader = get_vtk_reader(fn)
             if reader is None:
@@ -121,6 +124,7 @@ def read_image(fn: str) -> sitk.Image:
             image.SetSpacing(vtk_image.GetSpacing())
             image.SetOrigin(vtk_image.GetOrigin())
             # vtk image data doesn't seem to store direction data -- problem??
+            # just be sure to apply the transform that gets derived consistently later on I guess
             return image
         else:
             raise err
@@ -131,15 +135,25 @@ def pad_images_to_same_extent(fixed_image: sitk.Image, moving_image: sitk.Image)
     for i, sd in enumerate(size_difference):
         pad_lower = [0, 0, 0]
         pad_upper = [0, 0, 0]
-        pad_lower[i] = sd // 2
-        pad_upper[i] = sd - (sd // 2)
+        pad_lower[i] = abs(sd) // 2
+        pad_upper[i] = abs(sd) - (abs(sd) // 2)
         if sd > 0:
             # fixed image is bigger, so pad the moving image
             moving_image = sitk.ConstantPad(moving_image, pad_lower, pad_upper)
         if sd < 0:
             # fixed image is smaller, so pad the fixed image
             fixed_image = sitk.ConstantPad(fixed_image, pad_lower, pad_upper)
-        return fixed_image, moving_image
+    return fixed_image, moving_image
+
+
+def create_and_save_metrics_plot(metrics_history: List[float], fn: str) -> None:
+    plt.figure()
+    plt.plot(metrics_history)
+    plt.xlabel('iteration')
+    plt.ylabel('metric')
+    plt.yscale('log')
+    plt.grid()
+    plt.savefig(fn)
 
 
 def main():
@@ -153,7 +167,7 @@ def main():
     fixed_image = sitk.Cast(read_image(args.fixed_image), sitk.sitkFloat32)
     moving_image = sitk.Cast(read_image(args.moving_image), sitk.sitkFloat32)
     # optionally, downsample the fixed and moving images
-    if (args.downsampling_shrink_factor is not None) and (arg.downsampling_smoothing_sigma is not None):
+    if (args.downsampling_shrink_factor is not None) and (args.downsampling_smoothing_sigma is not None):
         fixed_image = smooth_and_resample(
             fixed_image, args.downsampling_shrink_factor, args.downsampling_smoothing_sigma
         )
@@ -212,7 +226,7 @@ def main():
         csv_writer.writerow(metric_history)
     # optionally, create a plot of the metric history and save it
     if args.plot_metric_history:
-        pass
+        create_and_save_metrics_plot(metric_history, f"{args.output}_metric_history.png")
 
 
 if __name__ == "__main__":
