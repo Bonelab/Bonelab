@@ -190,7 +190,8 @@ def main():
         demons_displacement_field_smooth_std=args.displacement_smoothing_std,
         demons_update_field_smooth_std=args.update_smoothing_std,
         initial_transform=initial_transform,
-        multiscale_progression=multiscale_progression
+        multiscale_progression=multiscale_progression,
+        verbose=args.verbose
     )
     # save the displacement transform or field
     if args.output_format == "transform":
