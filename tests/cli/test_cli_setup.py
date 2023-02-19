@@ -84,9 +84,29 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
         '''Can run `blRegBCtransformresults`'''
         self.runner('blRegBCtransformresults')
 
-    def test_blAtocontour(self):
+    def test_blAutocontour(self):
         ''' Can run `blAutocontour` '''
         self.runner('blAutocontour')
+
+    def test_blRegistration(self):
+        ''' Can run `blRegistration` '''
+        self.runner('blRegistration')
+
+    def test_blDemonsRegistration(self):
+        ''' Can run `blDemonsRegistration` '''
+        self.runner('blDemonsRegistration')
+
+    def test_blITKSnapAnnotParser(self):
+        ''' Can run `blITKSnapAnnotParser` '''
+        self.runner('blITKSnapAnnotParser')
+
+    def test_blImageFilter(self):
+        ''' Can run `blImageFilter` '''
+        self.runner('blImageFilter')
+
+    def test_blPanningVideo(self):
+        ''' Can run `blPanningVideo` '''
+        self.runner('blPanningVideo')
 
 if __name__ == '__main__':
     unittest.main()

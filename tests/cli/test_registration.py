@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import unittest
 from hypothesis import given, strategies as st
+import shutil
+import tempfile
 
 from bonelab.cli.registration import create_parser, registration
 
