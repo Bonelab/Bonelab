@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 # external imports
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace, ArgumentTypeError
 import SimpleITK as sitk
 from matplotlib import pyplot as plt
 import csv
@@ -20,13 +20,18 @@ def create_string_argument_checker(options: List[str], argument_name: str) -> Ca
         if s in options:
             return s
         else:
-            raise ValueError(f"`{argument_name}` must be one of {options}. got {s}")
+            raise ArgumentTypeError(f"`{argument_name}` must be one of {options}. got {s}")
 
     return argument_checker
 
 
-# TODO: The plan is to have several options for optimizer, metric, interpolator, and initialization
-# TODO: Metrics - MeanSquares, Correlation, JointHistogramMutualInformation, MattesMutualInformation
+def check_percentage(x: float) -> float:
+    x = float(x)
+    if (x < 0.0) or (x > 1.0):
+        raise ArgumentTypeError(f"value must be between 0.0 and 1.0, got {x}")
+    return x
+
+
 def create_parser() -> ArgumentParser:
     parser = ArgumentParser(
         description="blRegistration: SimpleITK Registration Tool.",
@@ -132,6 +137,20 @@ def create_parser() -> ArgumentParser:
         ),
         help="the similarity metric to use, options: `MeanSquares`, `Correlation`, "
              "`JointHistogramMutualInformation`, `MattesMutualInformation`"
+    )
+    parser.add_argument(
+        "--similarity-metric-sampling-strategy", "-smss", default="None", metavar="STR",
+        type=create_string_argument_checker(["NONE", "REGULAR", "RANDOM"], "similarity-metric-sampling-strategy"),
+        help="sampling strategy for similarity metric, options: `NONE`, `REGULAR`, `RANDOM`"
+    )
+    parser.add_argument(
+        "--similarity-metric-sampling-rate", "-smsr", default=0.2, type=check_percentage, metavar="P",
+        help="sampling rate for similarity metric, must be between 0.0 and 1.0"
+    )
+    parser.add_argument(
+        "--similarity-metric-sampling-seed", "-smssd", default=None, type=int, metavar="N",
+        help="the seed for random sampling, leave as `None` if you want a random seed. Can be useful if you want a "
+             "deterministic registration with random sampling for debugging/testing"
     )
     parser.add_argument(
         "--mutual-information-num-histogram-bins", "-minhb", default=20, type=int, metavar="N",
@@ -274,6 +293,12 @@ def setup_similarity_metric(
         )
     else:
         raise ValueError("`similarity-metric` is invalid and was not caught")
+    registration_method.SetMetricSamplingStrategy(args.similarity_metric_sampling_strategy)
+    seed = (
+        args.similarity_metric_sampling_seed if args.similarity_metric_sampling_seed is not None
+        else sitk.sitkWallClock
+    )
+    registration_method.SetMetricSamplingPercentage(args.similarity_metric_sampling_rate, seed)
     return registration_method
 
 
