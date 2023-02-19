@@ -84,6 +84,18 @@ def create_parser() -> ArgumentParser:
         help="the optimizer to use, options: `GradientDescent`, `L-BFGS2`"
     )
     parser.add_argument(
+        "--gradient-descent-learning-rate", "-gdlr", default=1e-3, type=float, metavar="X",
+        help="learning rate when using gradient descent optimizer"
+    )
+    parser.add_argument(
+        "--gradient-descent-convergence-min-value", "-gdcmv", default=1e-6, type=float, metavar="X",
+        help="minimum value for convergence when using gradient descent optimizer"
+    )
+    parser.add_argument(
+        "--gradient-descent-convergence-window-size", "-gdcws", default=10, type=int, metavar="N",
+        help="window size for checking for convergence when using gradient descent optimizer"
+    )
+    parser.add_argument(
         "--similarity-metric", "-sm", default="MeanSquares", metavar="STR",
         type=create_string_argument_checker(
             ["MeanSquares", "Correlation", "JointHistogramMutualInformation", "MattesMutualInformation"],
@@ -184,6 +196,24 @@ def setup_optimizer(
         registration_method: sitk.ImageRegistrationMethod,
         args: Namespace
 ) -> sitk.ImageRegistrationMethod:
+    if args.optimizer == "GradientDescent":
+        registration_method.SetOptimizerAsGradientDescent(
+            learningRate=args.gradient_descent_learning_rate,
+            numberOfIterations=args.max_iterations,
+            convergenceMinimumValue=args.gradient_descent_convergence_min_value,
+            convergenceWindowSize=args.gradient_descent_convergence_window_size
+        )
+    elif args.optimizer == "L-BFGS2":
+        registration_method.SetOptimizerAsLBFGS2(
+            solutionAccuracy=,
+            numberOfIterations=args.max_iterations,
+            hessianApproximateAccuracy=,
+            deltaConvergenceDistance=,
+            deltaConvergenceTolerance=,
+            lineSearchMaximumEvaluations=
+        )
+        else:
+        raise ValueError("`optimizer` is invalid and was not caught")
     return registration_method
 
 
@@ -243,16 +273,20 @@ def main():
     # so we do not waste a lot of time doing the registration and then crashing at the end because of write permissions
     write_args_to_yaml(args, f"{args.output}.yaml")
     fixed_image, moving_image = read_and_downsample_images(args)
+    # create the object
     registration_method = sitk.ImageRegistrationMethod()
+    # set it up
     registration_method = setup_optimizer(registration_method, args)
     registration_method = setup_similarity_metric(registration_method, args)
     registration_method = setup_interpolator(registration_method, args)
     registration_method = setup_transform(registration_method, fixed_image, moving_image, args)
+    # monitor the metric over time - init the list and add the callback
     metric_history = []
     registration_method.AddCommand(
         sitk.sitkIterationEvent,
         create_metric_tracking_callback(registration_method, metric_history, args.verbose)
     )
+    # do the registration
     transform = registration_method.Execute(fixed_image, moving_image)
     # write transform to file
     sitk.WriteTransform(transform, f"{args.output}.mat")
