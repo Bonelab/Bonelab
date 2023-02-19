@@ -254,6 +254,13 @@ def main():
         create_metric_tracking_callback(registration_method, metric_history, args.verbose)
     )
     transform = registration_method.Execute(fixed_image, moving_image)
+    # write transform to file
+    sitk.WriteTransform(transform, f"{args.output}.mat")
+    # save the metric history
+    write_metrics_to_csv(metric_history, f"{args.output}_metric_history.csv")
+    # optionally, create a plot of the metric history and save it
+    if args.plot_metric_history:
+        create_and_save_metrics_plot(metric_history, f"{args.output}_metric_history.png")
 
 
 if __name__ == "__main__":
