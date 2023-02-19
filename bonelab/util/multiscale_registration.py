@@ -26,7 +26,10 @@ def create_metric_tracking_callback(
 ) -> Callable:
 
     def metric_tracking_callback() -> None:
-        metric = registration_filter.GetMetric()
+        try:
+            metric = registration_filter.GetMetric()
+        except AttributeError:
+            metric = registration_filter.GetMetricValue()
         metric_history.append(metric)
         if verbose:
             iteration = registration_filter.GetElapsedIterations()

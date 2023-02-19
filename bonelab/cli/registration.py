@@ -162,7 +162,7 @@ def create_parser() -> ArgumentParser:
              "similarity metric"
     )
     parser.add_argument(
-        "--interpolation-method", "-im", default="Linear", metavar="STR",
+        "--interpolator", "-int", default="Linear", metavar="STR",
         type=create_string_argument_checker(["Linear", "NearestNeighbour", "Gaussian"], "interpolator"),
         help="the interpolator to use, options: `Linear`, `NearestNeighbour`, `Gaussian`"
     )
@@ -315,14 +315,14 @@ def setup_interpolator(
         args: Namespace
 ) -> sitk.ImageRegistrationMethod:
     if args.interpolator == "Linear":
-        interpolation_method = sitk.sitkLinear
+        interpolator = sitk.sitkLinear
     elif args.interpolator == "NearestNeighbour":
-        interpolation_method = sitk.sitkNearestNeighbor
+        interpolator = sitk.sitkNearestNeighbor
     elif args.interpolator == "Gaussian":
-        interpolation_method = sitk.sitkGaussian
+        interpolator = sitk.sitkGaussian
     else:
         raise ValueError("`interpolator` is invalid and was not caught")
-    registration_method.SetInterpolator(interpolation_method)
+    registration_method.SetInterpolator(interpolator)
     return registration_method
 
 
