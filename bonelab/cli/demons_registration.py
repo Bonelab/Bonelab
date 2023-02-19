@@ -140,8 +140,7 @@ def construct_multiscale_progression(args: Namespace) -> Optional[List[Tuple[flo
                          "either leave both as the default `None` or specify both (with equal length)")
 
 
-def main():
-    args = create_parser().parse_args()
+def demons_registration(args: Namespace):
     # save the arguments of this registration to a yaml file
     # this has the added benefit of ensuring up-front that we can write files to the "output" that was provided,
     # so we do not waste a lot of time doing the registration and then crashing at the end because of write permissions
@@ -178,6 +177,10 @@ def main():
     # optionally, create a plot of the metric history and save it
     if args.plot_metric_history:
         create_and_save_metrics_plot(metric_history, f"{args.output}_metric_history.png")
+
+
+def main():
+    demons_registration(create_parser().parse_args())
 
 
 if __name__ == "__main__":
