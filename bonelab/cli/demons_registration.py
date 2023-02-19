@@ -6,11 +6,13 @@ import SimpleITK as sitk
 from pathlib import Path
 import csv
 import yaml
+from typing import Tuple, Optional
 
 # internal imports
 from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_resample, DEMONS_FILTERS
 from bonelab.cli.registration import (
-    read_and_downsample_images, create_and_save_metrics_plot, output_format_checker, write_metrics_to_csv
+    read_and_downsample_images, create_and_save_metrics_plot, output_format_checker, write_metrics_to_csv,
+    create_string_argument_checker
 )
 
 
@@ -41,7 +43,8 @@ def create_parser() -> ArgumentParser:
         help="path to where you want outputs saved to, with no extension (will be added)"
     )
     parser.add_argument(
-        "--output-format", "-of", default="image", type=output_format_checker, metavar="STR",
+        "--output-format", "-of", default="image", metavar="STR",
+        type=create_string_argument_checker(["transform", "image", "compressed-image"], "output-format"),
         help="format to save the output in, must be `transform`, `image`, or `compressed-image`."
              "`transform` -> .mat,"
              "`image` -> .nii,"

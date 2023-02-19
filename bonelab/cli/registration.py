@@ -6,6 +6,7 @@ import SimpleITK as sitk
 from matplotlib import pyplot as plt
 import csv
 import yaml
+from typing import List, Callable
 
 # internal imports
 from bonelab.util.vtk_util import vtkImageData_to_numpy
@@ -13,19 +14,20 @@ from bonelab.io.vtk_helpers import get_vtk_reader
 from bonelab.util.multiscale_registration import smooth_and_resample, create_metric_tracking_callback
 
 
-def output_format_checker(s: str) -> str:
-    s = str(s)
-    if s in ["transform", "image", "compressed-image"]:
-        return s
-    else:
-        raise ValueError(f"output-format must be `transform`, `image`, or `compressed-image`. got {s}")
+def create_string_argument_checker(options: List[str], argument_name: str) -> Callable:
+    def argument_checker(s: str) -> str:
+        s = str(s)
+        if s in options:
+            return s
+        else:
+            raise ValueError(f"`{argument_name}` must be one of {options}. got {s}")
+
+    return argument_checker
 
 
 # TODO: The plan is to have several options for optimizer, metric, interpolator, and initialization
 # TODO: Optimizers - GradientDescent, L-BFGS2
 # TODO: Metrics - MeanSquares, Correlation, JointHistogramMutualInformation, MattesMutualInformation
-# TODO: Interpolators - NN, Linear, Gaussian
-# TODO: Initialization - GEOMETRY, MOMENTS
 def create_parser() -> ArgumentParser:
     parser = ArgumentParser(
         description="blRegistration: SimpleITK Registration Tool.",
@@ -49,7 +51,8 @@ def create_parser() -> ArgumentParser:
         help="path to where you want outputs saved to, with no extension (will be added)"
     )
     parser.add_argument(
-        "--output-format", "-of", default="image", type=output_format_checker, metavar="STR",
+        "--output-format", "-of", default="image", metavar="STR",
+        type=create_string_argument_checker(["transform", "image", "compressed-image"], "output-format"),
         help="format to save the output in, must be `transform`, `image`, or `compressed-image`."
              "`transform` -> .mat,"
              "`image` -> .nii,"
@@ -74,6 +77,38 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--verbose", "-v", default=False, action="store_true",
         help="enable this flag to print a lot of stuff to the terminal about how the registration is proceeding"
+    )
+    parser.add_argument(
+        "--optimizer", "-opt", default="GradientDescent", metavar="STR",
+        type=create_string_argument_checker(["GradientDescent", "L-BFGS2"], "optimizer"),
+        help="the optimizer to use, options: `GradientDescent`, `L-BFGS2`"
+    )
+    parser.add_argument(
+        "--similarity-metric", "-sm", default="MeanSquares", metavar="STR",
+        type=create_string_argument_checker(
+            ["MeanSquares", "Correlation", "JointHistogramMutualInformation", "MattesMutualInformation"],
+            "similarity-metric"
+        ),
+        help="the similarity metric to use, options: `MeanSquares`, `Correlation`, "
+             "`JointHistogramMutualInformation`, `MattesMutualInformation`"
+    )
+    parser.add_argument(
+        "--interpolation-method", "-im", default="Linear", metavar="STR",
+        type=create_string_argument_checker(["Linear", "NearestNeighbour", "Gaussian"], "interpolator"),
+        help="the interpolator to use, options: `Linear`, `NearestNeighbour`, `Gaussian`"
+    )
+    parser.add_argument(
+        "--centering-initialization", "-ci", default="Geometry", metavar="STR",
+        type=create_string_argument_checker(["Geometry", "Moments"], "centering-initialization"),
+        help="the centering initialization to use, options: `Geometry`, `Moments`"
+    )
+    parser.add_argument(
+        "--transform-type", "-tt", default="Euler3D", metavar="STR",
+        type=create_string_argument_checker(["Euler3D", "Euler2D"], "transform-type"),
+        help="the type of transformation to do, options: `Euler3D`, `Euler2D`. NOTE: these are just rigid "
+             "transformations in 3D or 2D, non-rigid transforms are beyond the current scope of this tool. If you "
+             "want a deformable registration, then either use blDemonsRegistration, extend this tool to be more "
+             "flexible, or write a custom registration script and manually specify the transform you want to fit. "
     )
 
     return parser
@@ -145,6 +180,62 @@ def read_and_downsample_images(args: Namespace) -> Tuple[sitk.Image, sitk.Image]
     return fixed_image, moving_image
 
 
+def setup_optimizer(
+        registration_method: sitk.ImageRegistrationMethod,
+        args: Namespace
+) -> sitk.ImageRegistrationMethod:
+    return registration_method
+
+
+def setup_similarity_metric(
+        registration_method: sitk.ImageRegistrationMethod,
+        args: Namespace
+) -> sitk.ImageRegistrationMethod:
+    return registration_method
+
+
+def setup_interpolator(
+        registration_method: sitk.ImageRegistrationMethod,
+        args: Namespace
+) -> sitk.ImageRegistrationMethod:
+    if args.interpolator == "Linear":
+        interpolation_method = sitk.sitkLinear
+    elif args.interpolator == "NearestNeighbour":
+        interpolation_method = sitk.sitkNearestNeighbor
+    elif args.interpolator == "Gaussian":
+        interpolation_method = sitk.sitkGaussian
+    else:
+        raise ValueError("`interpolator` is invalid and was not caught")
+    registration_method.SetInterpolator(interpolation_method)
+    return registration_method
+
+
+def setup_transform(
+        registration_method: sitk.ImageRegistrationMethod,
+        fixed_image: sitk.Image,
+        moving_image: sitk.Image,
+        args: Namespace
+) -> sitk.ImageRegistrationMethod:
+    if args.transform_type == "Euler3D":
+        transform_type = sitk.Euler3DTransform()
+    elif args.transform_type == "Euler2D":
+        transform_type = sitk.Euler2DTransform()
+    else:
+        raise ValueError("`transform-type` is invalid and was not caught")
+    if args.centering_initialization == "Geometry":
+        centering_initialization = sitk.CenteredTransformInitializerFilter.GEOMETRY
+    elif args.centering_initialization == "Moments":
+        centering_initialization = sitk.CenteredTransformInitializerFilter.MOMENTS
+    else:
+        raise ValueError("`centering_initialization` is invalid and was not caught")
+    initial_transform = sitk.CenteredTransformInitializer(
+        fixed_image, moving_image,
+        transform_type, centering_initialization
+    )
+    registration_method.SetInitialTransform(initial_transform)
+    return registration_method
+
+
 def main():
     args = create_parser().parse_args()
     # save the arguments of this registration to a yaml file
@@ -152,6 +243,17 @@ def main():
     # so we do not waste a lot of time doing the registration and then crashing at the end because of write permissions
     write_args_to_yaml(args, f"{args.output}.yaml")
     fixed_image, moving_image = read_and_downsample_images(args)
+    registration_method = sitk.ImageRegistrationMethod()
+    registration_method = setup_optimizer(registration_method, args)
+    registration_method = setup_similarity_metric(registration_method, args)
+    registration_method = setup_interpolator(registration_method, args)
+    registration_method = setup_transform(registration_method, fixed_image, moving_image, args)
+    metric_history = []
+    registration_method.AddCommand(
+        sitk.sitkIterationEvent,
+        create_metric_tracking_callback(registration_method, metric_history, args.verbose)
+    )
+    transform = registration_method.Execute(fixed_image, moving_image)
 
 
 if __name__ == "__main__":
