@@ -26,7 +26,6 @@ def create_string_argument_checker(options: List[str], argument_name: str) -> Ca
 
 
 # TODO: The plan is to have several options for optimizer, metric, interpolator, and initialization
-# TODO: Optimizers - GradientDescent, L-BFGS2
 # TODO: Metrics - MeanSquares, Correlation, JointHistogramMutualInformation, MattesMutualInformation
 def create_parser() -> ArgumentParser:
     parser = ArgumentParser(
@@ -71,6 +70,16 @@ def create_parser() -> ArgumentParser:
         help="number of iterations to run registration algorithm for at each stage"
     )
     parser.add_argument(
+        "--shrink-factors", "-sf", default=None, type=float, nargs="+", metavar="X",
+        help="factors by which to shrink the fixed and moving image at each stage of the multiscale progression. you "
+             "must give the same number of arguments here as you do for `smoothing-sigmas`"
+    )
+    parser.add_argument(
+        "--smoothing-sigmas", "-ss", default=None, type=float, nargs="+", metavar="X",
+        help="sigmas for the Gaussians used to smooth the fixed and moving image at each stage of the multiscale "
+             "progression. you must give the same number of arguments here as you do for `shrink-factors`"
+    )
+    parser.add_argument(
         "--plot-metric-history", "-pmh", default=False, action="store_true",
         help="enable this flag to save a plot of the metric history to file in addition to the raw data"
     )
@@ -96,6 +105,26 @@ def create_parser() -> ArgumentParser:
         help="window size for checking for convergence when using gradient descent optimizer"
     )
     parser.add_argument(
+        "--lbfgs-solution-accuracy", "-lsa", default=1e-5, type=float, metavar="X",
+        help="solution accuracy when using L-BFGS2 as optimizer"
+    )
+    parser.add_argument(
+        "--lbfgs-hessian-approximate-accuracy", "-lhaa", default=6, type=int, metavar="N",
+        help="hessian approximate accuracy when using L-BFGS2 as optimizer"
+    )
+    parser.add_argument(
+        "--lbfgs-delta-convergence-distance", "-ldcd", default=0, type=int, metavar="N",
+        help="delta convergence distance when using L-BFGS2 as optimizer"
+    )
+    parser.add_argument(
+        "--lbfgs-delta-convergence-tolerance", "-ldct", default=1e-5, type=float, metavar="X",
+        help="delta convergence tolerance when using L-BFGS2 as optimizer"
+    )
+    parser.add_argument(
+        "--lbfgs-linesearch-maximum-evaluations", "-llme", default=40, type=int, metavar="X",
+        help="maximum number of linesearch evaluations when using L-BFGS2 as optimizer"
+    )
+    parser.add_argument(
         "--similarity-metric", "-sm", default="MeanSquares", metavar="STR",
         type=create_string_argument_checker(
             ["MeanSquares", "Correlation", "JointHistogramMutualInformation", "MattesMutualInformation"],
@@ -103,6 +132,15 @@ def create_parser() -> ArgumentParser:
         ),
         help="the similarity metric to use, options: `MeanSquares`, `Correlation`, "
              "`JointHistogramMutualInformation`, `MattesMutualInformation`"
+    )
+    parser.add_argument(
+        "--mutual-information-num-histogram-bins", "-minhb", default=20, type=int, metavar="N",
+        help="number of bins in histogram when using joint histogram or Mattes mutual information similarity metrics"
+    )
+    parser.add_argument(
+        "--joint-mutual-information-joint-smoothing-variance", "-jmijsv", default=1.5, type=float, metavar="X",
+        help="variance to use when smoothing the joint PDF when using the joint histogram mutual information "
+             "similarity metric"
     )
     parser.add_argument(
         "--interpolation-method", "-im", default="Linear", metavar="STR",
@@ -205,14 +243,14 @@ def setup_optimizer(
         )
     elif args.optimizer == "L-BFGS2":
         registration_method.SetOptimizerAsLBFGS2(
-            solutionAccuracy=,
+            solutionAccuracy=args.lbfgs_solution_accuracy,
             numberOfIterations=args.max_iterations,
-            hessianApproximateAccuracy=,
-            deltaConvergenceDistance=,
-            deltaConvergenceTolerance=,
-            lineSearchMaximumEvaluations=
+            hessianApproximateAccuracy=args.lbfgs_hessian_approximate_accuracy,
+            deltaConvergenceDistance=args.lbfgs_delta_convergence_distance,
+            deltaConvergenceTolerance=args.lbfgs_delta_convergence_tolerance,
+            lineSearchMaximumEvaluations=args.lbfgs_linesearch_maximum_evaluations
         )
-        else:
+    else:
         raise ValueError("`optimizer` is invalid and was not caught")
     return registration_method
 
@@ -221,6 +259,21 @@ def setup_similarity_metric(
         registration_method: sitk.ImageRegistrationMethod,
         args: Namespace
 ) -> sitk.ImageRegistrationMethod:
+    if args.similarity_metric == "MeanSquares":
+        registration_method.SetMetricAsMeanSquares()
+    elif args.similarity_metric == "Correlation":
+        registration_method.SetMetricAsCorrelation()
+    elif args.similarity_metric == "JointHistogramMutualInformation":
+        registration_method.SetMetricAsJointHistogramMutualInformation(
+            numberOfHistogramBins=args.mutual_information_num_histogram_bins,
+            varianceForJointPDFSmoothing=args.joint_mutual_information_joint_smoothing_variance
+        )
+    elif args.similarity_metric == "MattesMutualInformation":
+        registration_method.SetMetricAsMattesMutualInformation(
+            numberOfHistogramBins=args.mutual_information_num_histogram_bins
+        )
+    else:
+        raise ValueError("`similarity-metric` is invalid and was not caught")
     return registration_method
 
 
@@ -266,6 +319,24 @@ def setup_transform(
     return registration_method
 
 
+def setup_multiscale_progression(
+        registration_method: sitk.ImageRegistrationMethod,
+        args: Namespace
+) -> sitk.ImageRegistrationMethod:
+    if (args.shrink_factors is not None) and (args.smoothing_sigmas is not None):
+        if len(args.shrink_factors) == len(args.smoothing_sigmas):
+            registration_method.SetShrinkFactorsPerLevel(args.shrink_factors)
+            registration_method.SetSmoothingSigmasPerLevel(args.smoothing_sigmas)
+            return registration_method
+        else:
+            raise ValueError("`shrink-factors` and `smoothing-sigmas` must have same length")
+    elif (args.shrink_factors is None) and (args.smoothing_sigmas is None):
+        return registration_method
+    else:
+        raise ValueError("one of `shrink-factors` or `smoothing-sigmas` have not been specified. you must "
+                         "either leave both as the default `None` or specify both (with equal length)")
+
+
 def main():
     args = create_parser().parse_args()
     # save the arguments of this registration to a yaml file
@@ -280,6 +351,7 @@ def main():
     registration_method = setup_similarity_metric(registration_method, args)
     registration_method = setup_interpolator(registration_method, args)
     registration_method = setup_transform(registration_method, fixed_image, moving_image, args)
+    registration_method = setup_multiscale_progression(registration_method, args)
     # monitor the metric over time - init the list and add the callback
     metric_history = []
     registration_method.AddCommand(
