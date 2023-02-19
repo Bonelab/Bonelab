@@ -77,7 +77,7 @@ class TestMultiscaleDemons(unittest.TestCase):
             [float((x + 1) ** 2) for x in range(n)], [float((x + 1) ** 2) for x in range(n)]
         ))
         fixed, moving = generate_sitk_image(shape), generate_sitk_image(shape)
-        ddf = multiscale_demons(
+        ddf, _ = multiscale_demons(
             fixed, moving, demons_type, demons_iterations,
             multiscale_progression=multiscale_progression
         )

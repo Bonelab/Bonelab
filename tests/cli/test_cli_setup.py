@@ -5,6 +5,7 @@ import subprocess
 
 from tests.config_cli import cfg
 
+
 class TestCommandLineInterfeceSetup(unittest.TestCase):
     '''Test command line interface setup
 
@@ -107,6 +108,7 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
     def test_blPanningVideo(self):
         ''' Can run `blPanningVideo` '''
         self.runner('blPanningVideo')
+
 
 if __name__ == '__main__':
     unittest.main()

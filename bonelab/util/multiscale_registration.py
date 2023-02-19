@@ -124,7 +124,8 @@ def multiscale_registration(
 
     # If we are doing this with a multiscale progression, work through this progression in order first
     if multiscale_progression is not None:
-        print(f"Multiscale progression starting | There will be {len(multiscale_progression):d} steps.")
+        if verbose:
+            print(f"Multiscale progression starting | There will be {len(multiscale_progression):d} steps.")
         for (i, (shrink_factor, smoothing_sigma)) in enumerate(multiscale_progression):
             if verbose:
                 print(f"Step {i+1:d} of {len(multiscale_progression):d} "
@@ -194,6 +195,9 @@ def multiscale_demons(
         sigma. If this argument is provided, a series of registrations will be performed on resampled and smoothed
         images in the order that the shrink factor and smoothing sigma pairs are given, ending with a final registration
         at full resolution. If this argument is not given then only one registration is performed, at full resolution.
+
+    verbose : bool
+        Whether to print messages to the terminal about how the registration is going.
 
     Returns
     -------

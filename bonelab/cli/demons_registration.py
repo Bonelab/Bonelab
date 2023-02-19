@@ -11,7 +11,7 @@ from typing import Tuple, Optional
 # internal imports
 from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_resample, DEMONS_FILTERS
 from bonelab.cli.registration import (
-    read_and_downsample_images, create_and_save_metrics_plot, output_format_checker, write_metrics_to_csv,
+    read_and_downsample_images, create_and_save_metrics_plot, write_metrics_to_csv,
     create_string_argument_checker
 )
 

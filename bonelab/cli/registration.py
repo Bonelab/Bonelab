@@ -140,7 +140,7 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "--similarity-metric-sampling-strategy", "-smss", default="None", metavar="STR",
-        type=create_string_argument_checker(["NONE", "REGULAR", "RANDOM"], "similarity-metric-sampling-strategy"),
+        type=create_string_argument_checker(["None", "Regular", "Random"], "similarity-metric-sampling-strategy"),
         help="sampling strategy for similarity metric, options: `NONE`, `REGULAR`, `RANDOM`"
     )
     parser.add_argument(
@@ -240,7 +240,7 @@ def read_and_downsample_images(args: Namespace) -> Tuple[sitk.Image, sitk.Image]
         moving_image = smooth_and_resample(
             moving_image, args.downsampling_shrink_factor, args.downsampling_smoothing_sigma
         )
-    elif (args.downsampling_shrink_factor is None) and (arg.downsampling_smoothing_sigma is None):
+    elif (args.downsampling_shrink_factor is None) and (args.downsampling_smoothing_sigma is None):
         # do not downsample fixed and moving images
         pass
     else:
@@ -293,7 +293,15 @@ def setup_similarity_metric(
         )
     else:
         raise ValueError("`similarity-metric` is invalid and was not caught")
-    registration_method.SetMetricSamplingStrategy(args.similarity_metric_sampling_strategy)
+    if args.similarity_metric_sampling_strategy == "None":
+        strategy = registration_method.NONE
+    elif args.similarity_metric_sampling_strategy == "Regular":
+        strategy = registration_method.REGULAR
+    elif args.similarity_metric_sampling_strategy == "Random":
+        strategy = registration_method.RANDOM
+    else:
+        raise ValueError("`similarity-sampling-strategy` is invalid but was not caught")
+    registration_method.SetMetricSamplingStrategy(strategy)
     seed = (
         args.similarity_metric_sampling_seed if args.similarity_metric_sampling_seed is not None
         else sitk.sitkWallClock
