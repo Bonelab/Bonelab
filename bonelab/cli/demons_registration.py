@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 # external imports
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace
 import SimpleITK as sitk
 from pathlib import Path
 import csv
@@ -61,7 +61,14 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--initial-transform", "-it", default=None, type=str, metavar="FN",
         help="the path to a file that can be read by sitk.ReadTransform and that contains the transform you want "
-             "to initialize the registration process with (e.g. can obtain using blRegistration)"
+             "to initialize the registration process with (e.g. can obtain using blRegistration). If you don't provide "
+             "anything then a basic centering initialization will be done."
+    )
+    parser.add_argument(
+        "--centering-initialization", "-ci", default="Geometry", metavar="STR",
+        type=create_string_argument_checker(["Geometry", "Moments"], "centering-initialization"),
+        help="if no initial transform provided, the centering initialization to use. "
+             "options: `Geometry`, `Moments`"
     )
     parser.add_argument(
         "--demons-type", "-dt", default="demons", type=demons_type_checker, metavar="STR",
@@ -140,6 +147,29 @@ def construct_multiscale_progression(args: Namespace) -> Optional[List[Tuple[flo
                          "either leave both as the default `None` or specify both (with equal length)")
 
 
+def create_centering_transform(
+        fixed_image: sitk.Image,
+        moving_image: sitk.Image,
+        args: Namespace
+) -> sitk.Transform:
+    if fixed_image.GetDimension() == 3:
+        transform_type = sitk.Euler3DTransform()
+    elif fixed_image.GetDimension() == 3:
+        transform_type = sitk.Euler2DTransform()
+    else:
+        raise ValueError(f"`fixed_image` has dimension of {fixed_image.GetDimension()}, only 2 and 3 supported")
+    if args.centering_initialization == "Geometry":
+        centering_initialization = sitk.CenteredTransformInitializerFilter.GEOMETRY
+    elif args.centering_initialization == "Moments":
+        centering_initialization = sitk.CenteredTransformInitializerFilter.MOMENTS
+    else:
+        raise ValueError("`centering_initialization` is invalid and was not caught")
+    return sitk.CenteredTransformInitializer(
+        fixed_image, moving_image,
+        transform_type, centering_initialization
+    )
+
+
 def demons_registration(args: Namespace):
     # save the arguments of this registration to a yaml file
     # this has the added benefit of ensuring up-front that we can write files to the "output" that was provided,
@@ -149,7 +179,16 @@ def demons_registration(args: Namespace):
     check_image_size_and_shrink_factors(fixed_image, moving_image, args.shrink_factors)
     # we have to pad the images to be the same size - just a requirement of the Demons algorithms
     fixed_image, moving_image = pad_images_to_same_extent(fixed_image, moving_image)
-    initial_transform = read_transform(args)
+    # I am a little bit unsure about this. You need the fixed and moving images to exist in the same physical space
+    # for the diffeomorphic, symmetric, and fast symmetric demons algorithms to work (otherwise they crash).
+    # copying the metadata from the fixed_image onto the moving_image makes it so these algorithms will run, but I'm
+    # not sure how this will affect the resulting transform. needs to be tested a bit to make sure we don't end up with
+    # with weird stuff happening
+    moving_image.CopyInformation(fixed_image)
+    if args.initial_transform is not None:
+        initial_transform = read_transform(args)
+    else:
+        initial_transform = create_centering_transform(fixed_image, moving_image, args)
     multiscale_progression = construct_multiscale_progression(args)
     # do the registration
     displacement_field, metric_history = multiscale_demons(

@@ -8,7 +8,7 @@ import tempfile
 import SimpleITK as sitk
 import numpy as np
 
-from bonelab.cli.demons_registration import create_parser, demons_registration
+from bonelab.cli.demons_registration import create_parser, demons_registration, DEMONS_FILTERS
 
 
 IMAGE_SIZE_DICT = {
@@ -96,11 +96,31 @@ class TestDemonsRegistration(unittest.TestCase):
                 + ["-sf"] + [f"{sf}" for sf in shrink_factors]
                 + ["-ss"] + [f"{ss}" for ss in smoothing_sigmas]
         )
+        # we want this to either succeed, or to fail because we correctly caught that the user gave a combination
+        # of a small image and a big shrink factor. any other error is not OK though
         try:
             demons_registration(create_parser().parse_args(args=args))
         except RuntimeError as err:
             if "image sizes and shrink factors" not in str(err):
                 raise err
+
+    @given(
+        fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        output_format=st.sampled_from(["transform", "image", "compressed-image"])
+    )
+    def test_output_formats(self, fixed_image, moving_image, output_format):
+        args = self._construct_default_args(fixed_image, moving_image) + ["-of", f"{output_format}"]
+        demons_registration(create_parser().parse_args(args=args))
+
+    @given(
+        fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        demons_type=st.sampled_from(list(DEMONS_FILTERS.keys()))
+    )
+    def test_demons_types(self, fixed_image, moving_image, demons_type):
+        args = self._construct_default_args(fixed_image, moving_image) + ["-dt", f"{demons_type}"]
+        demons_registration(create_parser().parse_args(args=args))
 
 
 if __name__ == '__main__':
