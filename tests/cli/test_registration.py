@@ -161,6 +161,15 @@ class TestRegistration(unittest.TestCase):
         args = self._construct_default_args(fixed_image, moving_image) + ["-int", f"{interpolator}"]
         registration(create_parser().parse_args(args=args))
 
+    @given(
+        fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        initialization=st.sampled_from(["Geometry", "Moments"])
+    )
+    def test_initialization(self, fixed_image, moving_image, initialization):
+        args = self._construct_default_args(fixed_image, moving_image) + ["-ci", f"{initialization}"]
+        registration(create_parser().parse_args(args=args))
+
 
 if __name__ == '__main__':
     unittest.main()
