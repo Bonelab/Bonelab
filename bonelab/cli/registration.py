@@ -368,12 +368,29 @@ def setup_multiscale_progression(
                          "either leave both as the default `None` or specify both (with equal length)")
 
 
+def check_image_size_and_shrink_factors(
+        fixed_image: sitk.Image,
+        moving_image: sitk.Image,
+        shrink_factors: Optional[List[int]]
+) -> None:
+    if shrink_factors is not None:
+        smallest_dim = min(fixed_image.GetSize() + moving_image.GetSize())
+        largest_shrink_factor = max(shrink_factors)
+        if smallest_dim // largest_shrink_factor == 1:
+            raise RuntimeError(f"The image sizes and shrink factors will result in an image being shrunk too much, such "
+                               f"that the downsampled image will have a unit size (or smaller). Revise parameters."
+                               f"\nfixed_image size: {fixed_image.GetSize()}"
+                               f"\nmoving_image size: {moving_image.GetSize()}"
+                               f"\nshrink_factors: {shrink_factors}")
+
+
 def registration(args: Namespace):
     # save the arguments of this registration to a yaml file
     # this has the added benefit of ensuring up-front that we can write files to the "output" that was provided,
     # so we do not waste a lot of time doing the registration and then crashing at the end because of write permissions
     write_args_to_yaml(args, f"{args.output}.yaml")
     fixed_image, moving_image = read_and_downsample_images(args)
+    check_image_size_and_shrink_factors(fixed_image, moving_image, args.shrink_factors)
     # create the object
     registration_method = sitk.ImageRegistrationMethod()
     # set it up

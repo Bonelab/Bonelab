@@ -71,6 +71,37 @@ class TestDemonsRegistration(unittest.TestCase):
         args += ["-it", os.path.join(self.test_dir, f"{TEST_OUTPUT_LABEL}.mat")]
         demons_registration(create_parser().parse_args(args=args))
 
+    @given(
+        fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        downsampling=st.integers(min_value=2, max_value=4)
+    )
+    def test_downsampling(self, fixed_image, moving_image, downsampling):
+        args = (
+                self._construct_default_args(fixed_image, moving_image)
+                + ["-dsf", f"{downsampling}", "-dss", f"{downsampling}"]
+        )
+        demons_registration(create_parser().parse_args(args=args))
+
+    @given(
+        fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        n=st.integers(min_value=2, max_value=4)
+    )
+    def test_multiscale(self, fixed_image, moving_image, n):
+        shrink_factors = [int(2 ** (x + 1)) for x in range(n)]
+        smoothing_sigmas = [float(2 ** (x + 1)) for x in range(n)]
+        args = (
+                self._construct_default_args(fixed_image, moving_image)
+                + ["-sf"] + [f"{sf}" for sf in shrink_factors]
+                + ["-ss"] + [f"{ss}" for ss in smoothing_sigmas]
+        )
+        try:
+            demons_registration(create_parser().parse_args(args=args))
+        except RuntimeError as err:
+            if "image sizes and shrink factors" not in str(err):
+                raise err
+
 
 if __name__ == '__main__':
     unittest.main()

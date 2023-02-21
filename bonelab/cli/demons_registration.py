@@ -12,7 +12,7 @@ from typing import Tuple, Optional
 from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_resample, DEMONS_FILTERS
 from bonelab.cli.registration import (
     read_and_downsample_images, create_and_save_metrics_plot, write_metrics_to_csv,
-    create_string_argument_checker, write_args_to_yaml
+    create_string_argument_checker, write_args_to_yaml, check_image_size_and_shrink_factors
 )
 
 
@@ -146,6 +146,7 @@ def demons_registration(args: Namespace):
     # so we do not waste a lot of time doing the registration and then crashing at the end because of write permissions
     write_args_to_yaml(args, f"{args.output}.yaml")
     fixed_image, moving_image = read_and_downsample_images(args)
+    check_image_size_and_shrink_factors(fixed_image, moving_image, args.shrink_factors)
     # we have to pad the images to be the same size - just a requirement of the Demons algorithms
     fixed_image, moving_image = pad_images_to_same_extent(fixed_image, moving_image)
     initial_transform = read_transform(args)
