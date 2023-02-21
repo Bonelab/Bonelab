@@ -137,7 +137,10 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--similarity-metric-sampling-strategy", "-smss", default="None", metavar="STR",
         type=create_string_argument_checker(["None", "Regular", "Random"], "similarity-metric-sampling-strategy"),
-        help="sampling strategy for similarity metric, options: `NONE`, `REGULAR`, `RANDOM`"
+        help="sampling strategy for similarity metric, options: "
+             "`None` -> use all points, "
+             "`Regular` -> sample on a regular grid with specified sampling rate, "
+             "`Random` -> sample randomly with specified sampling rate."
     )
     parser.add_argument(
         "--similarity-metric-sampling-rate", "-smsr", default=0.2, type=check_percentage, metavar="P",

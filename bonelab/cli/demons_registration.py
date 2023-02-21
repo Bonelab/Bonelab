@@ -12,7 +12,7 @@ from typing import Tuple, Optional
 from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_resample, DEMONS_FILTERS
 from bonelab.cli.registration import (
     read_and_downsample_images, create_and_save_metrics_plot, write_metrics_to_csv,
-    create_string_argument_checker
+    create_string_argument_checker, write_args_to_yaml
 )
 
 
@@ -61,7 +61,7 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--initial-transform", "-it", default=None, type=str, metavar="FN",
         help="the path to a file that can be read by sitk.ReadTransform and that contains the transform you want "
-             "to initialize the registration process with (e.g. can obtain using blRegister)"
+             "to initialize the registration process with (e.g. can obtain using blRegistration)"
     )
     parser.add_argument(
         "--demons-type", "-dt", default="demons", type=demons_type_checker, metavar="STR",
