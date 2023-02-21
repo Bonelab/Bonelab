@@ -154,7 +154,7 @@ def create_centering_transform(
 ) -> sitk.Transform:
     if fixed_image.GetDimension() == 3:
         transform_type = sitk.Euler3DTransform()
-    elif fixed_image.GetDimension() == 3:
+    elif fixed_image.GetDimension() == 2:
         transform_type = sitk.Euler2DTransform()
     else:
         raise ValueError(f"`fixed_image` has dimension of {fixed_image.GetDimension()}, only 2 and 3 supported")
