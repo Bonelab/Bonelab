@@ -114,7 +114,7 @@ def create_parser() -> ArgumentParser:
         help="maximum number of line iterations when using Powell optimizer"
     )
     parser.add_argument(
-        "--powell_step_length", "-psl", default=float, type=1.0, metavar="X",
+        "--powell_step_length", "-psl", default=1.0, type=float, metavar="X",
         help="maximum step length when using Powell optimizer"
     )
     parser.add_argument(

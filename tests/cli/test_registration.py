@@ -103,15 +103,31 @@ class TestRegistration(unittest.TestCase):
     @given(
         fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
-        lr=st.floats(min_value=1e-6, max_value=1e-2),
-        cmv=st.floats(min_value=1e-6, max_value=1e-2),
-        cws=st.integers(min_value=3, max_value=20)
+        gdlr=st.floats(min_value=1e-6, max_value=1e-2),
+        gdcmv=st.floats(min_value=1e-6, max_value=1e-2),
+        gdcws=st.integers(min_value=3, max_value=20)
     )
-    def test_gradient_descent(self, fixed_image, moving_image, lr, cmv, cws):
+    def test_gradient_descent(self, fixed_image, moving_image, gdlr, gdcmv, gdcws):
         args = (
             self._construct_default_args(fixed_image, moving_image)
             + ["-opt", "GradientDescent"]
-            + ["-gdlr", f"{lr}", "-gdcmv", f"{cmv}", "-gdcws", f"{cws}"]
+            + ["-gdlr", f"{gdlr}", "-gdcmv", f"{gdcmv}", "-gdcws", f"{gdcws}"]
+        )
+        registration(create_parser().parse_args(args=args))
+
+    @given(
+        fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        pmli=st.integers(min_value=10, max_value=20),
+        psl=st.floats(min_value=0.1, max_value=10.0),
+        pst=st.floats(min_value=1e-8, max_value=1e-4),
+        pvt=st.floats(min_value=1e-8, max_value=1e-4),
+    )
+    def test_powell(self, fixed_image, moving_image, pmli, psl, pst, pvt):
+        args = (
+            self._construct_default_args(fixed_image, moving_image)
+            + ["-opt", "Powell", "-dsf", "2", "-dss", f"2.0"]
+            + ["-pmli", f"{pmli}", "-psl", f"{psl}", "-pst", f"{pst}", "-pvt", f"{pvt}"]
         )
         registration(create_parser().parse_args(args=args))
 
