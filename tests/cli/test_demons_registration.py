@@ -24,15 +24,7 @@ DEFAULT_ITERATIONS = 10
 
 """
 We probably want to do something like this here to test that we can load a transform
-    @given(
-        fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
-        moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys()))
-    )
-    def test_default_then_load_transform(self, fixed_image, moving_image):
-        args = self._construct_default_args(fixed_image, moving_image)
-        registration(create_parser().parse_args(args=args))
-        args += ["-it", os.path.join(self.test_dir, f"{TEST_OUTPUT_LABEL}.mat")]
-        registration(create_parser().parse_args(args=args))
+
 """
 
 
@@ -67,6 +59,16 @@ class TestDemonsRegistration(unittest.TestCase):
     )
     def test_default(self, fixed_image, moving_image):
         args = self._construct_default_args(fixed_image, moving_image)
+        demons_registration(create_parser().parse_args(args=args))
+
+    @given(
+        fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys()))
+    )
+    def test_default_then_load_transform(self, fixed_image, moving_image):
+        args = self._construct_default_args(fixed_image, moving_image) + ["-of", "transform"]
+        demons_registration(create_parser().parse_args(args=args))
+        args += ["-it", os.path.join(self.test_dir, f"{TEST_OUTPUT_LABEL}.mat")]
         demons_registration(create_parser().parse_args(args=args))
 
 
