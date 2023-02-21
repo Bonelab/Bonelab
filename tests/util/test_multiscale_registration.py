@@ -74,7 +74,7 @@ class TestMultiscaleDemons(unittest.TestCase):
     def test_demons(self, demons_type, d, n, demons_iterations):
         shape = (d, d, d)
         multiscale_progression = tuple(zip(
-            [float((x + 1) ** 2) for x in range(n)], [float((x + 1) ** 2) for x in range(n)]
+            [float(2 ** (x + 1)) for x in range(n)], [float(2 ** (x + 1)) for x in range(n)]
         ))
         fixed, moving = generate_sitk_image(shape), generate_sitk_image(shape)
         ddf, _ = multiscale_demons(

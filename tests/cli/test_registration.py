@@ -12,10 +12,15 @@ from bonelab.cli.registration import create_parser, registration
 
 
 IMAGE_SIZE_DICT = {
-    "small": 10,
-    "medium": 15,
-    "big": 20
+    "small": 20,
+    "medium": 25,
+    "big": 30
 }
+
+TEST_OUTPUT_LABEL = "test_output"
+
+# set this low so that testing goes quickly
+DEFAULT_ITERATIONS = 10
 
 
 class TestRegistration(unittest.TestCase):
@@ -36,13 +41,78 @@ class TestRegistration(unittest.TestCase):
         # Remove temporary directory and all files
         shutil.rmtree(self.test_dir)
 
+    def _construct_default_args(self, fixed_image: str, moving_image: str) -> List[str]:
+        output = os.path.join(self.test_dir, TEST_OUTPUT_LABEL)
+        return [
+            self.random_images[fixed_image], self.random_images[moving_image], output,
+            "-mi", f"{DEFAULT_ITERATIONS}"
+        ]
+
     @given(
         fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys()))
     )
     def test_default(self, fixed_image, moving_image):
-        output = os.path.join(self.test_dir, "test_output")
-        args = [self.random_images[fixed_image], self.random_images[moving_image], output]
+        args = self._construct_default_args(fixed_image, moving_image)
+        registration(create_parser().parse_args(args=args))
+
+    @given(
+        fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        output_format=st.sampled_from(["transform", "image", "compressed-image"])
+    )
+    def test_output_formats(self, fixed_image, moving_image, output_format):
+        args = self._construct_default_args(fixed_image, moving_image) + ["-of", output_format]
+        registration(create_parser().parse_args(args=args))
+
+    @given(
+        fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        downsampling=st.integers(min_value=2, max_value=4)
+    )
+    def test_downsampling(self, fixed_image, moving_image, downsampling):
+        args = (
+            self._construct_default_args(fixed_image, moving_image)
+            + ["-dsf", f"{downsampling}", "-dss", f"{downsampling}"]
+        )
+        registration(create_parser().parse_args(args=args))
+
+    @given(
+        fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        n=st.integers(min_value=2, max_value=4)
+    )
+    def test_multiscale(self, fixed_image, moving_image, n):
+        shrink_factors = [int(2 ** (x + 1)) for x in range(n)]
+        smoothing_sigmas = [float(2 ** (x + 1)) for x in range(n)]
+        args = (
+                self._construct_default_args(fixed_image, moving_image)
+                + ["-sf"] + [f"{sf}" for sf in shrink_factors]
+                + ["-ss"] + [f"{ss}" for ss in smoothing_sigmas]
+        )
+        registration(create_parser().parse_args(args=args))
+
+    @given(
+        fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys()))
+    )
+    def test_plot_metric_history(self, fixed_image, moving_image):
+        args = self._construct_default_args(fixed_image, moving_image) + ["-pmh"]
+        registration(create_parser().parse_args(args=args))
+
+    @given(
+        fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        lr=st.floats(min_value=1e-6, max_value=1e-2),
+        cmv=st.floats(min_value=1e-6, max_value=1e-2),
+        cws=st.integers(min_value=3, max_value=20)
+    )
+    def test_gradient_descent(self, fixed_image, moving_image, lr, cmv, cws):
+        args = (
+            self._construct_default_args(fixed_image, moving_image)
+            + ["-opt", "GradientDescent"]
+            + ["-gdlr", f"{lr}", "-gdcmv", f"{cmv}", "-gdcws", f"{cws}"]
+        )
         registration(create_parser().parse_args(args=args))
 
 

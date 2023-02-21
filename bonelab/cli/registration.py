@@ -75,7 +75,7 @@ def create_parser() -> ArgumentParser:
         help="number of iterations to run registration algorithm for at each stage"
     )
     parser.add_argument(
-        "--shrink-factors", "-sf", default=None, type=float, nargs="+", metavar="X",
+        "--shrink-factors", "-sf", default=None, type=int, nargs="+", metavar="X",
         help="factors by which to shrink the fixed and moving image at each stage of the multiscale progression. you "
              "must give the same number of arguments here as you do for `smoothing-sigmas`"
     )
@@ -94,8 +94,8 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "--optimizer", "-opt", default="GradientDescent", metavar="STR",
-        type=create_string_argument_checker(["GradientDescent", "L-BFGS2"], "optimizer"),
-        help="the optimizer to use, options: `GradientDescent`, `L-BFGS2`"
+        type=create_string_argument_checker(["GradientDescent", "Powell"], "optimizer"),
+        help="the optimizer to use, options: `GradientDescent`, `Powell`"
     )
     parser.add_argument(
         "--gradient-descent-learning-rate", "-gdlr", default=1e-3, type=float, metavar="X",
@@ -110,24 +110,20 @@ def create_parser() -> ArgumentParser:
         help="window size for checking for convergence when using gradient descent optimizer"
     )
     parser.add_argument(
-        "--lbfgs-solution-accuracy", "-lsa", default=1e-5, type=float, metavar="X",
-        help="solution accuracy when using L-BFGS2 as optimizer"
+        "--powell_max_line_iterations", "-pmli", default=100, type=int, metavar="N",
+        help="maximum number of line iterations when using Powell optimizer"
     )
     parser.add_argument(
-        "--lbfgs-hessian-approximate-accuracy", "-lhaa", default=6, type=int, metavar="N",
-        help="hessian approximate accuracy when using L-BFGS2 as optimizer"
+        "--powell_step_length", "-psl", default=float, type=1.0, metavar="X",
+        help="maximum step length when using Powell optimizer"
     )
     parser.add_argument(
-        "--lbfgs-delta-convergence-distance", "-ldcd", default=0, type=int, metavar="N",
-        help="delta convergence distance when using L-BFGS2 as optimizer"
+        "--powell_step_tolerance", "-pst", default=1e-6, type=float, metavar="X",
+        help="step tolerance when using Powell optimizer"
     )
     parser.add_argument(
-        "--lbfgs-delta-convergence-tolerance", "-ldct", default=1e-5, type=float, metavar="X",
-        help="delta convergence tolerance when using L-BFGS2 as optimizer"
-    )
-    parser.add_argument(
-        "--lbfgs-linesearch-maximum-evaluations", "-llme", default=40, type=int, metavar="X",
-        help="maximum number of linesearch evaluations when using L-BFGS2 as optimizer"
+        "--powell_value_tolerance", "-pvt", default=1e-6, type=float, metavar="X",
+        help="value tolerance when using Powell optimizer"
     )
     parser.add_argument(
         "--similarity-metric", "-sm", default="MeanSquares", metavar="STR",
@@ -220,10 +216,9 @@ def write_metrics_to_csv(metric_history: List[float], fn: str) -> None:
 
 def create_and_save_metrics_plot(metrics_history: List[float], fn: str) -> None:
     plt.figure()
-    plt.plot(metrics_history)
+    plt.plot(metrics_history, "k-o")
     plt.xlabel('iteration')
     plt.ylabel('metric')
-    plt.yscale('log')
     plt.grid()
     plt.savefig(fn)
 
@@ -260,14 +255,13 @@ def setup_optimizer(
             convergenceMinimumValue=args.gradient_descent_convergence_min_value,
             convergenceWindowSize=args.gradient_descent_convergence_window_size
         )
-    elif args.optimizer == "L-BFGS2":
-        registration_method.SetOptimizerAsLBFGS2(
-            solutionAccuracy=args.lbfgs_solution_accuracy,
+    elif args.optimizer == "Powell":
+        registration_method.SetOptimizerAsPowell(
             numberOfIterations=args.max_iterations,
-            hessianApproximateAccuracy=args.lbfgs_hessian_approximate_accuracy,
-            deltaConvergenceDistance=args.lbfgs_delta_convergence_distance,
-            deltaConvergenceTolerance=args.lbfgs_delta_convergence_tolerance,
-            lineSearchMaximumEvaluations=args.lbfgs_linesearch_maximum_evaluations
+            maximumLineIterations=args.powell_max_line_iterations,
+            stepLength=args.powell_step_length,
+            stepTolerance=args.powell_step_tolerance,
+            valueTolerance=args.powell_value_tolerance
         )
     else:
         raise ValueError("`optimizer` is invalid and was not caught")
@@ -388,7 +382,7 @@ def registration(args: Namespace):
     metric_history = []
     registration_method.AddCommand(
         sitk.sitkIterationEvent,
-        create_metric_tracking_callback(registration_method, metric_history, args.verbose)
+        create_metric_tracking_callback(registration_method, metric_history, verbose=args.verbose, demons=False)
     )
     # do the registration
     transform = registration_method.Execute(fixed_image, moving_image)
