@@ -179,11 +179,11 @@ def demons_registration(args: Namespace):
     check_image_size_and_shrink_factors(fixed_image, moving_image, args.shrink_factors)
     # we have to pad the images to be the same size - just a requirement of the Demons algorithms
     fixed_image, moving_image = pad_images_to_same_extent(fixed_image, moving_image)
-    # I am a little bit unsure about this. You need the fixed and moving images to exist in the same physical space
-    # for the diffeomorphic, symmetric, and fast symmetric demons algorithms to work (otherwise they crash).
+    # I am a little bit unsure about this next thing. You need the fixed and moving images to exist in the same physical
+    # space for the diffeomorphic, symmetric, and fast symmetric demons algorithms to work (otherwise they crash).
     # copying the metadata from the fixed_image onto the moving_image makes it so these algorithms will run, but I'm
     # not sure how this will affect the resulting transform. needs to be tested a bit to make sure we don't end up with
-    # with weird stuff happening
+    # weird stuff happening (though the resulting displacement field is in the fixed frame, so maybe it doesn't matter?)
     moving_image.CopyInformation(fixed_image)
     if args.initial_transform is not None:
         initial_transform = read_transform(args)

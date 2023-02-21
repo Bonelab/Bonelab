@@ -122,6 +122,16 @@ class TestDemonsRegistration(unittest.TestCase):
         args = self._construct_default_args(fixed_image, moving_image) + ["-dt", f"{demons_type}"]
         demons_registration(create_parser().parse_args(args=args))
 
+    @given(
+        fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        ds=st.floats(min_value=0.1, max_value=3.0),
+        us=st.floats(min_value=0.1, max_value=3.0)
+    )
+    def test_regularization_factors(self, fixed_image, moving_image, ds, us):
+        args = self._construct_default_args(fixed_image, moving_image) + ["-ds", f"{ds}", "-us", f"{us}"]
+        demons_registration(create_parser().parse_args(args=args))
+
 
 if __name__ == '__main__':
     unittest.main()

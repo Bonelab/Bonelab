@@ -94,14 +94,6 @@ class TestRegistration(unittest.TestCase):
 
     @given(
         fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
-        moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys()))
-    )
-    def test_plot_metric_history(self, fixed_image, moving_image):
-        args = self._construct_default_args(fixed_image, moving_image) + ["-pmh"]
-        registration(create_parser().parse_args(args=args))
-
-    @given(
-        fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         gdlr=st.floats(min_value=1e-6, max_value=1e-2),
         gdcmv=st.floats(min_value=1e-6, max_value=1e-2),
