@@ -146,7 +146,8 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--similarity-metric-sampling-seed", "-smssd", default=None, type=int, metavar="N",
         help="the seed for random sampling, leave as `None` if you want a random seed. Can be useful if you want a "
-             "deterministic registration with random sampling for debugging/testing"
+             "deterministic registration with random sampling for debugging/testing. Don't go crazy and use huge "
+             "numbers since SITK might report an OverflowError. I found keeping it <=255 worked."
     )
     parser.add_argument(
         "--mutual-information-num-histogram-bins", "-minhb", default=20, type=int, metavar="N",

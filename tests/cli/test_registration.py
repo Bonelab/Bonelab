@@ -131,6 +131,27 @@ class TestRegistration(unittest.TestCase):
         )
         registration(create_parser().parse_args(args=args))
 
+    @given(
+        fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        sm=st.sampled_from(
+            ["MeanSquares", "Correlation", "JointHistogramMutualInformation", "MattesMutualInformation"]
+        ),
+        smss=st.sampled_from(["None", "Regular", "Random"]),
+        smsr=st.floats(min_value=0.01, max_value=1.0),
+        smssd=st.integers(min_value=1, max_value=255),
+        minhb=st.integers(min_value=10, max_value=20),
+        jmijsv=st.floats(min_value=0.5, max_value=2.0)
+    )
+    def test_similarity_metrics(self, fixed_image, moving_image, sm, smss, smsr, smssd, minhb, jmijsv):
+        args = (
+            self._construct_default_args(fixed_image, moving_image)
+            + ["-sm", f"{sm}", "-dsf", "2", "-dss", f"2.0"]
+            + ["-smss", f"{smss}", "-smsr", f"{smsr}", "-smssd", f"{smssd}"]
+            + ["-minhb", f"{minhb}", "-jmijsv", f"{jmijsv}"]
+        )
+        registration(create_parser().parse_args(args=args))
+
 
 if __name__ == '__main__':
     unittest.main()
