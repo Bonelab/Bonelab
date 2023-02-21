@@ -152,6 +152,15 @@ class TestRegistration(unittest.TestCase):
         )
         registration(create_parser().parse_args(args=args))
 
+    @given(
+        fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
+        interpolator=st.sampled_from(["Linear", "NearestNeighbour", "BSpline"])
+    )
+    def test_interpolator(self, fixed_image, moving_image, interpolator):
+        args = self._construct_default_args(fixed_image, moving_image) + ["-int", f"{interpolator}"]
+        registration(create_parser().parse_args(args=args))
+
 
 if __name__ == '__main__':
     unittest.main()

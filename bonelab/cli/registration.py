@@ -160,8 +160,8 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "--interpolator", "-int", default="Linear", metavar="STR",
-        type=create_string_argument_checker(["Linear", "NearestNeighbour", "Gaussian"], "interpolator"),
-        help="the interpolator to use, options: `Linear`, `NearestNeighbour`, `Gaussian`"
+        type=create_string_argument_checker(["Linear", "NearestNeighbour", "BSpline"], "interpolator"),
+        help="the interpolator to use, options: `Linear`, `NearestNeighbour`, `BSpline`"
     )
     parser.add_argument(
         "--centering-initialization", "-ci", default="Geometry", metavar="STR",
@@ -313,8 +313,8 @@ def setup_interpolator(
         interpolator = sitk.sitkLinear
     elif args.interpolator == "NearestNeighbour":
         interpolator = sitk.sitkNearestNeighbor
-    elif args.interpolator == "Gaussian":
-        interpolator = sitk.sitkGaussian
+    elif args.interpolator == "BSpline":
+        interpolator = sitk.sitkBSpline
     else:
         raise ValueError("`interpolator` is invalid and was not caught")
     registration_method.SetInterpolator(interpolator)
