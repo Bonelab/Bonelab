@@ -109,6 +109,10 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
         ''' Can run `blPanningVideo` '''
         self.runner('blPanningVideo')
 
+    def test_blApplyTransform(self):
+        ''' Can run `blApplyTransform` '''
+        self.runner('blApplyTransform')
+
 
 if __name__ == '__main__':
     unittest.main()
