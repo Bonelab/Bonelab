@@ -16,7 +16,7 @@ matplotlib
 # Data
 pandas
 openpyxl
-yaml
+pyyaml
 
 # Writing video
 ffmpeg
