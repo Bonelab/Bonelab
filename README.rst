@@ -103,59 +103,63 @@ bonelab.util
 Command Line Apps
 =================
 
-:code:`aimod`
+Here is a list of all of the command-line apps that get installed along with the bonelab package.
+For detailed usage instructions, type the command followed by :code:`-h` into the terminal
+with the :code:`bl` environment activated.
 
-:code:`aix`
+:code:`aimod` → read in an AIM and examine or modify spacing, origin, and dimensions
 
-:code:`blDownloadData`
+:code:`aix` → read in an AIM and parse through the processing log
 
-:code:`blExtractFields`
+:code:`blDownloadData` → download the Bonelab test data
 
-:code:`blImage2ImageSeries`
+:code:`blExtractFields` → extract fields from an n88model and write them to an image
 
-:code:`blImageConvert`
+:code:`blImage2ImageSeries` →
 
-:code:`blImageSeries2Image`
+:code:`blImageConvert` →
 
-:code:`blMuscle`
+:code:`blImageSeries2Image` →
 
-:code:`blPseudoCT`
+:code:`blMuscle` →
 
-:code:`blSliceViewer`
+:code:`blPseudoCT` →
 
-:code:`blVisualizeSegmentation`
+:code:`blSliceViewer` →
 
-:code:`blRapidPrototype`
+:code:`blVisualizeSegmentation` →
 
-:code:`blRegBCn88modelgenerator`
+:code:`blRapidPrototype` →
 
-:code:`blRegBCtransformresults`
+:code:`blRegBCn88modelgenerator` →
 
-:code:`scrub_vms_extension`
+:code:`blRegBCtransformresults` →
 
-:code:`blBPAQ`
+:code:`scrub_vms_extension` →
 
-:code:`blRapidPrototypeLetters`
+:code:`blBPAQ` →
 
-:code:`blQtViewer`
+:code:`blRapidPrototypeLetters` →
 
-:code:`blQtBasic`
+:code:`blQtViewer` →
 
-:code:`blAutocontour`
+:code:`blQtBasic` →
 
-:code:`blImageFilter`
+:code:`blAutocontour` →
 
-:code:`blPanningVideo`
+:code:`blImageFilter` →
 
-:code:`blITKSnapAnnotParser`
+:code:`blPanningVideo` →
 
-:code:`blRegistration`
+:code:`blITKSnapAnnotParser` →
 
-:code:`blDemonsRegistration`
+:code:`blRegistration` →
 
-:code:`blApplyTransform`
+:code:`blDemonsRegistration` →
 
-:code:`blComputeOverlap`
+:code:`blApplyTransform` →
+
+:code:`blComputeOverlap` →
 
 
 Running Tests
