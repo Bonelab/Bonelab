@@ -50,7 +50,7 @@ class TestComputeOverlap(unittest.TestCase):
         compute_overlap(create_parser().parse_args(args=args))
 
     def test_full_overlap(self):
-        output = "full_overlap.csv"
+        output = os.path.join(self.test_dir, "full_overlap.csv")
         mask = np.zeros((5, 5, 5))
         mask[2, 2, 2] = 1
         mask = sitk.GetImageFromArray(mask)
@@ -63,7 +63,7 @@ class TestComputeOverlap(unittest.TestCase):
         self.assertAlmostEqual(1.0, df["jaccard_1"].values[0])
 
     def test_no_overlap(self):
-        output = "no_overlap.csv"
+        output = os.path.join(self.test_dir, "no_overlap.csv")
         mask = np.zeros((5, 5, 5))
         mask[2, 2, 2] = 1
         opp = 1-mask
