@@ -46,7 +46,8 @@ class TestComputeOverlap(unittest.TestCase):
         cl=st.lists(st.integers(min_value=1, max_value=MAX_VALUE), min_size=1, max_size=5)
     )
     def test_various_random_images_and_class_labels(self, img1, img2, cl):
-        args = [self.random_images[img1], self.random_images[img2], TEST_OUTPUT_LABEL, "-cl", *[str(x) for x in cl]]
+        output = os.path.join(self.test_dir, TEST_OUTPUT_LABEL)
+        args = [self.random_images[img1], self.random_images[img2], output, "-cl", *[str(x) for x in cl]]
         compute_overlap(create_parser().parse_args(args=args))
 
     def test_full_overlap(self):
