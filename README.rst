@@ -52,13 +52,53 @@ This removes the need to run ``pip install`` with each change. However, changing
 Utilities
 =========
 
-io
---
+bonelab.io
+----------
+
+:code:`bonelab.io.download_data`
+
+- environment variables for downloading Bonelab test data
+
+:code:`bonelab.io.sitk_helpers`
+
+- dictionary of file types and casting types for reading and writing 2D raster images with :code:`SimpleITK`
 
 
-util
+:code:`bonelab.io.vtk_helpers`
+
+- utility functions for reading and writing images with :code:`vtk` and :code:`vtkbone`
+- particularly useful functions for properly writing AIMs!
+
+bonelab.util
 ----
 
+:code:`bonelab.util.aim_calibration_header`
+
+- utility functions for parsing calibration coefficients from AIM calibration headers
+
+:code:`bonelab.util.echo_arguments`
+
+- utility function to use with a command-line application, or a function, to automatically print the arguments to the terminal
+
+:code:`bonelab.util.multiscale_registration`
+
+- utility functions for performing multi-scale Demons registration with SimpleITK
+
+:code:`bonelab.util.n88_util`
+
+- utility functions for extracting fields from n88models as :code:`numpy` arrays for visualization or processing
+
+:code:`bonelab.util.time_stamp`
+
+- utility function for printing a message along with a time stamp, for logging, debugging, etc.
+
+:code:`bonelab.util.vtk_util`
+
+- utility functions for converting data between :code:`vtk.vtkImageData` and :code:`np.ndarray` formats
+
+:code:`bonelab.util.write_csv`
+
+- utility function for writing data stored in a dictionary to a csv file
 
 Command Line Apps
 =================
