@@ -113,6 +113,10 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
         ''' Can run `blApplyTransform` '''
         self.runner('blApplyTransform')
 
+    def test_blComputeOverlap(self):
+        ''' Can run `blComputeOverlap` '''
+        self.runner('blComputeOverlap')
+
 
 if __name__ == '__main__':
     unittest.main()
