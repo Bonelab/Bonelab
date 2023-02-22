@@ -48,6 +48,76 @@ Installing in an 'editable' format allows changes to the code to be immediately 
 This removes the need to run ``pip install`` with each change. However, changing entry points in
 ``setup.cfg`` will require re-runing ``pip install``.
 
+
+Utilities
+=========
+
+io
+--
+
+
+util
+----
+
+
+Command Line Apps
+=================
+
+:code:`aimod`
+
+:code:`aix`
+
+:code:`blDownloadData`
+
+:code:`blExtractFields`
+
+:code:`blImage2ImageSeries`
+
+:code:`blImageConvert`
+
+:code:`blImageSeries2Image`
+
+:code:`blMuscle`
+
+:code:`blPseudoCT`
+
+:code:`blSliceViewer`
+
+:code:`blVisualizeSegmentation`
+
+:code:`blRapidPrototype`
+
+:code:`blRegBCn88modelgenerator`
+
+:code:`blRegBCtransformresults`
+
+:code:`scrub_vms_extension`
+
+:code:`blBPAQ`
+
+:code:`blRapidPrototypeLetters`
+
+:code:`blQtViewer`
+
+:code:`blQtBasic`
+
+:code:`blAutocontour`
+
+:code:`blImageFilter`
+
+:code:`blPanningVideo`
+
+:code:`blITKSnapAnnotParser`
+
+:code:`blRegistration`
+
+:code:`blDemonsRegistration`
+
+:code:`blApplyTransform`
+
+:code:`blComputeOverlap`
+
+
 Running Tests
 =============
 .. code-block:: bash
