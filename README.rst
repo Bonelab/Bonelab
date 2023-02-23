@@ -26,10 +26,7 @@ Install
     # ... or straight HTTPS
     git clone https://github.com/Bonelab/Bonelab.git
 
-    # It is recommended to use anaconda and install from the environment file
-    conda env create -f environment.yml
-
-    # ... alternatively, you can setup the environment directly
+    # setup the environment
     conda create -n bl -c numerics88 -c conda-forge python=3 pyqt n88tools simpleitk pbr nose six pydicom gdcm
 
     # ... or start fresh

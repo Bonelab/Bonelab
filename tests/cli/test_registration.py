@@ -90,7 +90,13 @@ class TestRegistration(unittest.TestCase):
                 + ["-sf"] + [f"{sf}" for sf in shrink_factors]
                 + ["-ss"] + [f"{ss}" for ss in smoothing_sigmas]
         )
-        registration(create_parser().parse_args(args=args))
+        # we want this to either succeed, or to fail because we correctly caught that the user gave a combination
+        # of a small image and a big shrink factor. any other error is not OK though
+        try:
+            registration(create_parser().parse_args(args=args))
+        except RuntimeError as err:
+            if "image sizes and shrink factors" not in str(err):
+                raise err
 
     @given(
         fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
