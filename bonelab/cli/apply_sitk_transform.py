@@ -3,17 +3,13 @@ from __future__ import annotations
 # external imports
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace, ArgumentTypeError
 import SimpleITK as sitk
-from matplotlib import pyplot as plt
-import csv
-import yaml
-from typing import List, Callable
 
 # internal imports
 from bonelab.io.vtk_helpers import get_vtk_writer
 from bonelab.cli.registration import read_image, create_string_argument_checker
 
 INTERPOLATORS = {
-    "Linear": sitk.Linear,
+    "Linear": sitk.sitkLinear,
     "NearestNeighbour": sitk.sitkNearestNeighbor,
     "BSpline": sitk.sitkBSpline
 }
@@ -60,19 +56,24 @@ def create_parser() -> ArgumentParser:
     return parser
 
 
-def read_transform(fn: str) -> sitk.Transform:
+def read_transform(fn: str, invert: bool) -> sitk.Transform:
     if fn.endswith(".mat"):
-        return sitk.ReadTransform(fn)
+        transform = sitk.ReadTransform(fn)
+        if invert:
+            return transform.GetInverse()
+        else:
+            return transform
     else:
         field = sitk.ReadImage(fn)
-        return sitk.DisplacementFieldTransform(field)
+        if invert:
+            return sitk.DisplacementFieldTransform(sitk.InverseDisplacementField(field))
+        else:
+            return sitk.DisplacementFieldTransform(field)
 
 
 def apply_sitk_transform(args: Namespace):
     fixed_image = read_image(args.fixed_image)
-    transform = read_transform(args.transform)
-    if args.invert_transform:
-        transform = transform.GetInverse()
+    transform = read_transform(args.transform, args.invert_transform)
     if args.moving_image is not None:
         moving_image = read_image(args.moving_image)
         transformed_image = sitk.Resample(fixed_image, moving_image, transform, INTERPOLATORS[args.interpolator])
