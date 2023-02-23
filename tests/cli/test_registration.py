@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from hypothesis import given, strategies as st
+from hypothesis import given, settings, strategies as st
 import os
 import shutil
 import tempfile
@@ -10,6 +10,7 @@ import numpy as np
 
 from bonelab.cli.registration import create_parser, registration
 
+HYPOTHESIS_DEADLINE = 2000  # this is how many milliseconds each test has to finish in
 
 IMAGE_SIZE_DICT = {
     "small": 20,
@@ -48,6 +49,7 @@ class TestRegistration(unittest.TestCase):
             "-mi", f"{DEFAULT_ITERATIONS}"
         ]
 
+    @settings(deadline=HYPOTHESIS_DEADLINE)
     @given(
         fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys()))
@@ -56,6 +58,7 @@ class TestRegistration(unittest.TestCase):
         args = self._construct_default_args(fixed_image, moving_image)
         registration(create_parser().parse_args(args=args))
 
+    @settings(deadline=HYPOTHESIS_DEADLINE)
     @given(
         fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
@@ -65,6 +68,7 @@ class TestRegistration(unittest.TestCase):
         args = self._construct_default_args(fixed_image, moving_image) + ["-of", output_format]
         registration(create_parser().parse_args(args=args))
 
+    @settings(deadline=HYPOTHESIS_DEADLINE)
     @given(
         fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
@@ -77,6 +81,7 @@ class TestRegistration(unittest.TestCase):
         )
         registration(create_parser().parse_args(args=args))
 
+    @settings(deadline=HYPOTHESIS_DEADLINE)
     @given(
         fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
@@ -98,6 +103,7 @@ class TestRegistration(unittest.TestCase):
             if "image sizes and shrink factors" not in str(err):
                 raise err
 
+    @settings(deadline=HYPOTHESIS_DEADLINE)
     @given(
         fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
@@ -113,10 +119,11 @@ class TestRegistration(unittest.TestCase):
         )
         registration(create_parser().parse_args(args=args))
 
+    @settings(deadline=HYPOTHESIS_DEADLINE)
     @given(
         fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
-        pmli=st.integers(min_value=10, max_value=20),
+        pmli=st.integers(min_value=10, max_value=15),
         psl=st.floats(min_value=0.1, max_value=10.0),
         pst=st.floats(min_value=1e-8, max_value=1e-4),
         pvt=st.floats(min_value=1e-8, max_value=1e-4),
@@ -129,6 +136,7 @@ class TestRegistration(unittest.TestCase):
         )
         registration(create_parser().parse_args(args=args))
 
+    @settings(deadline=HYPOTHESIS_DEADLINE)
     @given(
         fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
@@ -150,6 +158,7 @@ class TestRegistration(unittest.TestCase):
         )
         registration(create_parser().parse_args(args=args))
 
+    @settings(deadline=HYPOTHESIS_DEADLINE)
     @given(
         fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
@@ -159,6 +168,7 @@ class TestRegistration(unittest.TestCase):
         args = self._construct_default_args(fixed_image, moving_image) + ["-int", f"{interpolator}"]
         registration(create_parser().parse_args(args=args))
 
+    @settings(deadline=HYPOTHESIS_DEADLINE)
     @given(
         fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),

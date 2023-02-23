@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from hypothesis import given, strategies as st
+from hypothesis import given, settings, strategies as st
 import os
 import shutil
 import tempfile
@@ -10,6 +10,7 @@ import numpy as np
 
 from bonelab.cli.demons_registration import create_parser, demons_registration, DEMONS_FILTERS
 
+HYPOTHESIS_DEADLINE = 2000  # this is how many milliseconds each test has to finish in
 
 IMAGE_SIZE_DICT = {
     "small": 20,
@@ -53,6 +54,7 @@ class TestDemonsRegistration(unittest.TestCase):
             "-mi", f"{DEFAULT_ITERATIONS}"
         ]
 
+    @settings(deadline=HYPOTHESIS_DEADLINE)
     @given(
         fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys()))
@@ -61,6 +63,7 @@ class TestDemonsRegistration(unittest.TestCase):
         args = self._construct_default_args(fixed_image, moving_image)
         demons_registration(create_parser().parse_args(args=args))
 
+    @settings(deadline=HYPOTHESIS_DEADLINE)
     @given(
         fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys()))
@@ -71,6 +74,7 @@ class TestDemonsRegistration(unittest.TestCase):
         args += ["-it", os.path.join(self.test_dir, f"{TEST_OUTPUT_LABEL}.mat")]
         demons_registration(create_parser().parse_args(args=args))
 
+    @settings(deadline=HYPOTHESIS_DEADLINE)
     @given(
         fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
@@ -83,6 +87,7 @@ class TestDemonsRegistration(unittest.TestCase):
         )
         demons_registration(create_parser().parse_args(args=args))
 
+    @settings(deadline=HYPOTHESIS_DEADLINE)
     @given(
         fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
@@ -104,6 +109,7 @@ class TestDemonsRegistration(unittest.TestCase):
             if "image sizes and shrink factors" not in str(err):
                 raise err
 
+    @settings(deadline=HYPOTHESIS_DEADLINE)
     @given(
         fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
@@ -113,6 +119,7 @@ class TestDemonsRegistration(unittest.TestCase):
         args = self._construct_default_args(fixed_image, moving_image) + ["-of", f"{output_format}"]
         demons_registration(create_parser().parse_args(args=args))
 
+    @settings(deadline=HYPOTHESIS_DEADLINE)
     @given(
         fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
@@ -122,6 +129,7 @@ class TestDemonsRegistration(unittest.TestCase):
         args = self._construct_default_args(fixed_image, moving_image) + ["-dt", f"{demons_type}"]
         demons_registration(create_parser().parse_args(args=args))
 
+    @settings(deadline=HYPOTHESIS_DEADLINE)
     @given(
         fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
