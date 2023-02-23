@@ -9,9 +9,14 @@ import yaml
 from typing import List, Callable
 
 # internal imports
-from bonelab.util.vtk_util import vtkImageData_to_numpy
-from bonelab.io.vtk_helpers import get_vtk_reader
-from bonelab.util.multiscale_registration import smooth_and_resample, create_metric_tracking_callback
+from bonelab.io.vtk_helpers import get_vtk_writer
+from bonelab.cli.registration import read_image, create_string_argument_checker
+
+INTERPOLATORS = {
+    "Linear": sitk.Linear,
+    "NearestNeighbour": sitk.sitkNearestNeighbor,
+    "BSpline": sitk.sitkBSpline
+}
 
 
 def create_parser() -> ArgumentParser:
@@ -29,8 +34,10 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "output", type=str, metavar="OUTPUT",
-        help="path to where you want the transformed image saved, should have a file extension that is either *.aim, "
-             "*.AIM, or compatible with sitk.WriteImage"
+        help="path to where you want the transformed image saved, should have a file extension that is compatible "
+             "with sitk.WriteImage - if you want an AIM at the end of this then you'll need to deal with converting "
+             "your transformed image back to an AIM yourself or with another utility because that's beyond the scope "
+             "of this tool."
     )
     parser.add_argument(
         "--moving-image", "-mi", type=str, default=None, metavar="STR",
@@ -40,16 +47,38 @@ def create_parser() -> ArgumentParser:
              "there should usually be a moving image that you used to get the transform in the first place anyways"
     )
     parser.add_argument(
-        "--invert", "-i", default=False, action="store_true",
+        "--invert-transform", "-it", default=False, action="store_true",
         help="enable this flag to invert the transform before applying it. you would want to do this if you registered "
              "image A (fixed) to image B (moving) but now you want to transform something from the coordindate system "
              "of image B to image A"
     )
+    parser.add_argument(
+        "--interpolator", "-int", default="Linear", metavar="STR",
+        type=create_string_argument_checker(list(INTERPOLATORS.keys()), "interpolator"),
+        help="the interpolator to use, options: `Linear`, `NearestNeighbour`, `BSpline`"
+    )
     return parser
 
 
+def read_transform(fn: str) -> sitk.Transform:
+    if fn.endswith(".mat"):
+        return sitk.ReadTransform(fn)
+    else:
+        field = sitk.ReadImage(fn)
+        return sitk.DisplacementFieldTransform(field)
+
+
 def apply_sitk_transform(args: Namespace):
-    pass
+    fixed_image = read_image(args.fixed_image)
+    transform = read_transform(args.transform)
+    if args.invert_transform:
+        transform = transform.GetInverse()
+    if args.moving_image is not None:
+        moving_image = read_image(args.moving_image)
+        transformed_image = sitk.Resample(fixed_image, moving_image, transform, INTERPOLATORS[args.interpolator])
+    else:
+        transformed_image = sitk.Resample(fixed_image, transform, INTERPOLATORS[args.interpolator])
+    sitk.WriteImage(transformed_image, args.output)
 
 
 def main():
