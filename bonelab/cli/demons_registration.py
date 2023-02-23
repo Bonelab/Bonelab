@@ -184,7 +184,11 @@ def demons_registration(args: Namespace):
     # copying the metadata from the fixed_image onto the moving_image makes it so these algorithms will run, but I'm
     # not sure how this will affect the resulting transform. needs to be tested a bit to make sure we don't end up with
     # weird stuff happening (though the resulting displacement field is in the fixed frame, so maybe it doesn't matter?)
-    moving_image.CopyInformation(fixed_image)
+    # moving_image.CopyInformation(fixed_image)
+    # it makes much more sense to me to resample the moving image to the physical space and grid of the fixed image
+    # prior to registration, however we will see how this goes in testing. it's possible that here we need to be
+    # applying a centering transform to make sure they line up so we do not lose a bunch of information.
+    moving_image = sitk.Resample(moving_image, fixed_image)
     if args.initial_transform is not None:
         initial_transform = read_transform(args)
     else:
