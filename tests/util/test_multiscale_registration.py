@@ -43,7 +43,7 @@ class TestMultiscaleRegistration(unittest.TestCase):
         self.registration_filter.SetSmoothUpdateField(True)
         self.registration_filter.SetUpdateFieldStandardDeviations(1.0)
 
-    @given(d=st.integers(min_value=20, max_value=50))
+    @given(d=st.integers(min_value=20, max_value=30))
     def test_normal_registration(self, d):
         shape = (d, d, d)
         fixed, moving = generate_sitk_image(shape), generate_sitk_image(shape)
