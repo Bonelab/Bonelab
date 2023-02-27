@@ -25,7 +25,7 @@ INTERPOLATORS = {
 # define file extensions that we consider available for input images
 INPUT_EXTENSIONS = [".aim", ".nii", ".nii.gz"]
 
-# define file extensions that we would consider available for saving transforms and images
+# define file extensions that we would consider available for saving transforms
 TRANSFORM_EXTENSIONS = [".txt", ".tfm", ".xfm", ".hdf", ".mat"]
 
 
@@ -286,17 +286,22 @@ def setup_transform(
         registration_method: sitk.ImageRegistrationMethod,
         fixed_image: sitk.Image,
         moving_image: sitk.Image,
-        args: Namespace
+        transform_type: str,
+        centering_initialization: str,
+        silent: bool
 ) -> sitk.ImageRegistrationMethod:
-    if args.transform_type == "Euler3D":
+    if not silent:
+        message(f"Initializing transform, with a transform type of {transform_type} "
+                f"and a centering initialization of {centering_initialization}")
+    if transform_type == "Euler3D":
         transform_type = sitk.Euler3DTransform()
-    elif args.transform_type == "Euler2D":
+    elif transform_type == "Euler2D":
         transform_type = sitk.Euler2DTransform()
     else:
         raise ValueError("`transform-type` is invalid and was not caught")
-    if args.centering_initialization == "Geometry":
+    if centering_initialization == "Geometry":
         centering_initialization = sitk.CenteredTransformInitializerFilter.GEOMETRY
-    elif args.centering_initialization == "Moments":
+    elif centering_initialization == "Moments":
         centering_initialization = sitk.CenteredTransformInitializerFilter.MOMENTS
     else:
         raise ValueError("`centering_initialization` is invalid and was not caught")
@@ -310,16 +315,25 @@ def setup_transform(
 
 def setup_multiscale_progression(
         registration_method: sitk.ImageRegistrationMethod,
-        args: Namespace
+        shrink_factors: List[int],
+        smoothing_sigmas: List[float],
+        silent: bool
 ) -> sitk.ImageRegistrationMethod:
-    if (args.shrink_factors is not None) and (args.smoothing_sigmas is not None):
-        if len(args.shrink_factors) == len(args.smoothing_sigmas):
-            registration_method.SetShrinkFactorsPerLevel(args.shrink_factors)
-            registration_method.SetSmoothingSigmasPerLevel(args.smoothing_sigmas)
+    if (shrink_factors is not None) and (smoothing_sigmas is not None):
+        if len(shrink_factors) == len(smoothing_sigmas):
+            if not silent:
+                message(f"Performing multiscale registration with shrink factors: "
+                        f"{', '.join([str(sf) for sf in shrink_factors])}; "
+                        f"and smoothing sigmas: "
+                        f"{', '.join([str(ss) for ss in smoothing_sigmas])}")
+            registration_method.SetShrinkFactorsPerLevel(shrink_factors)
+            registration_method.SetSmoothingSigmasPerLevel(smoothing_sigmas)
             return registration_method
         else:
             raise ValueError("`shrink-factors` and `smoothing-sigmas` must have same length")
-    elif (args.shrink_factors is None) and (args.smoothing_sigmas is None):
+    elif (shrink_factors is None) and (smoothing_sigmas is None):
+        if not silent:
+            message("Not performing multiscale registration.")
         return registration_method
     else:
         raise ValueError("one of `shrink-factors` or `smoothing-sigmas` have not been specified. you must "
@@ -400,8 +414,17 @@ def registration(args: Namespace):
         args.silent
     )
     registration_method = setup_interpolator(registration_method, args.interpolator, args.silent)
-    registration_method = setup_transform(registration_method, fixed_image, moving_image, args)
-    registration_method = setup_multiscale_progression(registration_method, args)
+    registration_method = setup_transform(
+        registration_method,
+        fixed_image, moving_image,
+        args.transform_type, args.centering_initialization,
+        args.silent
+    )
+    registration_method = setup_multiscale_progression(
+        registration_method,
+        args.shrink_factors, args.smoothing_sigmas,
+        args.silent
+    )
     # monitor the metric over time - init the list and add the callback
     metric_history = []
     registration_method.AddCommand(
