@@ -35,21 +35,31 @@ def demons_type_checker(s: str) -> str:
         return ValueError(f"Demons type {s}, not valid, please choose from: {list(DEMONS_FILTERS.keys())}")
 
 
-def read_transform(args: Namespace) -> Optional[sitk.Transform]:
-    if args.initial_transform is not None:
-        initial_transform = sitk.ReadTransform(args.initial_transform)
+def read_transform(initial_transform: str) -> Optional[sitk.Transform]:
+    if initial_transform is not None:
+        return sitk.ReadTransform(initial_transform)
     else:
-        initial_transform = None
-    return initial_transform
+        return None
 
 
-def construct_multiscale_progression(args: Namespace) -> Optional[List[Tuple[float]]]:
-    if (args.shrink_factors is not None) and (args.smoothing_sigmas is not None):
-        if len(args.shrink_factors) == len(args.smoothing_sigmas):
-            return list(zip(args.shrink_factors, args.smoothing_sigmas))
+def construct_multiscale_progression(
+        shrink_factors: List[float],
+        smoothing_sigmas: List[float],
+        silent: bool
+) -> Optional[List[Tuple[float]]]:
+    if (shrink_factors is not None) and (smoothing_sigmas is not None):
+        if len(shrink_factors) == len(smoothing_sigmas):
+            if not silent:
+                message(f"Performing multiscale registration with shrink factors: "
+                        f"{', '.join([str(sf) for sf in shrink_factors])}; "
+                        f"and smoothing sigmas: "
+                        f"{', '.join([str(ss) for ss in smoothing_sigmas])}")
+            return list(zip(shrink_factors, smoothing_sigmas))
         else:
             raise ValueError("`shrink-factors` and `smoothing-sigmas` must have same length")
-    elif (args.shrink_factors is None) and (args.smoothing_sigmas is None):
+    elif (shrink_factors is None) and (smoothing_sigmas is None):
+        if not silent:
+            message("Not performing multiscale registration.")
         return None
     else:
         raise ValueError("one of `shrink-factors` or `smoothing-sigmas` have not been specified. you must "
@@ -59,23 +69,67 @@ def construct_multiscale_progression(args: Namespace) -> Optional[List[Tuple[flo
 def create_centering_transform(
         fixed_image: sitk.Image,
         moving_image: sitk.Image,
-        args: Namespace
+        centering_initialization: str,
+        silent: bool
 ) -> sitk.Transform:
     if fixed_image.GetDimension() == 3:
+        if not silent:
+            message("Initializing a 3D rigid transform")
         transform_type = sitk.Euler3DTransform()
     elif fixed_image.GetDimension() == 2:
+        if not silent:
+            message("Initializing a 2D rigid transform")
         transform_type = sitk.Euler2DTransform()
     else:
         raise ValueError(f"`fixed_image` has dimension of {fixed_image.GetDimension()}, only 2 and 3 supported")
-    if args.centering_initialization == "Geometry":
+    if centering_initialization == "Geometry":
+        if not silent:
+            message("Centering the initial transform using geometry")
         centering_initialization = sitk.CenteredTransformInitializerFilter.GEOMETRY
-    elif args.centering_initialization == "Moments":
+    elif centering_initialization == "Moments":
+        if not silent:
+            message("Centering the initial transform using moments")
         centering_initialization = sitk.CenteredTransformInitializerFilter.MOMENTS
     else:
         raise ValueError("`centering_initialization` is invalid and was not caught")
     return sitk.CenteredTransformInitializer(
         fixed_image, moving_image,
         transform_type, centering_initialization
+    )
+
+
+def get_initial_transform(
+        initial_transform: str,
+        fixed_image: sitk.Image,
+        moving_image: sitk.Image,
+        centering_initialization: str,
+        silent: bool
+) -> sitk.Transform:
+    if initial_transform is not None:
+        if not silent:
+            message("Reading initial transform.")
+        return read_transform(initial_transform)
+    else:
+        return create_centering_transform(fixed_image, moving_image, centering_initialization, silent)
+
+
+def add_initial_transform_to_displacement_field(
+        field: sitk.Image,
+        transform: sitk.Transform,
+        silent: bool
+) -> sitk.Image:
+    if not silent:
+        message("Converting initial transform to displacement field and adding it to the Demons displacement field.")
+    return sitk.Add(
+        field,
+        sitk.TransformToDisplacementField(
+            transform,
+            field.GetPixelID(),
+            field.GetSize(),
+            field.GetOrigin(),
+            field.GetSpacing(),
+            field.GetDirection()
+        )
     )
 
 
@@ -111,51 +165,42 @@ def demons_registration(args: Namespace):
     # save the arguments of this registration to a yaml file
     # this has the added benefit of ensuring up-front that we can write files to the "output" that was provided,
     # so we do not waste a lot of time doing the registration and then crashing at the end because of write permissions
-    write_args_to_yaml(f"{args.output}.yaml", args, args.silent)
+    write_args_to_yaml(output_yaml, args, args.silent)
     fixed_image, moving_image = read_and_downsample_images(
         args.fixed_image, args.moving_image,
         args.downsampling_shrink_factor, args.downsampling_smoothing_sigma,
         args.silent
     )
     check_image_size_and_shrink_factors(fixed_image, moving_image, args.shrink_factors, args.silent)
-    # I am a little bit unsure about this next thing. You need the fixed and moving images to exist in the same physical
-    # space for the diffeomorphic, symmetric, and fast symmetric demons algorithms to work (otherwise they crash).
-    # copying the metadata from the fixed_image onto the moving_image makes it so these algorithms will run, but I'm
-    # not sure how this will affect the resulting transform. needs to be tested a bit to make sure we don't end up with
-    # weird stuff happening (though the resulting displacement field is in the fixed frame, so maybe it doesn't matter?)
-    # moving_image.CopyInformation(fixed_image)
-    # it makes much more sense to me to resample the moving image to the physical space and grid of the fixed image
-    # prior to registration, however I will see how this goes in testing. it's possible that here I need to be
-    # applying a centering transform to make sure the images line up so we do not lose a bunch of information.
-    # if I do end up changing it so the centering transform is applied here, I will then somehow have to make sure
-    # that the final transform that gets saved is the two transforms combined somehow
-    # this will likely involve using sitk.TransformToDisplacementField to convert that original centering
-    # transform to a displacement field and just adding them together
+    initial_transform = get_initial_transform(
+        args.initial_transform, fixed_image, moving_image, args.centering_initialization, args.silent
+    )
     if not args.silent:
-        message("Resampling fixed image onto the moving image.")
-    moving_image = sitk.Resample(moving_image, fixed_image)
-    if args.initial_transform is not None:
-        initial_transform = read_transform(args)
-    else:
-        initial_transform = create_centering_transform(fixed_image, moving_image, args)
-    multiscale_progression = construct_multiscale_progression(args)
+        message("Resampling fixed image onto the moving image using initial transform.")
+    fixed_image = sitk.Resample(fixed_image, moving_image, initial_transform)
+    multiscale_progression = construct_multiscale_progression(
+        args.shrink_factors, args.smoothing_sigmas, args.silent
+    )
     # do the registration
     displacement_field, metric_history = multiscale_demons(
         fixed_image, moving_image, args.demons_type, args.max_iterations,
         demons_displacement_field_smooth_std=args.displacement_smoothing_std,
         demons_update_field_smooth_std=args.update_smoothing_std,
-        initial_transform=initial_transform,
+        initial_transform=None,
         multiscale_progression=multiscale_progression,
         silent=args.silent
     )
-    # save the displacement transform or field
+    # add the initial transform and the demons transform together
+    displacement_field = add_initial_transform_to_displacement_field(
+        displacement_field, initial_transform, args.silent
+    )
+    # write the displacement transform or field
     write_transform_or_field(args.output, displacement_field, args.silent)
-
     # save the metric history
-    write_metrics_to_csv(f"{args.output}_metric_history.csv", metric_history, args.silent)
+    write_metrics_to_csv(output_metric_csv, metric_history, args.silent)
     # optionally, create a plot of the metric history and save it
     if args.plot_metric_history:
-        create_and_save_metrics_plot(f"{args.output}_metric_history.png", metric_history, args.silent)
+        create_and_save_metrics_plot(output_metric_png, metric_history, args.silent)
 
 
 def create_parser() -> ArgumentParser:
