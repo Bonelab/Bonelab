@@ -21,7 +21,7 @@ INPUT_EXTENSIONS = [".aim", ".nii", ".nii.gz"]
 TRANSFORM_EXTENSIONS = [".txt", ".tfm", ".xfm", ".hdf", ".mat"]
 
 
-def create_filename_checker(extensions: List[str], argument_name: str) -> Callable[[str], str]:
+def create_file_extension_checker(extensions: List[str], argument_name: str) -> Callable[[str], str]:
     def filename_checker(fn: str) -> str:
         fn = str(fn)
         extension_matched = False
@@ -306,15 +306,15 @@ def create_parser() -> ArgumentParser:
         formatter_class=ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
-        "fixed_image", type=create_filename_checker(INPUT_EXTENSIONS, "fixed_image"), metavar="FIXED",
+        "fixed_image", type=create_file_extension_checker(INPUT_EXTENSIONS, "fixed_image"), metavar="FIXED",
         help=f"Provide fixed image input filename ({', '.join(INPUT_EXTENSIONS)})"
     )
     parser.add_argument(
-        "moving_image", type=create_filename_checker(INPUT_EXTENSIONS, "moving_image"), metavar="MOVING",
+        "moving_image", type=create_file_extension_checker(INPUT_EXTENSIONS, "moving_image"), metavar="MOVING",
         help=f"Provide moving image input filename "
     )
     parser.add_argument(
-        "output", type=create_filename_checker(TRANSFORM_EXTENSIONS, "output"), metavar="OUTPUT",
+        "output", type=create_file_extension_checker(TRANSFORM_EXTENSIONS, "output"), metavar="OUTPUT",
         help=f"Provide output filename ({', '.join(TRANSFORM_EXTENSIONS)})"
     )
     parser.add_argument(
