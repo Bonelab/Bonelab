@@ -320,8 +320,11 @@ def setup_multiscale_progression(
 def check_image_size_and_shrink_factors(
         fixed_image: sitk.Image,
         moving_image: sitk.Image,
-        shrink_factors: Optional[List[int]]
+        shrink_factors: Optional[List[int]],
+        silent: bool
 ) -> None:
+    if not silent:
+        message("Checking that image size and shrink factors are compatible.")
     if shrink_factors is not None:
         smallest_dim = min(fixed_image.GetSize() + moving_image.GetSize())
         largest_shrink_factor = max(shrink_factors)
@@ -331,10 +334,15 @@ def check_image_size_and_shrink_factors(
                                f"\nfixed_image size: {fixed_image.GetSize()}"
                                f"\nmoving_image size: {moving_image.GetSize()}"
                                f"\nshrink_factors: {shrink_factors}")
+        if not silent:
+            message("Image size and shrink factors are compatible.")
+    else:
+        if not silent:
+            message("No shrink factors given.")
 
 
 def registration(args: Namespace):
-    # get the base of the output so we can construct the filenames of the auxiliary outputs
+    # get the base of the output, so we can construct the filenames of the auxiliary outputs
     output_base = get_output_base(args.output, TRANSFORM_EXTENSIONS, args.silent)
     output_yaml = f"{output_base}.yaml"
     output_metric_csv = f"{output_base}_metric_history.csv"
@@ -355,7 +363,7 @@ def registration(args: Namespace):
         args.downsampling_shrink_factor, args.downsampling_smoothing_sigma,
         args.silent
     )
-    check_image_size_and_shrink_factors(fixed_image, moving_image, args.shrink_factors)
+    check_image_size_and_shrink_factors(fixed_image, moving_image, args.shrink_factors, args.silent)
     # create the object
     registration_method = sitk.ImageRegistrationMethod()
     # set it up
@@ -383,8 +391,14 @@ def registration(args: Namespace):
         create_metric_tracking_callback(registration_method, metric_history, silent=args.silent, demons=False)
     )
     # do the registration
+    if not args.silent:
+        message("Starting registration.")
     transform = registration_method.Execute(fixed_image, moving_image)
+    if not args.silent:
+        message(f"Registration stopping condition: {registration_method.GetOptimizerStopConditionDescription()}")
     # write transform to file
+    if not args.silent:
+        message(f"Writing transformation to {args.output}")
     sitk.WriteTransform(transform, args.output)
     # save the metric history
     write_metrics_to_csv(output_metric_csv, metric_history, args.silent)
