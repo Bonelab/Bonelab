@@ -127,7 +127,7 @@ with the :code:`bl` environment activated.
    * - :code:`blMuscle`
      - segment and quantitatively analyze muscle in calibrated CT
    * - :code:`blPseudoCT`
-     - ???
+     - Generate pseudo-CT image from MRI image
    * - :code:`blSliceViewer`
      - interactive 2D slice viewer
    * - :code:`blVisualizeSegmentation`

@@ -186,8 +186,12 @@ def demons_registration(args: Namespace):
     # weird stuff happening (though the resulting displacement field is in the fixed frame, so maybe it doesn't matter?)
     # moving_image.CopyInformation(fixed_image)
     # it makes much more sense to me to resample the moving image to the physical space and grid of the fixed image
-    # prior to registration, however we will see how this goes in testing. it's possible that here we need to be
-    # applying a centering transform to make sure they line up so we do not lose a bunch of information.
+    # prior to registration, however I will see how this goes in testing. it's possible that here I need to be
+    # applying a centering transform to make sure the images line up so we do not lose a bunch of information.
+    # if I do end up changing it so the centering transform is applied here, I will then somehow have to make sure
+    # that the final transform that gets saved is the two transforms combined somehow
+    # this will likely involve using sitk.TransformToDisplacementField to convert that original centering
+    # transform to a displacement field and just adding them together
     moving_image = sitk.Resample(moving_image, fixed_image)
     if args.initial_transform is not None:
         initial_transform = read_transform(args)
