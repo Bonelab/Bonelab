@@ -18,7 +18,7 @@ IMAGE_SIZE_DICT = {
     "big": 30
 }
 
-TEST_OUTPUT_LABEL = "test_output"
+TEST_OUTPUT_LABEL = "test_output.txt"
 
 # set this low so that testing goes quickly
 DEFAULT_ITERATIONS = 10
@@ -56,16 +56,6 @@ class TestRegistration(unittest.TestCase):
     )
     def test_default(self, fixed_image, moving_image):
         args = self._construct_default_args(fixed_image, moving_image)
-        registration(create_parser().parse_args(args=args))
-
-    @settings(deadline=HYPOTHESIS_DEADLINE)
-    @given(
-        fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
-        moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
-        output_format=st.sampled_from(["transform", "image", "compressed-image"])
-    )
-    def test_output_formats(self, fixed_image, moving_image, output_format):
-        args = self._construct_default_args(fixed_image, moving_image) + ["-of", output_format]
         registration(create_parser().parse_args(args=args))
 
     @settings(deadline=HYPOTHESIS_DEADLINE)

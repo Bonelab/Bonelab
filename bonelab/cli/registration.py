@@ -55,8 +55,8 @@ def check_percentage(x: float) -> float:
     return x
 
 
-def get_output_base(output: str) -> str:
-    for ext in INPUT_EXTENSIONS:
+def get_output_base(output: str, extensions: List[str]) -> str:
+    for ext in extensions:
         if output.lower().endswith(ext):
             return output[:(-len(ext))]
     raise ValueError("output base could not be created because the output does not end with an available extension")
@@ -264,10 +264,11 @@ def check_image_size_and_shrink_factors(
 
 
 def registration(args: Namespace):
+    output_base = get_output_base(args.output, TRANSFORM_EXTENSIONS)
     # save the arguments of this registration to a yaml file
     # this has the added benefit of ensuring up-front that we can write files to the "output" that was provided,
     # so we do not waste a lot of time doing the registration and then crashing at the end because of write permissions
-    write_args_to_yaml(args, f"{args.output}.yaml")
+    write_args_to_yaml(args, f"{output_base}.yaml")
     fixed_image, moving_image = read_and_downsample_images(args)
     check_image_size_and_shrink_factors(fixed_image, moving_image, args.shrink_factors)
     # create the object
@@ -287,12 +288,12 @@ def registration(args: Namespace):
     # do the registration
     transform = registration_method.Execute(fixed_image, moving_image)
     # write transform to file
-    sitk.WriteTransform(transform, f"{args.output}.mat")
+    sitk.WriteTransform(transform, args.output)
     # save the metric history
-    write_metrics_to_csv(metric_history, f"{args.output}_metric_history.csv")
+    write_metrics_to_csv(metric_history, f"{output_base}_metric_history.csv")
     # optionally, create a plot of the metric history and save it
     if args.plot_metric_history:
-        create_and_save_metrics_plot(metric_history, f"{args.output}_metric_history.png")
+        create_and_save_metrics_plot(metric_history, f"{output_base}_metric_history.png")
 
 
 def create_parser() -> ArgumentParser:
