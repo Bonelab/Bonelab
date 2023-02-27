@@ -277,15 +277,16 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "fixed_image", type=str, metavar="FIXED",
-        help="path to the fixed image (don't use DICOMs; AIM  or NIfTI should work)"
+        help="Provide fixed image input filename (*.nii, *.nii.gz, *.aim)"
     )
     parser.add_argument(
         "moving_image", type=str, metavar="MOVING",
-        help="path to the moving image (don't use DICOMs; AIM  or NIfTI should work)"
+        help="Provide moving image input filename (*.nii, *.nii.gz, *.aim)"
     )
     parser.add_argument(
         "output", type=str, metavar="OUTPUT",
-        help="path to where you want outputs saved to, with no extension (will be added)"
+        help="Provide output filename. Extension must be compatible with SimpleITK's WriteTransform function,"
+             "e.g. .txt, .tfm, .xfm, .hdf or .mat (others may be supported, check SimpleITK documentation)"
     )
     parser.add_argument(
         "--downsampling-shrink-factor", "-dsf", type=float, default=None, metavar="X",
