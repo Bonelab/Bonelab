@@ -43,22 +43,6 @@ def read_transform(args: Namespace) -> Optional[sitk.Transform]:
     return initial_transform
 
 
-def pad_images_to_same_extent(fixed_image: sitk.Image, moving_image: sitk.Image) -> Tuple[sitk.Image, sitk.Image]:
-    size_difference = [fs - ms for (fs, ms) in zip(fixed_image.GetSize(), moving_image.GetSize())]
-    for i, sd in enumerate(size_difference):
-        pad_lower = [0, 0, 0]
-        pad_upper = [0, 0, 0]
-        pad_lower[i] = abs(sd) // 2
-        pad_upper[i] = abs(sd) - (abs(sd) // 2)
-        if sd > 0:
-            # fixed image is bigger, so pad the moving image
-            moving_image = sitk.ConstantPad(moving_image, pad_lower, pad_upper)
-        if sd < 0:
-            # fixed image is smaller, so pad the fixed image
-            fixed_image = sitk.ConstantPad(fixed_image, pad_lower, pad_upper)
-    return fixed_image, moving_image
-
-
 def construct_multiscale_progression(args: Namespace) -> Optional[List[Tuple[float]]]:
     if (args.shrink_factors is not None) and (args.smoothing_sigmas is not None):
         if len(args.shrink_factors) == len(args.smoothing_sigmas):
@@ -134,8 +118,6 @@ def demons_registration(args: Namespace):
         args.silent
     )
     check_image_size_and_shrink_factors(fixed_image, moving_image, args.shrink_factors, args.silent)
-    # we have to pad the images to be the same size - just a requirement of the Demons algorithms
-    fixed_image, moving_image = pad_images_to_same_extent(fixed_image, moving_image)
     # I am a little bit unsure about this next thing. You need the fixed and moving images to exist in the same physical
     # space for the diffeomorphic, symmetric, and fast symmetric demons algorithms to work (otherwise they crash).
     # copying the metadata from the fixed_image onto the moving_image makes it so these algorithms will run, but I'm
@@ -149,6 +131,8 @@ def demons_registration(args: Namespace):
     # that the final transform that gets saved is the two transforms combined somehow
     # this will likely involve using sitk.TransformToDisplacementField to convert that original centering
     # transform to a displacement field and just adding them together
+    if not args.silent:
+        message("Resampling fixed image onto the moving image.")
     moving_image = sitk.Resample(moving_image, fixed_image)
     if args.initial_transform is not None:
         initial_transform = read_transform(args)
