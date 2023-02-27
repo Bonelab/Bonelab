@@ -146,21 +146,33 @@ def create_and_save_metrics_plot(fn: str, metrics_history: List[float], silent: 
     plt.savefig(fn)
 
 
-def read_and_downsample_images(args: Namespace) -> Tuple[sitk.Image, sitk.Image]:
+def read_and_downsample_images(
+        fixed_image: str,
+        moving_image: str,
+        downsampling_shrink_factor: float,
+        downsampling_smoothing_sigma: float,
+        silent: bool
+) -> Tuple[sitk.Image, sitk.Image]:
+    if not silent:
+        message("Reading inputs.")
     # load images, cast to single precision float
-    fixed_image = sitk.Cast(read_image(args.fixed_image, "fixed_image", args.silent), sitk.sitkFloat32)
-    moving_image = sitk.Cast(read_image(args.moving_image, "moving_image", args.silent), sitk.sitkFloat32)
+    fixed_image = sitk.Cast(read_image(fixed_image, "fixed_image", silent), sitk.sitkFloat32)
+    moving_image = sitk.Cast(read_image(moving_image, "moving_image", silent), sitk.sitkFloat32)
     # optionally, downsample the fixed and moving images
-    if (args.downsampling_shrink_factor is not None) and (args.downsampling_smoothing_sigma is not None):
+    if (downsampling_shrink_factor is not None) and (downsampling_smoothing_sigma is not None):
+        if not silent:
+            message(f"Downsampling and smoothing inputs with shrink factor {downsampling_shrink_factor} and sigma "
+                  f"{downsampling_smoothing_sigma}.")
         fixed_image = smooth_and_resample(
-            fixed_image, args.downsampling_shrink_factor, args.downsampling_smoothing_sigma
+            fixed_image, downsampling_shrink_factor, downsampling_smoothing_sigma
         )
         moving_image = smooth_and_resample(
-            moving_image, args.downsampling_shrink_factor, args.downsampling_smoothing_sigma
+            moving_image, downsampling_shrink_factor, downsampling_smoothing_sigma
         )
-    elif (args.downsampling_shrink_factor is None) and (args.downsampling_smoothing_sigma is None):
+    elif (downsampling_shrink_factor is None) and (downsampling_smoothing_sigma is None):
         # do not downsample fixed and moving images
-        pass
+        if not silent:
+            message("Using inputs at full resolution.")
     else:
         raise ValueError("one of `downsampling-shrink-factor` or `downsampling-smoothing-sigma` have not been specified"
                          "you must either leave both as the default `None` or specify both")
@@ -169,22 +181,40 @@ def read_and_downsample_images(args: Namespace) -> Tuple[sitk.Image, sitk.Image]
 
 def setup_optimizer(
         registration_method: sitk.ImageRegistrationMethod,
-        args: Namespace
+        max_iterations: int,
+        gradient_descent_learning_rate: float,
+        gradient_descent_convergence_min_value: float,
+        gradient_descent_convergence_window_size: int,
+        powell_max_line_iterations: int,
+        powell_step_length: float,
+        powell_step_tolerance: float,
+        powell_value_tolerance: float,
+        optimizer: str,
+        silent: bool
 ) -> sitk.ImageRegistrationMethod:
-    if args.optimizer == "GradientDescent":
+    if optimizer == "GradientDescent":
+        if not silent:
+            message(f"Using {optimizer} with max iterations: {max_iterations:d}, learning rate: "
+                    f"{gradient_descent_learning_rate:e}, convergence min value: "
+                    f"{gradient_descent_convergence_min_value:e}, and convergence window size: "
+                    f"{gradient_descent_convergence_window_size:e}")
         registration_method.SetOptimizerAsGradientDescent(
-            learningRate=args.gradient_descent_learning_rate,
-            numberOfIterations=args.max_iterations,
-            convergenceMinimumValue=args.gradient_descent_convergence_min_value,
-            convergenceWindowSize=args.gradient_descent_convergence_window_size
+            learningRate=gradient_descent_learning_rate,
+            numberOfIterations=max_iterations,
+            convergenceMinimumValue=gradient_descent_convergence_min_value,
+            convergenceWindowSize=gradient_descent_convergence_window_size
         )
-    elif args.optimizer == "Powell":
+    elif optimizer == "Powell":
+        if not silent:
+            message(f"Using {optimizer} with max line iterations: {powell_max_line_iterations:d}, step length: "
+                    f"{powell_step_length:e}, step tolerance: {powell_step_tolerance:e}, and value tolerance: "
+                    f"{powell_value_tolerance:e}")
         registration_method.SetOptimizerAsPowell(
-            numberOfIterations=args.max_iterations,
-            maximumLineIterations=args.powell_max_line_iterations,
-            stepLength=args.powell_step_length,
-            stepTolerance=args.powell_step_tolerance,
-            valueTolerance=args.powell_value_tolerance
+            numberOfIterations=max_iterations,
+            maximumLineIterations=powell_max_line_iterations,
+            stepLength=powell_step_length,
+            stepTolerance=powell_step_tolerance,
+            valueTolerance=powell_value_tolerance
         )
     else:
         raise ValueError("`optimizer` is invalid and was not caught")
@@ -320,12 +350,28 @@ def registration(args: Namespace):
     # this has the added benefit of ensuring up-front that we can write files to the "output" that was provided,
     # so we do not waste a lot of time doing the registration and then crashing at the end because of write permissions
     write_args_to_yaml(output_yaml, args, args.silent)
-    fixed_image, moving_image = read_and_downsample_images(args)
+    fixed_image, moving_image = read_and_downsample_images(
+        args.fixed_image, args.moving_image,
+        args.downsampling_shrink_factor, args.downsampling_smoothing_sigma,
+        args.silent
+    )
     check_image_size_and_shrink_factors(fixed_image, moving_image, args.shrink_factors)
     # create the object
     registration_method = sitk.ImageRegistrationMethod()
     # set it up
-    registration_method = setup_optimizer(registration_method, args)
+    registration_method = setup_optimizer(
+        registration_method,
+        args.max_iterations,
+        args.gradient_descent_learning_rate,
+        args.gradient_descent_convergence_min_value,
+        args.gradient_descent_convergence_window_size,
+        args.powell_max_line_iterations,
+        args.powell_step_length,
+        args.powell_step_tolerance,
+        args.powell_value_tolerance,
+        args.optimizer,
+        args.silent
+    )
     registration_method = setup_similarity_metric(registration_method, args)
     registration_method = setup_interpolator(registration_method, args)
     registration_method = setup_transform(registration_method, fixed_image, moving_image, args)
@@ -363,7 +409,7 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "moving_image", type=create_file_extension_checker(INPUT_EXTENSIONS, "moving_image"), metavar="MOVING",
-        help=f"Provide moving image input filename "
+        help=f"Provide moving image input filename ({', '.join(INPUT_EXTENSIONS)})"
     )
     parser.add_argument(
         "output", type=create_file_extension_checker(TRANSFORM_EXTENSIONS, "output"), metavar="OUTPUT",
