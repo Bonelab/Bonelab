@@ -13,7 +13,7 @@ from enum import Enum
 from bonelab.util.time_stamp import message
 from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_resample, DEMONS_FILTERS
 from bonelab.cli.registration import (
-    read_and_downsample_images, create_and_save_metrics_plot, write_metrics_to_csv,
+    read_and_downsample_images, create_and_save_metrics_plot, write_metrics_to_csv, get_output_base,
     create_string_argument_checker, write_args_to_yaml, check_image_size_and_shrink_factors,
     create_file_extension_checker, check_inputs_exist, check_for_output_overwrite,
     INPUT_EXTENSIONS
@@ -112,6 +112,18 @@ def write_transform_or_field(fn: str, field: sitk.Image, silent: bool) -> None:
 
 
 def demons_registration(args: Namespace):
+    # get the base of the output, so we can construct the filenames of the auxiliary outputs
+    output_base = get_output_base(args.output, TRANSFORM_EXTENSIONS+IMAGE_EXTENSIONS, args.silent)
+    output_yaml = f"{output_base}.yaml"
+    output_metric_csv = f"{output_base}_metric_history.csv"
+    output_metric_png = f"{output_base}_metric_history.png"
+    # check that the inputs actually exist
+    check_inputs_exist([args.fixed_image, args.moving_image, args.initial_transform], args.silent)
+    # check if we're going to overwrite some outputs
+    check_for_output_overwrite(
+        [args.output, output_yaml, output_metric_csv, output_metric_png],
+        args.overwrite, args.silent
+    )
     # save the arguments of this registration to a yaml file
     # this has the added benefit of ensuring up-front that we can write files to the "output" that was provided,
     # so we do not waste a lot of time doing the registration and then crashing at the end because of write permissions
@@ -179,6 +191,10 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "output", type=create_file_extension_checker(TRANSFORM_EXTENSIONS+IMAGE_EXTENSIONS, "output"), metavar="OUTPUT",
         help=f"Provide output filename ({', '.join(TRANSFORM_EXTENSIONS+IMAGE_EXTENSIONS)})"
+    )
+    parser.add_argument(
+        "--overwrite", "-ow", default=False, action="store_true",
+        help="enable this flag to overwrite existing files, if they exist at output targets"
     )
     parser.add_argument(
         "--downsampling-shrink-factor", "-dsf", type=float, default=None, metavar="X",
