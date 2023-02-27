@@ -288,14 +288,6 @@ def create_parser() -> ArgumentParser:
         help="path to where you want outputs saved to, with no extension (will be added)"
     )
     parser.add_argument(
-        "--output-format", "-of", default="image", metavar="STR",
-        type=create_string_argument_checker(["transform", "image", "compressed-image"], "output-format"),
-        help="format to save the output in, must be `transform`, `image`, or `compressed-image`."
-             "`transform` -> .mat,"
-             "`image` -> .nii,"
-             "`compressed-image` -> .nii.gz"
-    )
-    parser.add_argument(
         "--downsampling-shrink-factor", "-dsf", type=float, default=None, metavar="X",
         help="the shrink factor to apply to the fixed and moving image before starting the registration"
     )
