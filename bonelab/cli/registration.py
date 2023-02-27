@@ -181,7 +181,7 @@ def read_and_downsample_images(
             message("Using inputs at full resolution.")
     else:
         raise ValueError("one of `downsampling-shrink-factor` or `downsampling-smoothing-sigma` have not been specified"
-                         "you must either leave both as the default `None` or specify both")
+                         " - you must either leave both as the default `None` or specify both")
     return fixed_image, moving_image
 
 
