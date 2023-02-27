@@ -46,7 +46,7 @@ class TestRegistration(unittest.TestCase):
         output = os.path.join(self.test_dir, TEST_OUTPUT_LABEL)
         return [
             self.random_images[fixed_image], self.random_images[moving_image], output,
-            "-mi", f"{DEFAULT_ITERATIONS}"
+            "-mi", f"{DEFAULT_ITERATIONS}", "-s"
         ]
 
     @settings(deadline=HYPOTHESIS_DEADLINE)

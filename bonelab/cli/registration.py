@@ -7,8 +7,10 @@ from matplotlib import pyplot as plt
 import csv
 import yaml
 from typing import List, Callable
+import os
 
 # internal imports
+from bonelab.util.time_stamp import message
 from bonelab.util.vtk_util import vtkImageData_to_numpy
 from bonelab.io.vtk_helpers import get_vtk_reader
 from bonelab.util.multiscale_registration import smooth_and_resample, create_metric_tracking_callback
@@ -55,19 +57,53 @@ def check_percentage(x: float) -> float:
     return x
 
 
-def get_output_base(output: str, extensions: List[str]) -> str:
+def get_output_base(output: str, extensions: List[str], silent: bool) -> str:
+    if not silent:
+        message("Extracting the base filename from the given output path...")
     for ext in extensions:
         if output.lower().endswith(ext):
-            return output[:(-len(ext))]
+            output_base = output[:(-len(ext))]
+            if not silent:
+                message(f"Base filename is {output_base}")
+            return output_base
     raise ValueError("output base could not be created because the output does not end with an available extension")
 
 
-def write_args_to_yaml(args: Namespace, fn: str) -> None:
+def write_args_to_yaml(fn: str, args: Namespace, silent: bool) -> None:
+    if not silent:
+        message(f"Writing the input arguments to {fn}")
     with open(fn, "w") as f:
         yaml.dump(vars(args), f)
 
 
-def read_image(fn: str) -> sitk.Image:
+def check_inputs_exist(fixed_image: str, moving_image: str, silent: bool) -> None:
+    if not silent:
+        message(f"Checking that {fixed_image} and {moving_image} exist before continuing.")
+    if not os.path.isfile(fixed_image):
+        raise FileExistsError(f"the fixed image, {fixed_image}, does not exist")
+    if not os.path.isfile(moving_image):
+        raise FileExistsError(f"the moving image, {moving_image}, does not exist")
+    if not silent:
+        message("Inputs exist.")
+
+
+def check_for_output_overwrite(outputs: List[str], overwrite: bool, silent: bool) -> None:
+    if overwrite:
+        if not silent:
+            message("`--overwrite` is enabled, proceeding without checking if outputs already exist.")
+        return
+    existing_outputs = []
+    for output in outputs:
+        if os.path.isfile(output):
+            existing_outputs.append(output)
+    if len(existing_outputs) > 0:
+        raise RuntimeError(f"the following output files already exist: f{', '.join(existing_outputs)}. Either enable"
+                           f"the `--overwrite` option, move these files, or choose a different `output` filename.")
+
+
+def read_image(fn: str, image_name: str, silent: bool) -> sitk.Image:
+    if not silent:
+        message(f"Reading {image_name} from {fn}.")
     # first let's see if SimpleITK can do it
     try:
         return sitk.ReadImage(fn)
@@ -91,13 +127,17 @@ def read_image(fn: str) -> sitk.Image:
             raise err
 
 
-def write_metrics_to_csv(metric_history: List[float], fn: str) -> None:
+def write_metrics_to_csv(fn: str, metric_history: List[float], silent: bool) -> None:
+    if not silent:
+        message(f"Writing metrics to {fn}.")
     with open(fn, "w") as f:
         csv_writer = csv.writer(f)
         csv_writer.writerow(metric_history)
 
 
-def create_and_save_metrics_plot(metrics_history: List[float], fn: str) -> None:
+def create_and_save_metrics_plot(fn: str, metrics_history: List[float], silent: bool) -> None:
+    if not silent:
+        message(f"Saving metrics plot to {fn}.")
     plt.figure()
     plt.plot(metrics_history, "k-o")
     plt.xlabel('iteration')
@@ -108,8 +148,8 @@ def create_and_save_metrics_plot(metrics_history: List[float], fn: str) -> None:
 
 def read_and_downsample_images(args: Namespace) -> Tuple[sitk.Image, sitk.Image]:
     # load images, cast to single precision float
-    fixed_image = sitk.Cast(read_image(args.fixed_image), sitk.sitkFloat32)
-    moving_image = sitk.Cast(read_image(args.moving_image), sitk.sitkFloat32)
+    fixed_image = sitk.Cast(read_image(args.fixed_image, "fixed_image", args.silent), sitk.sitkFloat32)
+    moving_image = sitk.Cast(read_image(args.moving_image, "moving_image", args.silent), sitk.sitkFloat32)
     # optionally, downsample the fixed and moving images
     if (args.downsampling_shrink_factor is not None) and (args.downsampling_smoothing_sigma is not None):
         fixed_image = smooth_and_resample(
@@ -256,19 +296,30 @@ def check_image_size_and_shrink_factors(
         smallest_dim = min(fixed_image.GetSize() + moving_image.GetSize())
         largest_shrink_factor = max(shrink_factors)
         if smallest_dim // largest_shrink_factor == 1:
-            raise RuntimeError(f"The image sizes and shrink factors will result in an image being shrunk too much, such "
-                               f"that the downsampled image will have a unit size (or smaller). Revise parameters."
+            raise RuntimeError(f"The image sizes and shrink factors will result in an image being shrunk too much, "
+                               f"such that the downsampled image will have a unit size (or smaller). Revise parameters."
                                f"\nfixed_image size: {fixed_image.GetSize()}"
                                f"\nmoving_image size: {moving_image.GetSize()}"
                                f"\nshrink_factors: {shrink_factors}")
 
 
 def registration(args: Namespace):
-    output_base = get_output_base(args.output, TRANSFORM_EXTENSIONS)
+    # get the base of the output so we can construct the filenames of the auxiliary outputs
+    output_base = get_output_base(args.output, TRANSFORM_EXTENSIONS, args.silent)
+    output_yaml = f"{output_base}.yaml"
+    output_metric_csv = f"{output_base}_metric_history.csv"
+    output_metric_png = f"{output_base}_metric_history.png"
+    # check that the inputs actually exist
+    check_inputs_exist(args.fixed_image, args.moving_image, args.silent)
+    # check if we're going to overwrite some outputs
+    check_for_output_overwrite(
+        [args.output, output_yaml, output_metric_csv, output_metric_png],
+        args.overwrite, args.silent
+    )
     # save the arguments of this registration to a yaml file
     # this has the added benefit of ensuring up-front that we can write files to the "output" that was provided,
     # so we do not waste a lot of time doing the registration and then crashing at the end because of write permissions
-    write_args_to_yaml(args, f"{output_base}.yaml")
+    write_args_to_yaml(output_yaml, args, args.silent)
     fixed_image, moving_image = read_and_downsample_images(args)
     check_image_size_and_shrink_factors(fixed_image, moving_image, args.shrink_factors)
     # create the object
@@ -290,10 +341,10 @@ def registration(args: Namespace):
     # write transform to file
     sitk.WriteTransform(transform, args.output)
     # save the metric history
-    write_metrics_to_csv(metric_history, f"{output_base}_metric_history.csv")
+    write_metrics_to_csv(output_metric_csv, metric_history, args.silent)
     # optionally, create a plot of the metric history and save it
     if args.plot_metric_history:
-        create_and_save_metrics_plot(metric_history, f"{output_base}_metric_history.png")
+        create_and_save_metrics_plot(output_metric_png, metric_history, args.silent)
 
 
 def create_parser() -> ArgumentParser:
@@ -317,6 +368,10 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "output", type=create_file_extension_checker(TRANSFORM_EXTENSIONS, "output"), metavar="OUTPUT",
         help=f"Provide output filename ({', '.join(TRANSFORM_EXTENSIONS)})"
+    )
+    parser.add_argument(
+        "--overwrite", "-ow", default=False, action="store_true",
+        help="enable this flag to overwrite existing files, if they exist at output targets"
     )
     parser.add_argument(
         "--downsampling-shrink-factor", "-dsf", type=float, default=None, metavar="X",
@@ -345,8 +400,8 @@ def create_parser() -> ArgumentParser:
         help="enable this flag to save a plot of the metric history to file in addition to the raw data"
     )
     parser.add_argument(
-        "--verbose", "-v", default=False, action="store_true",
-        help="enable this flag to print a lot of stuff to the terminal about how the registration is proceeding"
+        "--silent", "-s", default=False, action="store_true",
+        help="enable this flag to suppress terminal output about how the registration is proceeding"
     )
     parser.add_argument(
         "--optimizer", "-opt", default="GradientDescent", metavar="STR",

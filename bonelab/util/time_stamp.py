@@ -5,6 +5,7 @@ import time
 
 start_time = time.time()
 
+
 def message(msg, *additionalLines):
     """Print message with time stamp.
     
