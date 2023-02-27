@@ -149,23 +149,18 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "fixed_image", type=str, metavar="FIXED",
-        help="path to the fixed image (don't use DICOMs; AIM  or NIfTI should work)"
+        help="Provide fixed image input filename (*.nii, *.nii.gz, *.aim)"
     )
     parser.add_argument(
         "moving_image", type=str, metavar="MOVING",
-        help="path to the moving image (don't use DICOMs; AIM  or NIfTI should work)"
+        help="Provide moving image input filename (*.nii, *.nii.gz, *.aim)"
     )
     parser.add_argument(
         "output", type=str, metavar="OUTPUT",
-        help="path to where you want outputs saved to, with no extension (will be added)"
-    )
-    parser.add_argument(
-        "--output-format", "-of", default="image", metavar="STR",
-        type=create_string_argument_checker(["transform", "image", "compressed-image"], "output-format"),
-        help="format to save the output in, must be `transform`, `image`, or `compressed-image`."
-             "`transform` -> .mat,"
-             "`image` -> .nii,"
-             "`compressed-image` -> .nii.gz"
+        help="Provide output filename. Extension must be compatible with SimpleITK's WriteTransform or WriteImage "
+             "functions. For images: .nii, .nii.gz, or for transforms: .txt, .tfm, .xfm, .hdf or .mat (others may be "
+             "supported, check SimpleITK documentation). NOTE: Not recommended to write a dense displacement field to "
+             "file uncompressed, so please use .hdf or .mat rather than .txt if you write the transform."
     )
     parser.add_argument(
         "--downsampling-shrink-factor", "-dsf", type=float, default=None, metavar="X",
