@@ -39,7 +39,7 @@ def create_file_extension_checker(extensions: List[str], argument_name: str) -> 
         if extension_matched:
             return fn
         else:
-            raise ArgumentTypeError(f"given filename for {argument_name} must end with one of {', '.join(extensions)}"
+            raise ArgumentTypeError(f"given filename for {argument_name} must end with one of {', '.join(extensions)} "
                                     f"but got {fn}")
 
     return filename_checker
