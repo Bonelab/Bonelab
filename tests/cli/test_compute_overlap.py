@@ -47,7 +47,7 @@ class TestComputeOverlap(unittest.TestCase):
     )
     def test_various_random_images_and_class_labels(self, img1, img2, cl):
         output = os.path.join(self.test_dir, TEST_OUTPUT_LABEL)
-        args = [self.random_images[img1], self.random_images[img2], output, "-cl", *[str(x) for x in cl]]
+        args = [self.random_images[img1], self.random_images[img2], output, "-s", "-ow", "-cl", *[str(x) for x in cl]]
         compute_overlap(create_parser().parse_args(args=args))
 
     def test_full_overlap(self):
@@ -57,7 +57,7 @@ class TestComputeOverlap(unittest.TestCase):
         mask = sitk.GetImageFromArray(mask)
         fn = os.path.join(self.test_dir, "mask.nii")
         sitk.WriteImage(mask, fn)
-        args = [fn, fn, output]
+        args = [fn, fn, output, "-s", "-ow"]
         compute_overlap(create_parser().parse_args(args=args))
         df = pd.read_csv(output)
         self.assertAlmostEqual(1.0, df["dice_1"].values[0])
@@ -74,7 +74,7 @@ class TestComputeOverlap(unittest.TestCase):
         opp_fn = os.path.join(self.test_dir, "opp.nii")
         sitk.WriteImage(mask, mask_fn)
         sitk.WriteImage(opp, opp_fn)
-        args = [mask_fn, opp_fn, output]
+        args = [mask_fn, opp_fn, output, "-s", "-ow"]
         compute_overlap(create_parser().parse_args(args=args))
         df = pd.read_csv(output)
         self.assertAlmostEqual(0.0, df["dice_1"].values[0])
