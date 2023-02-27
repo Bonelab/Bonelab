@@ -37,8 +37,8 @@ def write_output(fn: str, mask1: str, mask2: str, metrics: List[Tuple[int, float
 
 def compute_overlap(args: Namespace):
     class_labels = set(args.class_labels) if args.class_labels is not None else [1]
-    mask1 = read_image(args.mask1)
-    mask2 = read_image(args.mask2)
+    mask1 = read_image(args.mask1, "mask1", args.silent)
+    mask2 = read_image(args.mask2, "mask2", args.silent)
     # resample mask2 onto mask1 so they share the same physical space
     # use nearest neighbour because we do not want to "smear out" labels
     mask2 = sitk.Resample(mask2, mask1, sitk.Transform(), sitk.sitkNearestNeighbor)
@@ -76,6 +76,10 @@ def create_parser() -> ArgumentParser:
         "--class-labels", "-cl", default=None, type=int, nargs="+", metavar="N",
         help="the class labels to calculate overlap metrics for. If nothing is provided then the images will be"
              "binarized and only a single value for each metric will be calculated."
+    )
+    parser.add_argument(
+        "--silent", "-s", default=False, action="store_true",
+        help="enable this flag to suppress terminal output about how the registration is proceeding"
     )
     return parser
 

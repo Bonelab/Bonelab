@@ -9,6 +9,7 @@ from bonelab.util.time_stamp import message
 from bonelab.io.vtk_helpers import get_vtk_writer
 from bonelab.cli.registration import (
     INTERPOLATORS, read_image, create_string_argument_checker, create_file_extension_checker,
+    check_inputs_exist, check_for_output_overwrite,
     INPUT_EXTENSIONS, TRANSFORM_EXTENSIONS
 )
 from bonelab.cli.demons_registration import IMAGE_EXTENSIONS
@@ -32,6 +33,7 @@ def read_transform(fn: str, invert: bool, silent: bool) -> sitk.Transform:
 
 
 def apply_sitk_transform(args: Namespace):
+    check_inputs_exist(fixed_image)
     fixed_image = read_image(args.fixed_image, "fixed_image", args.silent)
     transform = read_transform(args.transform, args.invert_transform, args.silent)
     if args.moving_image is not None:

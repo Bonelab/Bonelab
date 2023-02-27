@@ -82,13 +82,13 @@ def write_args_to_yaml(fn: str, args: Namespace, silent: bool) -> None:
         yaml.dump(vars(args), f)
 
 
-def check_inputs_exist(fixed_image: str, moving_image: str, silent: bool) -> None:
+def check_inputs_exist(fns: List[Optional[str]], silent: bool) -> None:
     if not silent:
-        message(f"Checking that {fixed_image} and {moving_image} exist before continuing.")
-    if not os.path.isfile(fixed_image):
-        raise FileNotFoundError(f"the fixed image, {fixed_image}, does not exist")
-    if not os.path.isfile(moving_image):
-        raise FileNotFoundError(f"the moving image, {moving_image}, does not exist")
+        message(f"Checking that inputs exist before continuing.")
+    for fn in fns:
+        if fn is not None:
+            if not os.path.isfile(fn):
+                raise FileNotFoundError(f"{fn} does not exist")
     if not silent:
         message("Inputs exist.")
 
@@ -371,7 +371,7 @@ def registration(args: Namespace):
     output_metric_csv = f"{output_base}_metric_history.csv"
     output_metric_png = f"{output_base}_metric_history.png"
     # check that the inputs actually exist
-    check_inputs_exist(args.fixed_image, args.moving_image, args.silent)
+    check_inputs_exist([args.fixed_image, args.moving_image], args.silent)
     # check if we're going to overwrite some outputs
     check_for_output_overwrite(
         [args.output, output_yaml, output_metric_csv, output_metric_png],
