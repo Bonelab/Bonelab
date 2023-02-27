@@ -22,7 +22,7 @@ DEMONS_FILTERS = {
 def create_metric_tracking_callback(
         registration_filter: sitk.ImageFilter,
         metric_history: List[float],
-        verbose: bool = False,
+        silent: bool = True,
         demons: bool = True
 ) -> Callable:
 
@@ -32,7 +32,7 @@ def create_metric_tracking_callback(
         else:
             metric = registration_filter.GetMetricValue()
         metric_history.append(metric)
-        if verbose:
+        if not silent:
             if demons:
                 iteration = registration_filter.GetElapsedIterations()
             else:

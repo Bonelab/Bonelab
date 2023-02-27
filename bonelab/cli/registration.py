@@ -334,7 +334,7 @@ def registration(args: Namespace):
     metric_history = []
     registration_method.AddCommand(
         sitk.sitkIterationEvent,
-        create_metric_tracking_callback(registration_method, metric_history, verbose=args.verbose, demons=False)
+        create_metric_tracking_callback(registration_method, metric_history, silent=args.silent, demons=False)
     )
     # do the registration
     transform = registration_method.Execute(fixed_image, moving_image)
