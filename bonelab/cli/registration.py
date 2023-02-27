@@ -86,9 +86,9 @@ def check_inputs_exist(fixed_image: str, moving_image: str, silent: bool) -> Non
     if not silent:
         message(f"Checking that {fixed_image} and {moving_image} exist before continuing.")
     if not os.path.isfile(fixed_image):
-        raise FileExistsError(f"the fixed image, {fixed_image}, does not exist")
+        raise FileNotFoundError(f"the fixed image, {fixed_image}, does not exist")
     if not os.path.isfile(moving_image):
-        raise FileExistsError(f"the moving image, {moving_image}, does not exist")
+        raise FileNotFoundError(f"the moving image, {moving_image}, does not exist")
     if not silent:
         message("Inputs exist.")
 
@@ -103,8 +103,8 @@ def check_for_output_overwrite(outputs: List[str], overwrite: bool, silent: bool
         if os.path.isfile(output):
             existing_outputs.append(output)
     if len(existing_outputs) > 0:
-        raise RuntimeError(f"the following output files already exist: f{', '.join(existing_outputs)}. Either enable"
-                           f"the `--overwrite` option, move these files, or choose a different `output` filename.")
+        raise FileExistsError(f"the following output files already exist: {', '.join(existing_outputs)}. Either enable "
+                              f"the `--overwrite` option, move these files, or choose a different `output` filename.")
 
 
 def read_image(fn: str, image_name: str, silent: bool) -> sitk.Image:
