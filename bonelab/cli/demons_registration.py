@@ -7,13 +7,22 @@ from pathlib import Path
 import csv
 import yaml
 from typing import Tuple, Optional
+from enum import Enum
 
 # internal imports
 from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_resample, DEMONS_FILTERS
 from bonelab.cli.registration import (
     read_and_downsample_images, create_and_save_metrics_plot, write_metrics_to_csv,
-    create_string_argument_checker, write_args_to_yaml, check_image_size_and_shrink_factors
+    create_string_argument_checker, write_args_to_yaml, check_image_size_and_shrink_factors,
+    INPUT_EXTENSIONS
 )
+
+# define output type enum
+OutputType = Enum("OutputType", ["IMAGE", "TRANSFORM"])
+
+# define file extensions that we would consider available for saving displacement_fields as images or transforms
+IMAGE_EXTENSIONS = [".nii", ".nii.gz"]
+TRANSFORM_EXTENSIONS = [".hdf", ".mat"]  # only allow the binary versions, no plain-text displacement fields
 
 
 def demons_type_checker(s: str) -> str:

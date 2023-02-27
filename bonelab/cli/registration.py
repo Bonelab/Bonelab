@@ -14,13 +14,36 @@ from bonelab.io.vtk_helpers import get_vtk_reader
 from bonelab.util.multiscale_registration import smooth_and_resample, create_metric_tracking_callback
 
 
-def create_string_argument_checker(options: List[str], argument_name: str) -> Callable:
+# define file extensions that we consider available for input images
+INPUT_EXTENSIONS = [".aim", ".nii", ".nii.gz"]
+
+# define file extensions that we would consider available for saving transforms and images
+TRANSFORM_EXTENSIONS = [".txt", ".tfm", ".xfm", ".hdf", ".mat"]
+
+
+def create_filename_checker(extensions: List[str], argument_name: str) -> Callable[[str], str]:
+    def filename_checker(fn: str) -> str:
+        fn = str(fn)
+        extension_matched = False
+        for ext in extensions:
+            if fn.lower().endswith(ext.lower()):
+                extension_matched = True
+        if extension_matched:
+            return fn
+        else:
+            raise ArgumentTypeError(f"given filename for {argument_name} must end with one of {', '.join(extensions)}"
+                                    f"but got {fn}")
+
+    return filename_checker
+
+
+def create_string_argument_checker(options: List[str], argument_name: str) -> Callable[[str], str]:
     def argument_checker(s: str) -> str:
         s = str(s)
         if s in options:
             return s
         else:
-            raise ArgumentTypeError(f"`{argument_name}` must be one of {options}. got {s}")
+            raise ArgumentTypeError(f"`{argument_name}` must be one of {', '.join(options)} but got {s}")
 
     return argument_checker
 
@@ -30,6 +53,13 @@ def check_percentage(x: float) -> float:
     if (x < 0.0) or (x > 1.0):
         raise ArgumentTypeError(f"value must be between 0.0 and 1.0, got {x}")
     return x
+
+
+def get_output_base(output: str) -> str:
+    for ext in INPUT_EXTENSIONS:
+        if output.lower().endswith(ext):
+            return output[:(-len(ext))]
+    raise ValueError("output base could not be created because the output does not end with an available extension")
 
 
 def write_args_to_yaml(args: Namespace, fn: str) -> None:
@@ -276,17 +306,16 @@ def create_parser() -> ArgumentParser:
         formatter_class=ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
-        "fixed_image", type=str, metavar="FIXED",
-        help="Provide fixed image input filename (*.nii, *.nii.gz, *.aim)"
+        "fixed_image", type=create_filename_checker(INPUT_EXTENSIONS, "fixed_image"), metavar="FIXED",
+        help=f"Provide fixed image input filename ({', '.join(INPUT_EXTENSIONS)})"
     )
     parser.add_argument(
-        "moving_image", type=str, metavar="MOVING",
-        help="Provide moving image input filename (*.nii, *.nii.gz, *.aim)"
+        "moving_image", type=create_filename_checker(INPUT_EXTENSIONS, "moving_image"), metavar="MOVING",
+        help=f"Provide moving image input filename "
     )
     parser.add_argument(
-        "output", type=str, metavar="OUTPUT",
-        help="Provide output filename. Extension must be compatible with SimpleITK's WriteTransform function,"
-             "e.g. .txt, .tfm, .xfm, .hdf or .mat (others may be supported, check SimpleITK documentation)"
+        "output", type=create_filename_checker(TRANSFORM_EXTENSIONS, "output"), metavar="OUTPUT",
+        help=f"Provide output filename ({', '.join(TRANSFORM_EXTENSIONS)})"
     )
     parser.add_argument(
         "--downsampling-shrink-factor", "-dsf", type=float, default=None, metavar="X",
