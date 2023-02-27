@@ -33,7 +33,8 @@ def read_transform(fn: str, invert: bool, silent: bool) -> sitk.Transform:
 
 
 def apply_sitk_transform(args: Namespace):
-    check_inputs_exist(fixed_image)
+    check_inputs_exist([args.fixed_image, args.transform, args.moving_image], args.silent)
+    check_for_output_overwrite(args.output)
     fixed_image = read_image(args.fixed_image, "fixed_image", args.silent)
     transform = read_transform(args.transform, args.invert_transform, args.silent)
     if args.moving_image is not None:
