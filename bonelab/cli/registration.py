@@ -168,7 +168,7 @@ def read_and_downsample_images(
     if (downsampling_shrink_factor is not None) and (downsampling_smoothing_sigma is not None):
         if not silent:
             message(f"Downsampling and smoothing inputs with shrink factor {downsampling_shrink_factor} and sigma "
-                  f"{downsampling_smoothing_sigma}.")
+                    f"{downsampling_smoothing_sigma}.")
         fixed_image = smooth_and_resample(
             fixed_image, downsampling_shrink_factor, downsampling_smoothing_sigma
         )
