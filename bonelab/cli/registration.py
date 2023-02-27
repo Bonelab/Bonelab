@@ -32,157 +32,6 @@ def check_percentage(x: float) -> float:
     return x
 
 
-def create_parser() -> ArgumentParser:
-    parser = ArgumentParser(
-        description="blRegistration: SimpleITK Registration Tool.",
-        epilog="This tool provides limited access to the full functionality of SimpleITK's registration framework. "
-               "If you want to do something more advanced, consult the following resources: "
-               "(1)https://simpleitk.org/SPIE2019_COURSE/04_basic_registration.html  --------- "
-               "(2)https://simpleitk.org/doxygen/latest/html/classitk_1_1simple_1_1ImageRegistrationMethod.html - "
-               "Alternately, feel free to extend this tool to add more flexibility if you want to.",
-        formatter_class=ArgumentDefaultsHelpFormatter
-    )
-    parser.add_argument(
-        "fixed_image", type=str, metavar="FIXED",
-        help="path to the fixed image (don't use DICOMs; AIM  or NIfTI should work)"
-    )
-    parser.add_argument(
-        "moving_image", type=str, metavar="MOVING",
-        help="path to the moving image (don't use DICOMs; AIM  or NIfTI should work)"
-    )
-    parser.add_argument(
-        "output", type=str, metavar="OUTPUT",
-        help="path to where you want outputs saved to, with no extension (will be added)"
-    )
-    parser.add_argument(
-        "--output-format", "-of", default="image", metavar="STR",
-        type=create_string_argument_checker(["transform", "image", "compressed-image"], "output-format"),
-        help="format to save the output in, must be `transform`, `image`, or `compressed-image`."
-             "`transform` -> .mat,"
-             "`image` -> .nii,"
-             "`compressed-image` -> .nii.gz"
-    )
-    parser.add_argument(
-        "--downsampling-shrink-factor", "-dsf", type=float, default=None, metavar="X",
-        help="the shrink factor to apply to the fixed and moving image before starting the registration"
-    )
-    parser.add_argument(
-        "--downsampling-smoothing-sigma", "-dss", type=float, default=None, metavar="X",
-        help="the smoothing sigma to apply to the fixed and moving image before starting the registration"
-    )
-    parser.add_argument(
-        "--max-iterations", "-mi", default=100, type=int, metavar="N",
-        help="number of iterations to run registration algorithm for at each stage"
-    )
-    parser.add_argument(
-        "--shrink-factors", "-sf", default=None, type=int, nargs="+", metavar="X",
-        help="factors by which to shrink the fixed and moving image at each stage of the multiscale progression. you "
-             "must give the same number of arguments here as you do for `smoothing-sigmas`"
-    )
-    parser.add_argument(
-        "--smoothing-sigmas", "-ss", default=None, type=float, nargs="+", metavar="X",
-        help="sigmas for the Gaussians used to smooth the fixed and moving image at each stage of the multiscale "
-             "progression. you must give the same number of arguments here as you do for `shrink-factors`"
-    )
-    parser.add_argument(
-        "--plot-metric-history", "-pmh", default=False, action="store_true",
-        help="enable this flag to save a plot of the metric history to file in addition to the raw data"
-    )
-    parser.add_argument(
-        "--verbose", "-v", default=False, action="store_true",
-        help="enable this flag to print a lot of stuff to the terminal about how the registration is proceeding"
-    )
-    parser.add_argument(
-        "--optimizer", "-opt", default="GradientDescent", metavar="STR",
-        type=create_string_argument_checker(["GradientDescent", "Powell"], "optimizer"),
-        help="the optimizer to use, options: `GradientDescent`, `Powell`"
-    )
-    parser.add_argument(
-        "--gradient-descent-learning-rate", "-gdlr", default=1e-3, type=float, metavar="X",
-        help="learning rate when using gradient descent optimizer"
-    )
-    parser.add_argument(
-        "--gradient-descent-convergence-min-value", "-gdcmv", default=1e-6, type=float, metavar="X",
-        help="minimum value for convergence when using gradient descent optimizer"
-    )
-    parser.add_argument(
-        "--gradient-descent-convergence-window-size", "-gdcws", default=10, type=int, metavar="N",
-        help="window size for checking for convergence when using gradient descent optimizer"
-    )
-    parser.add_argument(
-        "--powell_max_line_iterations", "-pmli", default=100, type=int, metavar="N",
-        help="maximum number of line iterations when using Powell optimizer"
-    )
-    parser.add_argument(
-        "--powell_step_length", "-psl", default=1.0, type=float, metavar="X",
-        help="maximum step length when using Powell optimizer"
-    )
-    parser.add_argument(
-        "--powell_step_tolerance", "-pst", default=1e-6, type=float, metavar="X",
-        help="step tolerance when using Powell optimizer"
-    )
-    parser.add_argument(
-        "--powell_value_tolerance", "-pvt", default=1e-6, type=float, metavar="X",
-        help="value tolerance when using Powell optimizer"
-    )
-    parser.add_argument(
-        "--similarity-metric", "-sm", default="MeanSquares", metavar="STR",
-        type=create_string_argument_checker(
-            ["MeanSquares", "Correlation", "JointHistogramMutualInformation", "MattesMutualInformation"],
-            "similarity-metric"
-        ),
-        help="the similarity metric to use, options: `MeanSquares`, `Correlation`, "
-             "`JointHistogramMutualInformation`, `MattesMutualInformation`"
-    )
-    parser.add_argument(
-        "--similarity-metric-sampling-strategy", "-smss", default="None", metavar="STR",
-        type=create_string_argument_checker(["None", "Regular", "Random"], "similarity-metric-sampling-strategy"),
-        help="sampling strategy for similarity metric, options: "
-             "`None` -> use all points, "
-             "`Regular` -> sample on a regular grid with specified sampling rate, "
-             "`Random` -> sample randomly with specified sampling rate."
-    )
-    parser.add_argument(
-        "--similarity-metric-sampling-rate", "-smsr", default=0.2, type=check_percentage, metavar="P",
-        help="sampling rate for similarity metric, must be between 0.0 and 1.0"
-    )
-    parser.add_argument(
-        "--similarity-metric-sampling-seed", "-smssd", default=None, type=int, metavar="N",
-        help="the seed for random sampling, leave as `None` if you want a random seed. Can be useful if you want a "
-             "deterministic registration with random sampling for debugging/testing. Don't go crazy and use huge "
-             "numbers since SITK might report an OverflowError. I found keeping it <=255 worked."
-    )
-    parser.add_argument(
-        "--mutual-information-num-histogram-bins", "-minhb", default=20, type=int, metavar="N",
-        help="number of bins in histogram when using joint histogram or Mattes mutual information similarity metrics"
-    )
-    parser.add_argument(
-        "--joint-mutual-information-joint-smoothing-variance", "-jmijsv", default=1.5, type=float, metavar="X",
-        help="variance to use when smoothing the joint PDF when using the joint histogram mutual information "
-             "similarity metric"
-    )
-    parser.add_argument(
-        "--interpolator", "-int", default="Linear", metavar="STR",
-        type=create_string_argument_checker(["Linear", "NearestNeighbour", "BSpline"], "interpolator"),
-        help="the interpolator to use, options: `Linear`, `NearestNeighbour`, `BSpline`"
-    )
-    parser.add_argument(
-        "--centering-initialization", "-ci", default="Geometry", metavar="STR",
-        type=create_string_argument_checker(["Geometry", "Moments"], "centering-initialization"),
-        help="the centering initialization to use, options: `Geometry`, `Moments`"
-    )
-    parser.add_argument(
-        "--transform-type", "-tt", default="Euler3D", metavar="STR",
-        type=create_string_argument_checker(["Euler3D", "Euler2D"], "transform-type"),
-        help="the type of transformation to do, options: `Euler3D`, `Euler2D`. NOTE: these are just rigid "
-             "transformations in 3D or 2D, non-rigid transforms are beyond the current scope of this tool. If you "
-             "want a deformable registration, then either use blDemonsRegistration, extend this tool to be more "
-             "flexible, or write a custom registration script and manually specify the transform you want to fit. "
-    )
-
-    return parser
-
-
 def write_args_to_yaml(args: Namespace, fn: str) -> None:
     with open(fn, "w") as f:
         yaml.dump(vars(args), f)
@@ -414,6 +263,157 @@ def registration(args: Namespace):
     # optionally, create a plot of the metric history and save it
     if args.plot_metric_history:
         create_and_save_metrics_plot(metric_history, f"{args.output}_metric_history.png")
+
+
+def create_parser() -> ArgumentParser:
+    parser = ArgumentParser(
+        description="blRegistration: SimpleITK Registration Tool.",
+        epilog="This tool provides limited access to the full functionality of SimpleITK's registration framework. "
+               "If you want to do something more advanced, consult the following resources: "
+               "(1)https://simpleitk.org/SPIE2019_COURSE/04_basic_registration.html  --------- "
+               "(2)https://simpleitk.org/doxygen/latest/html/classitk_1_1simple_1_1ImageRegistrationMethod.html - "
+               "Alternately, feel free to extend this tool to add more flexibility if you want to.",
+        formatter_class=ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument(
+        "fixed_image", type=str, metavar="FIXED",
+        help="path to the fixed image (don't use DICOMs; AIM  or NIfTI should work)"
+    )
+    parser.add_argument(
+        "moving_image", type=str, metavar="MOVING",
+        help="path to the moving image (don't use DICOMs; AIM  or NIfTI should work)"
+    )
+    parser.add_argument(
+        "output", type=str, metavar="OUTPUT",
+        help="path to where you want outputs saved to, with no extension (will be added)"
+    )
+    parser.add_argument(
+        "--output-format", "-of", default="image", metavar="STR",
+        type=create_string_argument_checker(["transform", "image", "compressed-image"], "output-format"),
+        help="format to save the output in, must be `transform`, `image`, or `compressed-image`."
+             "`transform` -> .mat,"
+             "`image` -> .nii,"
+             "`compressed-image` -> .nii.gz"
+    )
+    parser.add_argument(
+        "--downsampling-shrink-factor", "-dsf", type=float, default=None, metavar="X",
+        help="the shrink factor to apply to the fixed and moving image before starting the registration"
+    )
+    parser.add_argument(
+        "--downsampling-smoothing-sigma", "-dss", type=float, default=None, metavar="X",
+        help="the smoothing sigma to apply to the fixed and moving image before starting the registration"
+    )
+    parser.add_argument(
+        "--max-iterations", "-mi", default=100, type=int, metavar="N",
+        help="number of iterations to run registration algorithm for at each stage"
+    )
+    parser.add_argument(
+        "--shrink-factors", "-sf", default=None, type=int, nargs="+", metavar="X",
+        help="factors by which to shrink the fixed and moving image at each stage of the multiscale progression. you "
+             "must give the same number of arguments here as you do for `smoothing-sigmas`"
+    )
+    parser.add_argument(
+        "--smoothing-sigmas", "-ss", default=None, type=float, nargs="+", metavar="X",
+        help="sigmas for the Gaussians used to smooth the fixed and moving image at each stage of the multiscale "
+             "progression. you must give the same number of arguments here as you do for `shrink-factors`"
+    )
+    parser.add_argument(
+        "--plot-metric-history", "-pmh", default=False, action="store_true",
+        help="enable this flag to save a plot of the metric history to file in addition to the raw data"
+    )
+    parser.add_argument(
+        "--verbose", "-v", default=False, action="store_true",
+        help="enable this flag to print a lot of stuff to the terminal about how the registration is proceeding"
+    )
+    parser.add_argument(
+        "--optimizer", "-opt", default="GradientDescent", metavar="STR",
+        type=create_string_argument_checker(["GradientDescent", "Powell"], "optimizer"),
+        help="the optimizer to use, options: `GradientDescent`, `Powell`"
+    )
+    parser.add_argument(
+        "--gradient-descent-learning-rate", "-gdlr", default=1e-3, type=float, metavar="X",
+        help="learning rate when using gradient descent optimizer"
+    )
+    parser.add_argument(
+        "--gradient-descent-convergence-min-value", "-gdcmv", default=1e-6, type=float, metavar="X",
+        help="minimum value for convergence when using gradient descent optimizer"
+    )
+    parser.add_argument(
+        "--gradient-descent-convergence-window-size", "-gdcws", default=10, type=int, metavar="N",
+        help="window size for checking for convergence when using gradient descent optimizer"
+    )
+    parser.add_argument(
+        "--powell_max_line_iterations", "-pmli", default=100, type=int, metavar="N",
+        help="maximum number of line iterations when using Powell optimizer"
+    )
+    parser.add_argument(
+        "--powell_step_length", "-psl", default=1.0, type=float, metavar="X",
+        help="maximum step length when using Powell optimizer"
+    )
+    parser.add_argument(
+        "--powell_step_tolerance", "-pst", default=1e-6, type=float, metavar="X",
+        help="step tolerance when using Powell optimizer"
+    )
+    parser.add_argument(
+        "--powell_value_tolerance", "-pvt", default=1e-6, type=float, metavar="X",
+        help="value tolerance when using Powell optimizer"
+    )
+    parser.add_argument(
+        "--similarity-metric", "-sm", default="MeanSquares", metavar="STR",
+        type=create_string_argument_checker(
+            ["MeanSquares", "Correlation", "JointHistogramMutualInformation", "MattesMutualInformation"],
+            "similarity-metric"
+        ),
+        help="the similarity metric to use, options: `MeanSquares`, `Correlation`, "
+             "`JointHistogramMutualInformation`, `MattesMutualInformation`"
+    )
+    parser.add_argument(
+        "--similarity-metric-sampling-strategy", "-smss", default="None", metavar="STR",
+        type=create_string_argument_checker(["None", "Regular", "Random"], "similarity-metric-sampling-strategy"),
+        help="sampling strategy for similarity metric, options: "
+             "`None` -> use all points, "
+             "`Regular` -> sample on a regular grid with specified sampling rate, "
+             "`Random` -> sample randomly with specified sampling rate."
+    )
+    parser.add_argument(
+        "--similarity-metric-sampling-rate", "-smsr", default=0.2, type=check_percentage, metavar="P",
+        help="sampling rate for similarity metric, must be between 0.0 and 1.0"
+    )
+    parser.add_argument(
+        "--similarity-metric-sampling-seed", "-smssd", default=None, type=int, metavar="N",
+        help="the seed for random sampling, leave as `None` if you want a random seed. Can be useful if you want a "
+             "deterministic registration with random sampling for debugging/testing. Don't go crazy and use huge "
+             "numbers since SITK might report an OverflowError. I found keeping it <=255 worked."
+    )
+    parser.add_argument(
+        "--mutual-information-num-histogram-bins", "-minhb", default=20, type=int, metavar="N",
+        help="number of bins in histogram when using joint histogram or Mattes mutual information similarity metrics"
+    )
+    parser.add_argument(
+        "--joint-mutual-information-joint-smoothing-variance", "-jmijsv", default=1.5, type=float, metavar="X",
+        help="variance to use when smoothing the joint PDF when using the joint histogram mutual information "
+             "similarity metric"
+    )
+    parser.add_argument(
+        "--interpolator", "-int", default="Linear", metavar="STR",
+        type=create_string_argument_checker(["Linear", "NearestNeighbour", "BSpline"], "interpolator"),
+        help="the interpolator to use, options: `Linear`, `NearestNeighbour`, `BSpline`"
+    )
+    parser.add_argument(
+        "--centering-initialization", "-ci", default="Geometry", metavar="STR",
+        type=create_string_argument_checker(["Geometry", "Moments"], "centering-initialization"),
+        help="the centering initialization to use, options: `Geometry`, `Moments`"
+    )
+    parser.add_argument(
+        "--transform-type", "-tt", default="Euler3D", metavar="STR",
+        type=create_string_argument_checker(["Euler3D", "Euler2D"], "transform-type"),
+        help="the type of transformation to do, options: `Euler3D`, `Euler2D`. NOTE: these are just rigid "
+             "transformations in 3D or 2D, non-rigid transforms are beyond the current scope of this tool. If you "
+             "want a deformable registration, then either use blDemonsRegistration, extend this tool to be more "
+             "flexible, or write a custom registration script and manually specify the transform you want to fit. "
+    )
+
+    return parser
 
 
 def main():
