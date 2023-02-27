@@ -9,6 +9,8 @@ from __future__ import annotations
 import SimpleITK as sitk
 from typing import Callable, Optional, List
 
+from bonelab.util.time_stamp import message
+
 
 # a list of Demons registration filters available in SimpleITK
 DEMONS_FILTERS = {
@@ -37,7 +39,7 @@ def create_metric_tracking_callback(
                 iteration = registration_filter.GetElapsedIterations()
             else:
                 iteration = registration_filter.GetOptimizerIteration()
-            print(f"Iteration: {iteration:d}, Metric: {metric:0.5e}")
+            message(f"Iteration: {iteration:d}, Metric: {metric:0.5e}")
 
     return metric_tracking_callback
 
@@ -84,7 +86,7 @@ def multiscale_registration(
     moving_image: sitk.Image,
     initial_transform: Optional[sitk.Transform] = None,
     multiscale_progression: Optional[List[Tuple[float, float]]] = None,
-    verbose: bool = False
+    silent: bool = True
 ) -> sitk.DisplacementFieldTransform:
     """
     Perform a multiscale registration using a given registration algorithm and fixed/moving image pair. You can
@@ -113,6 +115,9 @@ def multiscale_registration(
         images in the order that the shrink factor and smoothing sigma pairs are given, ending with a final registration
         at full resolution. If this argument is not given then only one registration is performed, at full resolution.
 
+    silent : bool
+        Suppress terminal output.
+
     Returns
     -------
     sitk.DisplacementFieldTransform
@@ -131,10 +136,10 @@ def multiscale_registration(
 
     # If we are doing this with a multiscale progression, work through this progression in order first
     if multiscale_progression is not None:
-        if verbose:
-            print(f"Multiscale progression starting | There will be {len(multiscale_progression):d} steps.")
+        if not silent:
+            message(f"Multiscale progression starting | There will be {len(multiscale_progression):d} steps.")
         for (i, (shrink_factor, smoothing_sigma)) in enumerate(multiscale_progression):
-            if verbose:
+            if not silent:
                 print(f"Step {i+1:d} of {len(multiscale_progression):d} "
                       f"| Shrink factor: {shrink_factor:0.2f}, Sigma: {smoothing_sigma:0.2f} | Starting:")
             resampled_fixed_image = smooth_and_resample(fixed_image, shrink_factor, smoothing_sigma)
@@ -145,8 +150,8 @@ def multiscale_registration(
             )
 
     # Finish off by doing one registration at full resolution
-    if verbose:
-        print("Final registration at full resolution:")
+    if not silent:
+        message("Final registration at full resolution:")
     return registration_algorithm.Execute(fixed_image, moving_image, sitk.Resample(displacement_field, fixed_image))
 
 
@@ -159,7 +164,7 @@ def multiscale_demons(
     demons_update_field_smooth_std: Optional[float] = 1.0,
     initial_transform: Optional[sitk.Transform] = None,
     multiscale_progression: Optional[List[Tuple[float, float]]] = None,
-    verbose: bool = False
+    silent: bool = True
 ) -> Tuple[sitk.DisplacementFieldTransform, List[float]]:
     """
     Perform a multiscale registration using a given registration algorithm and fixed/moving image pair. You can
@@ -203,8 +208,8 @@ def multiscale_demons(
         images in the order that the shrink factor and smoothing sigma pairs are given, ending with a final registration
         at full resolution. If this argument is not given then only one registration is performed, at full resolution.
 
-    verbose : bool
-        Whether to print messages to the terminal about how the registration is going.
+    silent : bool
+        Suppress terminal output.
 
     Returns
     -------
@@ -228,8 +233,8 @@ def multiscale_demons(
     else:
         demons.SetSmoothUpdateField(False)
     metric_history = []
-    demons.AddCommand(sitk.sitkIterationEvent, create_metric_tracking_callback(demons, metric_history, verbose))
+    demons.AddCommand(sitk.sitkIterationEvent, create_metric_tracking_callback(demons, metric_history, silent))
     deformation_field = multiscale_registration(
-        demons, fixed_image, moving_image, initial_transform, multiscale_progression, verbose
+        demons, fixed_image, moving_image, initial_transform, multiscale_progression, silent
     )
     return deformation_field, metric_history

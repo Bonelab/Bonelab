@@ -93,9 +93,9 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
         ''' Can run `blRegistration` '''
         self.runner('blRegistration')
 
-    def test_blDemonsRegistration(self):
-        ''' Can run `blDemonsRegistration` '''
-        self.runner('blDemonsRegistration')
+    def test_blRegistrationDemons(self):
+        ''' Can run `blRegistrationDemons` '''
+        self.runner('blRegistrationDemons')
 
     def test_blITKSnapAnnotParser(self):
         ''' Can run `blITKSnapAnnotParser` '''
@@ -109,13 +109,13 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
         ''' Can run `blPanningVideo` '''
         self.runner('blPanningVideo')
 
-    def test_blApplyTransform(self):
-        ''' Can run `blApplyTransform` '''
-        self.runner('blApplyTransform')
+    def test_blRegistrationApplyTransform(self):
+        ''' Can run `blRegistrationApplyTransform` '''
+        self.runner('blRegistrationApplyTransform')
 
     def test_blComputeOverlap(self):
-        ''' Can run `blComputeOverlap` '''
-        self.runner('blComputeOverlap')
+        ''' Can run `blImageComputeOverlap` '''
+        self.runner('blImageComputeOverlap')
 
 
 if __name__ == '__main__':
