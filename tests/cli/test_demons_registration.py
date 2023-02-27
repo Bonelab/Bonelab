@@ -47,11 +47,14 @@ class TestDemonsRegistration(unittest.TestCase):
         # Remove temporary directory and all files
         shutil.rmtree(self.test_dir)
 
-    def _construct_default_args(self, fixed_image: str, moving_image: str) -> List[str]:
-        output = os.path.join(self.test_dir, TEST_OUTPUT_LABEL)
+    def _construct_default_args(self, fixed_image: str, moving_image: str, output_image: bool = True) -> List[str]:
+        if output_image:
+            output = os.path.join(self.test_dir, f"{TEST_OUTPUT_LABEL}.nii")
+        else:
+            output = os.path.join(self.test_dir, f"{TEST_OUTPUT_LABEL}.mat")
         return [
             self.random_images[fixed_image], self.random_images[moving_image], output,
-            "-mi", f"{DEFAULT_ITERATIONS}"
+            "-mi", f"{DEFAULT_ITERATIONS}", "-s"
         ]
 
     @settings(deadline=HYPOTHESIS_DEADLINE)
@@ -69,7 +72,7 @@ class TestDemonsRegistration(unittest.TestCase):
         moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys()))
     )
     def test_default_then_load_transform(self, fixed_image, moving_image):
-        args = self._construct_default_args(fixed_image, moving_image) + ["-of", "transform"]
+        args = self._construct_default_args(fixed_image, moving_image, output_image=False)
         demons_registration(create_parser().parse_args(args=args))
         args += ["-it", os.path.join(self.test_dir, f"{TEST_OUTPUT_LABEL}.mat")]
         demons_registration(create_parser().parse_args(args=args))
@@ -113,10 +116,10 @@ class TestDemonsRegistration(unittest.TestCase):
     @given(
         fixed_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         moving_image=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
-        output_format=st.sampled_from(["transform", "image", "compressed-image"])
+        output_image=st.booleans()
     )
-    def test_output_formats(self, fixed_image, moving_image, output_format):
-        args = self._construct_default_args(fixed_image, moving_image) + ["-of", f"{output_format}"]
+    def test_output_formats(self, fixed_image, moving_image, output_image):
+        args = self._construct_default_args(fixed_image, moving_image, output_image=output_image)
         demons_registration(create_parser().parse_args(args=args))
 
     @settings(deadline=HYPOTHESIS_DEADLINE)

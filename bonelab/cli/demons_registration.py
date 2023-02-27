@@ -10,10 +10,12 @@ from typing import Tuple, Optional
 from enum import Enum
 
 # internal imports
+from bonelab.util.time_stamp import message
 from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_resample, DEMONS_FILTERS
 from bonelab.cli.registration import (
     read_and_downsample_images, create_and_save_metrics_plot, write_metrics_to_csv,
     create_string_argument_checker, write_args_to_yaml, check_image_size_and_shrink_factors,
+    create_file_extension_checker, check_inputs_exist, check_for_output_overwrite,
     INPUT_EXTENSIONS
 )
 
@@ -93,13 +95,33 @@ def create_centering_transform(
     )
 
 
+def write_transform_or_field(fn: str, field: sitk.Image, silent: bool) -> None:
+    for ext in TRANSFORM_EXTENSIONS:
+        if fn.lower().endswith(ext):
+            if not silent:
+                message(f"Writing transform to {fn}")
+            sitk.WriteTransform(sitk.DisplacementFieldTransform(field), fn)
+            return
+    for ext in IMAGE_EXTENSIONS:
+        if fn.lower().endswith(ext):
+            if not silent:
+                message(f"Writing displacement field to {fn}")
+            sitk.WriteImage(field, fn)
+            return
+    raise ValueError(f"`output`, {fn}, does not have a valid extension and it was not caught.")
+
+
 def demons_registration(args: Namespace):
     # save the arguments of this registration to a yaml file
     # this has the added benefit of ensuring up-front that we can write files to the "output" that was provided,
     # so we do not waste a lot of time doing the registration and then crashing at the end because of write permissions
-    write_args_to_yaml(args, f"{args.output}.yaml")
-    fixed_image, moving_image = read_and_downsample_images(args)
-    check_image_size_and_shrink_factors(fixed_image, moving_image, args.shrink_factors)
+    write_args_to_yaml(f"{args.output}.yaml", args, args.silent)
+    fixed_image, moving_image = read_and_downsample_images(
+        args.fixed_image, args.moving_image,
+        args.downsampling_shrink_factor, args.downsampling_smoothing_sigma,
+        args.silent
+    )
+    check_image_size_and_shrink_factors(fixed_image, moving_image, args.shrink_factors, args.silent)
     # we have to pad the images to be the same size - just a requirement of the Demons algorithms
     fixed_image, moving_image = pad_images_to_same_extent(fixed_image, moving_image)
     # I am a little bit unsure about this next thing. You need the fixed and moving images to exist in the same physical
@@ -128,26 +150,16 @@ def demons_registration(args: Namespace):
         demons_update_field_smooth_std=args.update_smoothing_std,
         initial_transform=initial_transform,
         multiscale_progression=multiscale_progression,
-        verbose=args.verbose
+        silent=args.silent
     )
     # save the displacement transform or field
-    if args.output_format == "transform":
-        sitk.WriteTransform(sitk.DisplacementFieldTransform(displacement_field), f"{args.output}.mat")
-    elif args.output_format == "image":
-        sitk.WriteImage(
-            displacement_field, f"{args.output}.nii"
-        )
-    elif args.output_format == "compressed-image":
-        sitk.WriteImage(
-            displacement_field, f"{args.output}.nii.gz"
-        )
-    else:
-        raise ValueError(f"value given for `output-format`, {args.output_format}, is invalid and was not caught")
+    write_transform_or_field(args.output, displacement_field, args.silent)
+
     # save the metric history
-    write_metrics_to_csv(metric_history, f"{args.output}_metric_history.csv")
+    write_metrics_to_csv(f"{args.output}_metric_history.csv", metric_history, args.silent)
     # optionally, create a plot of the metric history and save it
     if args.plot_metric_history:
-        create_and_save_metrics_plot(metric_history, f"{args.output}_metric_history.png")
+        create_and_save_metrics_plot(f"{args.output}_metric_history.png", metric_history, args.silent)
 
 
 def create_parser() -> ArgumentParser:
@@ -157,19 +169,16 @@ def create_parser() -> ArgumentParser:
         formatter_class=ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
-        "fixed_image", type=str, metavar="FIXED",
-        help="Provide fixed image input filename (*.nii, *.nii.gz, *.aim)"
+        "fixed_image", type=create_file_extension_checker(INPUT_EXTENSIONS, "fixed_image"), metavar="FIXED",
+        help=f"Provide fixed image input filename ({', '.join(INPUT_EXTENSIONS)})"
     )
     parser.add_argument(
-        "moving_image", type=str, metavar="MOVING",
-        help="Provide moving image input filename (*.nii, *.nii.gz, *.aim)"
+        "moving_image", type=create_file_extension_checker(INPUT_EXTENSIONS, "moving_image"), metavar="MOVING",
+        help=f"Provide moving image input filename ({', '.join(INPUT_EXTENSIONS)})"
     )
     parser.add_argument(
-        "output", type=str, metavar="OUTPUT",
-        help="Provide output filename. Extension must be compatible with SimpleITK's WriteTransform or WriteImage "
-             "functions. For images: .nii, .nii.gz, or for transforms: .txt, .tfm, .xfm, .hdf or .mat (others may be "
-             "supported, check SimpleITK documentation). NOTE: Not recommended to write a dense displacement field to "
-             "file uncompressed, so please use .hdf or .mat rather than .txt if you write the transform."
+        "output", type=create_file_extension_checker(TRANSFORM_EXTENSIONS+IMAGE_EXTENSIONS, "output"), metavar="OUTPUT",
+        help=f"Provide output filename ({', '.join(TRANSFORM_EXTENSIONS+IMAGE_EXTENSIONS)})"
     )
     parser.add_argument(
         "--downsampling-shrink-factor", "-dsf", type=float, default=None, metavar="X",
@@ -181,9 +190,9 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "--initial-transform", "-it", default=None, type=str, metavar="FN",
-        help="the path to a file that can be read by sitk.ReadTransform and that contains the transform you want "
-             "to initialize the registration process with (e.g. can obtain using blRegistration). If you don't provide "
-             "anything then a basic centering initialization will be done."
+        help=f"the path to a file that contains the transform you want "
+             f"to initialize the registration process with ({', '.join(TRANSFORM_EXTENSIONS)}). "
+             f"If you don't provide anything then a basic centering initialization will be done."
     )
     parser.add_argument(
         "--centering-initialization", "-ci", default="Geometry", metavar="STR",
@@ -224,8 +233,8 @@ def create_parser() -> ArgumentParser:
         help="enable this flag to save a plot of the metric history to file in addition to the raw data"
     )
     parser.add_argument(
-        "--verbose", "-v", default=False, action="store_true",
-        help="enable this flag to print a lot of stuff to the terminal about how the registration is proceeding"
+        "--silent", "-s", default=False, action="store_true",
+        help="enable this flag to suppress terminal output about how the registration is proceeding"
     )
 
     return parser
