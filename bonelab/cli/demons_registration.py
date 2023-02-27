@@ -24,92 +24,6 @@ def demons_type_checker(s: str) -> str:
         return ValueError(f"Demons type {s}, not valid, please choose from: {list(DEMONS_FILTERS.keys())}")
 
 
-def create_parser() -> ArgumentParser:
-
-    parser = ArgumentParser(
-        description='blDemonsRegistration: Demons Registration Tool',
-        formatter_class=ArgumentDefaultsHelpFormatter
-    )
-    parser.add_argument(
-        "fixed_image", type=str, metavar="FIXED",
-        help="path to the fixed image (don't use DICOMs; AIM  or NIfTI should work)"
-    )
-    parser.add_argument(
-        "moving_image", type=str, metavar="MOVING",
-        help="path to the moving image (don't use DICOMs; AIM  or NIfTI should work)"
-    )
-    parser.add_argument(
-        "output", type=str, metavar="OUTPUT",
-        help="path to where you want outputs saved to, with no extension (will be added)"
-    )
-    parser.add_argument(
-        "--output-format", "-of", default="image", metavar="STR",
-        type=create_string_argument_checker(["transform", "image", "compressed-image"], "output-format"),
-        help="format to save the output in, must be `transform`, `image`, or `compressed-image`."
-             "`transform` -> .mat,"
-             "`image` -> .nii,"
-             "`compressed-image` -> .nii.gz"
-    )
-    parser.add_argument(
-        "--downsampling-shrink-factor", "-dsf", type=float, default=None, metavar="X",
-        help="the shrink factor to apply to the fixed and moving image before starting the registration"
-    )
-    parser.add_argument(
-        "--downsampling-smoothing-sigma", "-dss", type=float, default=None, metavar="X",
-        help="the smoothing sigma to apply to the fixed and moving image before starting the registration"
-    )
-    parser.add_argument(
-        "--initial-transform", "-it", default=None, type=str, metavar="FN",
-        help="the path to a file that can be read by sitk.ReadTransform and that contains the transform you want "
-             "to initialize the registration process with (e.g. can obtain using blRegistration). If you don't provide "
-             "anything then a basic centering initialization will be done."
-    )
-    parser.add_argument(
-        "--centering-initialization", "-ci", default="Geometry", metavar="STR",
-        type=create_string_argument_checker(["Geometry", "Moments"], "centering-initialization"),
-        help="if no initial transform provided, the centering initialization to use. "
-             "options: `Geometry`, `Moments`"
-    )
-    parser.add_argument(
-        "--demons-type", "-dt", default="demons", type=demons_type_checker, metavar="STR",
-        help=f"type of demons algorithm to use. options: {list(DEMONS_FILTERS.keys())}"
-    )
-    parser.add_argument(
-        "--max-iterations", "-mi", default=100, type=int, metavar="N",
-        help="number of iterations to run registration algorithm for at each stage"
-    )
-    parser.add_argument(
-        "--displacement-smoothing-std", "-ds", default=1.0, type=float, metavar="X",
-        help="standard deviation for the Gaussian smoothing applied to the displacement field at each step."
-             "this is how you control the elasticity of the smoothing of the deformation"
-    )
-    parser.add_argument(
-        "--update-smoothing-std", "-us", default=1.0, type=float, metavar="X",
-        help="standard deviation for the Gaussian smoothing applied to the update field at each step."
-             "this is how you control the viscosity of the smoothing of the deformation"
-    )
-    parser.add_argument(
-        "--shrink-factors", "-sf", default=None, type=float, nargs="+", metavar="X",
-        help="factors by which to shrink the fixed and moving image at each stage of the multiscale progression. you "
-             "must give the same number of arguments here as you do for `smoothing-sigmas`"
-    )
-    parser.add_argument(
-        "--smoothing-sigmas", "-ss", default=None, type=float, nargs="+", metavar="X",
-        help="sigmas for the Gaussians used to smooth the fixed and moving image at each stage of the multiscale "
-             "progression. you must give the same number of arguments here as you do for `shrink-factors`"
-    )
-    parser.add_argument(
-        "--plot-metric-history", "-pmh", default=False, action="store_true",
-        help="enable this flag to save a plot of the metric history to file in addition to the raw data"
-    )
-    parser.add_argument(
-        "--verbose", "-v", default=False, action="store_true",
-        help="enable this flag to print a lot of stuff to the terminal about how the registration is proceeding"
-    )
-
-    return parser
-
-
 def read_transform(args: Namespace) -> Optional[sitk.Transform]:
     if args.initial_transform is not None:
         initial_transform = sitk.ReadTransform(args.initial_transform)
@@ -225,6 +139,92 @@ def demons_registration(args: Namespace):
     # optionally, create a plot of the metric history and save it
     if args.plot_metric_history:
         create_and_save_metrics_plot(metric_history, f"{args.output}_metric_history.png")
+
+
+def create_parser() -> ArgumentParser:
+
+    parser = ArgumentParser(
+        description='blDemonsRegistration: Demons Registration Tool',
+        formatter_class=ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument(
+        "fixed_image", type=str, metavar="FIXED",
+        help="path to the fixed image (don't use DICOMs; AIM  or NIfTI should work)"
+    )
+    parser.add_argument(
+        "moving_image", type=str, metavar="MOVING",
+        help="path to the moving image (don't use DICOMs; AIM  or NIfTI should work)"
+    )
+    parser.add_argument(
+        "output", type=str, metavar="OUTPUT",
+        help="path to where you want outputs saved to, with no extension (will be added)"
+    )
+    parser.add_argument(
+        "--output-format", "-of", default="image", metavar="STR",
+        type=create_string_argument_checker(["transform", "image", "compressed-image"], "output-format"),
+        help="format to save the output in, must be `transform`, `image`, or `compressed-image`."
+             "`transform` -> .mat,"
+             "`image` -> .nii,"
+             "`compressed-image` -> .nii.gz"
+    )
+    parser.add_argument(
+        "--downsampling-shrink-factor", "-dsf", type=float, default=None, metavar="X",
+        help="the shrink factor to apply to the fixed and moving image before starting the registration"
+    )
+    parser.add_argument(
+        "--downsampling-smoothing-sigma", "-dss", type=float, default=None, metavar="X",
+        help="the smoothing sigma to apply to the fixed and moving image before starting the registration"
+    )
+    parser.add_argument(
+        "--initial-transform", "-it", default=None, type=str, metavar="FN",
+        help="the path to a file that can be read by sitk.ReadTransform and that contains the transform you want "
+             "to initialize the registration process with (e.g. can obtain using blRegistration). If you don't provide "
+             "anything then a basic centering initialization will be done."
+    )
+    parser.add_argument(
+        "--centering-initialization", "-ci", default="Geometry", metavar="STR",
+        type=create_string_argument_checker(["Geometry", "Moments"], "centering-initialization"),
+        help="if no initial transform provided, the centering initialization to use. "
+             "options: `Geometry`, `Moments`"
+    )
+    parser.add_argument(
+        "--demons-type", "-dt", default="demons", type=demons_type_checker, metavar="STR",
+        help=f"type of demons algorithm to use. options: {list(DEMONS_FILTERS.keys())}"
+    )
+    parser.add_argument(
+        "--max-iterations", "-mi", default=100, type=int, metavar="N",
+        help="number of iterations to run registration algorithm for at each stage"
+    )
+    parser.add_argument(
+        "--displacement-smoothing-std", "-ds", default=1.0, type=float, metavar="X",
+        help="standard deviation for the Gaussian smoothing applied to the displacement field at each step."
+             "this is how you control the elasticity of the smoothing of the deformation"
+    )
+    parser.add_argument(
+        "--update-smoothing-std", "-us", default=1.0, type=float, metavar="X",
+        help="standard deviation for the Gaussian smoothing applied to the update field at each step."
+             "this is how you control the viscosity of the smoothing of the deformation"
+    )
+    parser.add_argument(
+        "--shrink-factors", "-sf", default=None, type=float, nargs="+", metavar="X",
+        help="factors by which to shrink the fixed and moving image at each stage of the multiscale progression. you "
+             "must give the same number of arguments here as you do for `smoothing-sigmas`"
+    )
+    parser.add_argument(
+        "--smoothing-sigmas", "-ss", default=None, type=float, nargs="+", metavar="X",
+        help="sigmas for the Gaussians used to smooth the fixed and moving image at each stage of the multiscale "
+             "progression. you must give the same number of arguments here as you do for `shrink-factors`"
+    )
+    parser.add_argument(
+        "--plot-metric-history", "-pmh", default=False, action="store_true",
+        help="enable this flag to save a plot of the metric history to file in addition to the raw data"
+    )
+    parser.add_argument(
+        "--verbose", "-v", default=False, action="store_true",
+        help="enable this flag to print a lot of stuff to the terminal about how the registration is proceeding"
+    )
+
+    return parser
 
 
 def main():
