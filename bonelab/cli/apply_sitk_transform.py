@@ -34,7 +34,7 @@ def read_transform(fn: str, invert: bool, silent: bool) -> sitk.Transform:
 
 def apply_sitk_transform(args: Namespace):
     check_inputs_exist([args.fixed_image, args.transform, args.moving_image], args.silent)
-    check_for_output_overwrite(args.output)
+    check_for_output_overwrite(args.output, args.overwrite, args.silent)
     fixed_image = read_image(args.fixed_image, "fixed_image", args.silent)
     transform = read_transform(args.transform, args.invert_transform, args.silent)
     if args.moving_image is not None:
@@ -68,6 +68,10 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "output", type=str, metavar="OUTPUT",
         help=f"Provide output filename ({', '.join(IMAGE_EXTENSIONS)})"
+    )
+    parser.add_argument(
+        "--overwrite", "-ow", default=False, action="store_true",
+        help="enable this flag to overwrite existing files, if they exist at output targets"
     )
     parser.add_argument(
         "--moving_image", "-mi", type=create_file_extension_checker(INPUT_EXTENSIONS, "moving_image"),
