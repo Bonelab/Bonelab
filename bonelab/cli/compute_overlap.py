@@ -12,37 +12,6 @@ from typing import List, Callable
 from bonelab.cli.registration import read_image
 
 
-def create_parser() -> ArgumentParser:
-    parser = ArgumentParser(
-        description="blComputeOverlap: SimpleITK Overlap Computing Tool.",
-        formatter_class=ArgumentDefaultsHelpFormatter
-    )
-    parser.add_argument(
-        "mask1", type=str, metavar="MASK1",
-        help="path to the first mask (don't use DICOMs; AIM  or NIfTI should work). Should contain either a binary "
-             "mask or an integer image where the values at each voxel are class labels. NOTE: MASK2 will be resampled "
-             "onto MASK1 so be aware of how that might affect your metrics if your two masks do not share the same "
-             "physical space"
-    )
-    parser.add_argument(
-        "mask2", type=str, metavar="MASK1",
-        help="path to the first mask (don't use DICOMs; AIM  or NIfTI should work). Should contain either a binary "
-             "mask or an integer image where the values at each voxel are class labels. NOTE: MASK2 will be resampled "
-             "onto MASK1 so be aware of how that might affect your metrics if your two masks do not share the same "
-             "physical space"
-    )
-    parser.add_argument(
-        "output", type=str, metavar="OUTPUT",
-        help="path to the file to save the output to, should end with *.csv"
-    )
-    parser.add_argument(
-        "--class-labels", "-cl", default=None, type=int, nargs="+", metavar="N",
-        help="the class labels to calculate overlap metrics for. If nothing is provided then the images will be"
-             "binarized and only a single value for each metric will be calculated."
-    )
-    return parser
-
-
 def compute_dice_and_jaccard(x: sitk.Image, y: sitk.Image, class_labels: List[int]) -> Tuple[List[float]]:
     overlap = sitk.LabelOverlapMeasuresImageFilter()
     dice = []
@@ -78,6 +47,37 @@ def compute_overlap(args: Namespace):
         mask2 = sitk.Cast(mask2 > 0, sitk.sitkInt16)
     dice, jaccard = compute_dice_and_jaccard(mask1, mask2, class_labels)
     write_output(args.output, args.mask1, args.mask2, list(zip(class_labels, dice, jaccard)))
+
+
+def create_parser() -> ArgumentParser:
+    parser = ArgumentParser(
+        description="blComputeOverlap: SimpleITK Overlap Computing Tool.",
+        formatter_class=ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument(
+        "mask1", type=str, metavar="MASK1",
+        help="path to the first mask (don't use DICOMs; AIM  or NIfTI should work). Should contain either a binary "
+             "mask or an integer image where the values at each voxel are class labels. NOTE: MASK2 will be resampled "
+             "onto MASK1 so be aware of how that might affect your metrics if your two masks do not share the same "
+             "physical space"
+    )
+    parser.add_argument(
+        "mask2", type=str, metavar="MASK1",
+        help="path to the first mask (don't use DICOMs; AIM  or NIfTI should work). Should contain either a binary "
+             "mask or an integer image where the values at each voxel are class labels. NOTE: MASK2 will be resampled "
+             "onto MASK1 so be aware of how that might affect your metrics if your two masks do not share the same "
+             "physical space"
+    )
+    parser.add_argument(
+        "output", type=str, metavar="OUTPUT",
+        help="path to the file to save the output to, should end with *.csv"
+    )
+    parser.add_argument(
+        "--class-labels", "-cl", default=None, type=int, nargs="+", metavar="N",
+        help="the class labels to calculate overlap metrics for. If nothing is provided then the images will be"
+             "binarized and only a single value for each metric will be calculated."
+    )
+    return parser
 
 
 def main():
