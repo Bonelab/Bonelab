@@ -15,6 +15,12 @@ from bonelab.util.vtk_util import vtkImageData_to_numpy
 from bonelab.io.vtk_helpers import get_vtk_reader
 from bonelab.util.multiscale_registration import smooth_and_resample, create_metric_tracking_callback
 
+# define an interpolators dict
+INTERPOLATORS = {
+    "Linear": sitk.sitkLinear,
+    "NearestNeighbour": sitk.sitkNearestNeighbor,
+    "BSpline": sitk.sitkBSpline
+}
 
 # define file extensions that we consider available for input images
 INPUT_EXTENSIONS = [".aim", ".nii", ".nii.gz"]
@@ -223,53 +229,56 @@ def setup_optimizer(
 
 def setup_similarity_metric(
         registration_method: sitk.ImageRegistrationMethod,
-        args: Namespace
+        similarity_metric: str,
+        mutual_information_num_histogram_bins: int,
+        joint_mutual_information_joint_smoothing_variance: float,
+        sampling_strategy: str,
+        sampling_rate: float,
+        seed: int,
+        silent: bool
 ) -> sitk.ImageRegistrationMethod:
-    if args.similarity_metric == "MeanSquares":
+    if not silent:
+        message(f"Setting similarity metric :{similarity_metric}), strategy: {sampling_strategy}, seed: {seed}, "
+                f"and sampling rate: {sampling_rate}.")
+    if similarity_metric == "MeanSquares":
         registration_method.SetMetricAsMeanSquares()
-    elif args.similarity_metric == "Correlation":
+    elif similarity_metric == "Correlation":
         registration_method.SetMetricAsCorrelation()
-    elif args.similarity_metric == "JointHistogramMutualInformation":
+    elif similarity_metric == "JointHistogramMutualInformation":
         registration_method.SetMetricAsJointHistogramMutualInformation(
-            numberOfHistogramBins=args.mutual_information_num_histogram_bins,
-            varianceForJointPDFSmoothing=args.joint_mutual_information_joint_smoothing_variance
+            numberOfHistogramBins=mutual_information_num_histogram_bins,
+            varianceForJointPDFSmoothing=joint_mutual_information_joint_smoothing_variance
         )
-    elif args.similarity_metric == "MattesMutualInformation":
+    elif similarity_metric == "MattesMutualInformation":
         registration_method.SetMetricAsMattesMutualInformation(
-            numberOfHistogramBins=args.mutual_information_num_histogram_bins
+            numberOfHistogramBins=mutual_information_num_histogram_bins
         )
     else:
         raise ValueError("`similarity-metric` is invalid and was not caught")
-    if args.similarity_metric_sampling_strategy == "None":
-        strategy = registration_method.NONE
-    elif args.similarity_metric_sampling_strategy == "Regular":
-        strategy = registration_method.REGULAR
-    elif args.similarity_metric_sampling_strategy == "Random":
-        strategy = registration_method.RANDOM
+    if sampling_strategy == "None":
+        registration_method.SetMetricSamplingStrategy(registration_method.NONE)
+    elif sampling_strategy == "Regular":
+        registration_method.SetMetricSamplingStrategy(registration_method.REGULAR)
+    elif sampling_strategy == "Random":
+        registration_method.SetMetricSamplingStrategy(registration_method.RANDOM)
     else:
         raise ValueError("`similarity-sampling-strategy` is invalid but was not caught")
-    registration_method.SetMetricSamplingStrategy(strategy)
-    seed = (
-        args.similarity_metric_sampling_seed if args.similarity_metric_sampling_seed is not None
-        else sitk.sitkWallClock
-    )
-    registration_method.SetMetricSamplingPercentage(args.similarity_metric_sampling_rate, seed)
+    seed = seed if seed is not None else sitk.sitkWallClock
+    registration_method.SetMetricSamplingPercentage(sampling_rate, seed)
     return registration_method
 
 
 def setup_interpolator(
         registration_method: sitk.ImageRegistrationMethod,
-        args: Namespace
+        interpolator: str,
+        silent: bool
 ) -> sitk.ImageRegistrationMethod:
-    if args.interpolator == "Linear":
-        interpolator = sitk.sitkLinear
-    elif args.interpolator == "NearestNeighbour":
-        interpolator = sitk.sitkNearestNeighbor
-    elif args.interpolator == "BSpline":
-        interpolator = sitk.sitkBSpline
+    if not silent:
+        message(f"Setting interpolator: {interpolator}")
+    if interpolator in INTERPOLATORS:
+        registration_method.SetInterpolator(INTERPOLATORS[interpolator])
     else:
         raise ValueError("`interpolator` is invalid and was not caught")
-    registration_method.SetInterpolator(interpolator)
     return registration_method
 
 
@@ -380,8 +389,17 @@ def registration(args: Namespace):
         args.optimizer,
         args.silent
     )
-    registration_method = setup_similarity_metric(registration_method, args)
-    registration_method = setup_interpolator(registration_method, args)
+    registration_method = setup_similarity_metric(
+        registration_method,
+        args.similarity_metric,
+        args.mutual_information_num_histogram_bins,
+        args.joint_mutual_information_joint_smoothing_variance,
+        args.similarity_metric_sampling_strategy,
+        args.similarity_metric_sampling_rate,
+        args.similarity_metric_sampling_seed,
+        args.silent
+    )
+    registration_method = setup_interpolator(registration_method, args.interpolator, args.silent)
     registration_method = setup_transform(registration_method, fixed_image, moving_image, args)
     registration_method = setup_multiscale_progression(registration_method, args)
     # monitor the metric over time - init the list and add the callback
@@ -534,7 +552,7 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "--interpolator", "-int", default="Linear", metavar="STR",
-        type=create_string_argument_checker(["Linear", "NearestNeighbour", "BSpline"], "interpolator"),
+        type=create_string_argument_checker(list(INTERPOLATORS.keys()), "interpolator"),
         help="the interpolator to use, options: `Linear`, `NearestNeighbour`, `BSpline`"
     )
     parser.add_argument(

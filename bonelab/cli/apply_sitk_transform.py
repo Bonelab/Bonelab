@@ -6,13 +6,7 @@ import SimpleITK as sitk
 
 # internal imports
 from bonelab.io.vtk_helpers import get_vtk_writer
-from bonelab.cli.registration import read_image, create_string_argument_checker
-
-INTERPOLATORS = {
-    "Linear": sitk.sitkLinear,
-    "NearestNeighbour": sitk.sitkNearestNeighbor,
-    "BSpline": sitk.sitkBSpline
-}
+from bonelab.cli.registration import INTERPOLATORS, read_image, create_string_argument_checker
 
 
 def read_transform(fn: str, invert: bool) -> sitk.Transform:
