@@ -15,6 +15,32 @@ INTERPOLATORS = {
 }
 
 
+def read_transform(fn: str, invert: bool) -> sitk.Transform:
+    if fn.endswith(".mat"):
+        transform = sitk.ReadTransform(fn)
+        if invert:
+            return transform.GetInverse()
+        else:
+            return transform
+    else:
+        field = sitk.ReadImage(fn)
+        if invert:
+            return sitk.DisplacementFieldTransform(sitk.InverseDisplacementField(field))
+        else:
+            return sitk.DisplacementFieldTransform(field)
+
+
+def apply_sitk_transform(args: Namespace):
+    fixed_image = read_image(args.fixed_image)
+    transform = read_transform(args.transform, args.invert_transform)
+    if args.moving_image is not None:
+        moving_image = read_image(args.moving_image)
+        transformed_image = sitk.Resample(fixed_image, moving_image, transform, INTERPOLATORS[args.interpolator])
+    else:
+        transformed_image = sitk.Resample(fixed_image, transform, INTERPOLATORS[args.interpolator])
+    sitk.WriteImage(transformed_image, args.output)
+
+
 def create_parser() -> ArgumentParser:
     parser = ArgumentParser(
         description="blApplyTransform: SimpleITK Transformation Tool.",
@@ -54,32 +80,6 @@ def create_parser() -> ArgumentParser:
         help="the interpolator to use, options: `Linear`, `NearestNeighbour`, `BSpline`"
     )
     return parser
-
-
-def read_transform(fn: str, invert: bool) -> sitk.Transform:
-    if fn.endswith(".mat"):
-        transform = sitk.ReadTransform(fn)
-        if invert:
-            return transform.GetInverse()
-        else:
-            return transform
-    else:
-        field = sitk.ReadImage(fn)
-        if invert:
-            return sitk.DisplacementFieldTransform(sitk.InverseDisplacementField(field))
-        else:
-            return sitk.DisplacementFieldTransform(field)
-
-
-def apply_sitk_transform(args: Namespace):
-    fixed_image = read_image(args.fixed_image)
-    transform = read_transform(args.transform, args.invert_transform)
-    if args.moving_image is not None:
-        moving_image = read_image(args.moving_image)
-        transformed_image = sitk.Resample(fixed_image, moving_image, transform, INTERPOLATORS[args.interpolator])
-    else:
-        transformed_image = sitk.Resample(fixed_image, transform, INTERPOLATORS[args.interpolator])
-    sitk.WriteImage(transformed_image, args.output)
 
 
 def main():
