@@ -62,7 +62,7 @@ class TestApplySitkTransform(unittest.TestCase):
         fixed_image = self.random_images[fixed_image]
         output = os.path.join(self.test_dir, TEST_OUTPUT_LABEL)
         transform = self.rigid_fn if use_rigid else self.field_fn
-        args = [f"{fixed_image}", f"{transform}", f"{output}"]
+        args = [f"{fixed_image}", f"{transform}", f"{output}", "-s"]
         if moving_image is not None:
             moving_image = self.random_images[moving_image]
             args += ["-mi", f"{moving_image}"]

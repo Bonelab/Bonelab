@@ -5,11 +5,18 @@ from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace, A
 import SimpleITK as sitk
 
 # internal imports
+from bonelab.util.time_stamp import message
 from bonelab.io.vtk_helpers import get_vtk_writer
-from bonelab.cli.registration import INTERPOLATORS, read_image, create_string_argument_checker
+from bonelab.cli.registration import (
+    INTERPOLATORS, read_image, create_string_argument_checker, create_file_extension_checker,
+    INPUT_EXTENSIONS, TRANSFORM_EXTENSIONS
+)
+from bonelab.cli.demons_registration import IMAGE_EXTENSIONS
 
 
-def read_transform(fn: str, invert: bool) -> sitk.Transform:
+def read_transform(fn: str, invert: bool, silent: bool) -> sitk.Transform:
+    if not silent:
+        message("Reading transform.")
     if fn.endswith(".mat"):
         transform = sitk.ReadTransform(fn)
         if invert:
@@ -25,13 +32,19 @@ def read_transform(fn: str, invert: bool) -> sitk.Transform:
 
 
 def apply_sitk_transform(args: Namespace):
-    fixed_image = read_image(args.fixed_image)
-    transform = read_transform(args.transform, args.invert_transform)
+    fixed_image = read_image(args.fixed_image, "fixed_image", args.silent)
+    transform = read_transform(args.transform, args.invert_transform, args.silent)
     if args.moving_image is not None:
-        moving_image = read_image(args.moving_image)
+        moving_image = read_image(args.moving_image, "moving_image", args.silent)
+        if not args.silent:
+            message("Resampling fixed image onto moving image using given transform.")
         transformed_image = sitk.Resample(fixed_image, moving_image, transform, INTERPOLATORS[args.interpolator])
     else:
+        if not args.silent:
+            message("Resampling fixed image onto itself using given transform.")
         transformed_image = sitk.Resample(fixed_image, transform, INTERPOLATORS[args.interpolator])
+    if not args.silent:
+        message(f"Writing transformed image to {args.output}")
     sitk.WriteImage(transformed_image, args.output)
 
 
@@ -41,26 +54,26 @@ def create_parser() -> ArgumentParser:
         formatter_class=ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
-        "fixed_image", type=str, metavar="FIXED",
-        help="path to the fixed image (don't use DICOMs; AIM  or NIfTI should work)"
+        "fixed_image", type=create_file_extension_checker(INPUT_EXTENSIONS, "fixed_image"), metavar="FIXED",
+        help=f"Provide fixed image input filename ({', '.join(INPUT_EXTENSIONS)})"
     )
     parser.add_argument(
-        "transform", type=str, metavar="TRANSFORM",
-        help="path to the transform, should either be *.mat, *.nii, or *.nii.gz"
+        "transform", metavar="TRANSFORM",
+        type=create_file_extension_checker(IMAGE_EXTENSIONS+TRANSFORM_EXTENSIONS, "transform"),
+        help=f"Provide transform filename ({', '.join(IMAGE_EXTENSIONS+TRANSFORM_EXTENSIONS)})"
     )
     parser.add_argument(
         "output", type=str, metavar="OUTPUT",
-        help="path to where you want the transformed image saved, should have a file extension that is compatible "
-             "with sitk.WriteImage - if you want an AIM at the end of this then you'll need to deal with converting "
-             "your transformed image back to an AIM yourself or with another utility because that's beyond the scope "
-             "of this tool."
+        help=f"Provide output filename ({', '.join(IMAGE_EXTENSIONS)})"
     )
     parser.add_argument(
-        "--moving-image", "-mi", type=str, default=None, metavar="STR",
-        help="if given, the fixed image will be resampled onto the moving image using the transform. If you do not "
+        "--moving_image", "-mi", type=create_file_extension_checker(INPUT_EXTENSIONS, "moving_image"),
+        default=None, metavar="MOVING",
+        help=f"Optionally provide moving image input filename ({', '.join(INPUT_EXTENSIONS)}). "
+             "If given, the fixed image will be resampled onto the moving image using the transform. If you do not "
              "give a moving image then the fixed image will be resampled onto itself using the transform, which could "
              "possibly result in the data going out of the bounds of the image - recommended to provide this since "
-             "there should usually be a moving image that you used to get the transform in the first place anyways"
+             "there should usually be a moving image that you used to get the transform in the first place anyways."
     )
     parser.add_argument(
         "--invert-transform", "-it", default=False, action="store_true",
@@ -72,6 +85,10 @@ def create_parser() -> ArgumentParser:
         "--interpolator", "-int", default="Linear", metavar="STR",
         type=create_string_argument_checker(list(INTERPOLATORS.keys()), "interpolator"),
         help="the interpolator to use, options: `Linear`, `NearestNeighbour`, `BSpline`"
+    )
+    parser.add_argument(
+        "--silent", "-s", default=False, action="store_true",
+        help="enable this flag to suppress terminal output about how the registration is proceeding"
     )
     return parser
 
