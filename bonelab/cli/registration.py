@@ -238,7 +238,7 @@ def setup_similarity_metric(
         silent: bool
 ) -> sitk.ImageRegistrationMethod:
     if not silent:
-        message(f"Setting similarity metric :{similarity_metric}), strategy: {sampling_strategy}, seed: {seed}, "
+        message(f"Setting similarity metric: {similarity_metric}, strategy: {sampling_strategy}, seed: {seed}, "
                 f"and sampling rate: {sampling_rate}.")
     if similarity_metric == "MeanSquares":
         registration_method.SetMetricAsMeanSquares()

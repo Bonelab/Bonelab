@@ -18,23 +18,26 @@ from bonelab.cli.demons_registration import IMAGE_EXTENSIONS
 def read_transform(fn: str, invert: bool, silent: bool) -> sitk.Transform:
     if not silent:
         message("Reading transform.")
-    if fn.endswith(".mat"):
-        transform = sitk.ReadTransform(fn)
-        if invert:
-            return transform.GetInverse()
-        else:
-            return transform
-    else:
-        field = sitk.ReadImage(fn)
-        if invert:
-            return sitk.DisplacementFieldTransform(sitk.InverseDisplacementField(field))
-        else:
-            return sitk.DisplacementFieldTransform(field)
+    for ext in TRANSFORM_EXTENSIONS:
+        if fn.lower().endswith(ext):
+            transform = sitk.ReadTransform(fn)
+            if invert:
+                return transform.GetInverse()
+            else:
+                return transform
+    for ext in IMAGE_EXTENSIONS:
+        if fn.lower().endswith(ext):
+            field = sitk.ReadImage(fn)
+            if invert:
+                return sitk.DisplacementFieldTransform(sitk.InverseDisplacementField(field))
+            else:
+                return sitk.DisplacementFieldTransform(field)
+    raise ValueError("`transform` has invalid extension and was not caught")
 
 
 def apply_sitk_transform(args: Namespace):
     check_inputs_exist([args.fixed_image, args.transform, args.moving_image], args.silent)
-    check_for_output_overwrite(args.output, args.overwrite, args.silent)
+    check_for_output_overwrite([args.output], args.overwrite, args.silent)
     fixed_image = read_image(args.fixed_image, "fixed_image", args.silent)
     transform = read_transform(args.transform, args.invert_transform, args.silent)
     if args.moving_image is not None:
@@ -66,7 +69,8 @@ def create_parser() -> ArgumentParser:
         help=f"Provide transform filename ({', '.join(IMAGE_EXTENSIONS+TRANSFORM_EXTENSIONS)})"
     )
     parser.add_argument(
-        "output", type=str, metavar="OUTPUT",
+        "output", metavar="OUTPUT",
+        type=create_file_extension_checker(IMAGE_EXTENSIONS, "output"),
         help=f"Provide output filename ({', '.join(IMAGE_EXTENSIONS)})"
     )
     parser.add_argument(
