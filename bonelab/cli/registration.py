@@ -294,20 +294,20 @@ def setup_transform(
         message(f"Initializing transform, with a transform type of {transform_type} "
                 f"and a centering initialization of {centering_initialization}")
     if transform_type == "Euler3D":
-        transform_type = sitk.Euler3DTransform()
+        transform = sitk.Euler3DTransform()
     elif transform_type == "Euler2D":
-        transform_type = sitk.Euler2DTransform()
+        transform = sitk.Euler2DTransform()
     else:
         raise ValueError("`transform-type` is invalid and was not caught")
     if centering_initialization == "Geometry":
-        centering_initialization = sitk.CenteredTransformInitializerFilter.GEOMETRY
+        initializer = sitk.CenteredTransformInitializerFilter.GEOMETRY
     elif centering_initialization == "Moments":
-        centering_initialization = sitk.CenteredTransformInitializerFilter.MOMENTS
+        initializer = sitk.CenteredTransformInitializerFilter.MOMENTS
     else:
         raise ValueError("`centering_initialization` is invalid and was not caught")
     initial_transform = sitk.CenteredTransformInitializer(
         fixed_image, moving_image,
-        transform_type, centering_initialization
+        transform, initializer
     )
     registration_method.SetInitialTransform(initial_transform)
     return registration_method

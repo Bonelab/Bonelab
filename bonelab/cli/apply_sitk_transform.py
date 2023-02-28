@@ -38,19 +38,19 @@ def read_transform(fn: str, invert: bool, silent: bool) -> sitk.Transform:
 def apply_sitk_transform(args: Namespace):
     check_inputs_exist([args.fixed_image, args.transform, args.moving_image], args.silent)
     check_for_output_overwrite([args.output], args.overwrite, args.silent)
-    fixed_image = read_image(args.fixed_image, "fixed_image", args.silent)
+    moving_image = read_image(args.moving_image, "moving_image", args.silent)
     transform = read_transform(args.transform, args.invert_transform, args.silent)
     if args.moving_image is not None:
-        moving_image = read_image(args.moving_image, "moving_image", args.silent)
+        fixed_image = read_image(args.fixed_image, "fixed_image", args.silent)
         if not args.silent:
-            message("Resampling fixed image onto moving image using given transform.")
-        transformed_image = sitk.Resample(fixed_image, moving_image, transform, INTERPOLATORS[args.interpolator])
+            message("Resampling moving image onto fixed image using given transform.")
+        transformed_image = sitk.Resample(moving_image, fixed_image, transform, INTERPOLATORS[args.interpolator])
     else:
         if not args.silent:
-            message("Resampling fixed image onto itself using given transform.")
-        transformed_image = sitk.Resample(fixed_image, transform, INTERPOLATORS[args.interpolator])
+            message("Resampling moving image onto itself using given transform.")
+        transformed_image = sitk.Resample(moving_image, transform, INTERPOLATORS[args.interpolator])
     if not args.silent:
-        message(f"Writing transformed image to {args.output}")
+        message(f"Writing transformed moving image to {args.output}")
     sitk.WriteImage(transformed_image, args.output)
 
 
@@ -60,8 +60,8 @@ def create_parser() -> ArgumentParser:
         formatter_class=ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
-        "fixed_image", type=create_file_extension_checker(INPUT_EXTENSIONS, "fixed_image"), metavar="FIXED",
-        help=f"Provide fixed image input filename ({', '.join(INPUT_EXTENSIONS)})"
+        "moving_image", type=create_file_extension_checker(INPUT_EXTENSIONS, "fixed_image"), metavar="FIXED",
+        help=f"Provide moving image input filename ({', '.join(INPUT_EXTENSIONS)})"
     )
     parser.add_argument(
         "transform", metavar="TRANSFORM",
@@ -78,9 +78,9 @@ def create_parser() -> ArgumentParser:
         help="enable this flag to overwrite existing files, if they exist at output targets"
     )
     parser.add_argument(
-        "--moving_image", "-mi", type=create_file_extension_checker(INPUT_EXTENSIONS, "moving_image"),
+        "--fixed_image", "-mi", type=create_file_extension_checker(INPUT_EXTENSIONS, "moving_image"),
         default=None, metavar="MOVING",
-        help=f"Optionally provide moving image input filename ({', '.join(INPUT_EXTENSIONS)}). "
+        help=f"Optionally provide fixed image input filename ({', '.join(INPUT_EXTENSIONS)}). "
              "If given, the fixed image will be resampled onto the moving image using the transform. If you do not "
              "give a moving image then the fixed image will be resampled onto itself using the transform, which could "
              "possibly result in the data going out of the bounds of the image - recommended to provide this since "
