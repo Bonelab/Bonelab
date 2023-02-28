@@ -40,7 +40,7 @@ def apply_sitk_transform(args: Namespace):
     check_for_output_overwrite([args.output], args.overwrite, args.silent)
     moving_image = read_image(args.moving_image, "moving_image", args.silent)
     transform = read_transform(args.transform, args.invert_transform, args.silent)
-    if args.moving_image is not None:
+    if args.fixed_image is not None:
         fixed_image = read_image(args.fixed_image, "fixed_image", args.silent)
         if not args.silent:
             message("Resampling moving image onto fixed image using given transform.")
@@ -60,7 +60,7 @@ def create_parser() -> ArgumentParser:
         formatter_class=ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
-        "moving_image", type=create_file_extension_checker(INPUT_EXTENSIONS, "fixed_image"), metavar="FIXED",
+        "moving_image", type=create_file_extension_checker(INPUT_EXTENSIONS, "fixed_image"), metavar="MOVING",
         help=f"Provide moving image input filename ({', '.join(INPUT_EXTENSIONS)})"
     )
     parser.add_argument(
@@ -79,7 +79,7 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "--fixed_image", "-mi", type=create_file_extension_checker(INPUT_EXTENSIONS, "moving_image"),
-        default=None, metavar="MOVING",
+        default=None, metavar="FIXED",
         help=f"Optionally provide fixed image input filename ({', '.join(INPUT_EXTENSIONS)}). "
              "If given, the fixed image will be resampled onto the moving image using the transform. If you do not "
              "give a moving image then the fixed image will be resampled onto itself using the transform, which could "

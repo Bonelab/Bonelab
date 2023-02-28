@@ -84,14 +84,14 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "mask1", type=str, metavar="MASK1",
-        help=f"Provide mask 1 input filename ({', '.join(INPUT_EXTENSIONS)})"
+        help=f"Provide mask 1 input filename ({', '.join(INPUT_EXTENSIONS)}). "
              f"Should contain either a binary mask or an integer image where the values at each voxel are class labels."
              f" NOTE: MASK2 will be resampled onto MASK1 so be aware of how that might affect your metrics if your "
              f"two masks do not share the same physical space"
     )
     parser.add_argument(
         "mask2", type=str, metavar="MASK1",
-        help=f"Provide mask2 input filename ({', '.join(INPUT_EXTENSIONS)})"
+        help=f"Provide mask2 input filename ({', '.join(INPUT_EXTENSIONS)}). "
              f"Should contain either a binary mask or an integer image where the values at each voxel are class labels."
              f" NOTE: MASK2 will be resampled onto MASK1 so be aware of how that might affect your metrics if your "
              f"two masks do not share the same physical space"
