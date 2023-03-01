@@ -450,7 +450,11 @@ def registration(args: Namespace):
 
 def create_parser() -> ArgumentParser:
     parser = ArgumentParser(
-        description="blRegistration: SimpleITK Registration Tool.",
+        description="This tool allows you to do a rigid registration using the SimpleITK registration framework. "
+                    "Options are provided to configure the initialization, optimizer, metric, and interpolation "
+                    "scheme, and whether and how to do a multiscale registration. "
+                    "NOTE: The resulting transformation will transform points from the MOVING frame to the FIXED "
+                    "frame, so keep that in mind when using the transformation to transform images or masks.",
         epilog="This tool provides limited access to the full functionality of SimpleITK's registration framework. "
                "If you want to do something more advanced, consult the following resources: "
                "(1)https://simpleitk.org/SPIE2019_COURSE/04_basic_registration.html  --------- "
