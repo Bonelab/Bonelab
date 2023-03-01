@@ -83,7 +83,8 @@ def create_parser() -> ArgumentParser:
                     "The masks can either be binary or have integer values where each value corresponds to a separate "
                     "class - in that case Dice and Jaccard will be computed for each class. NOTE: MASK2 will be "
                     "resampled onto MASK1 so be aware of how that might affect your metrics if your two masks do not "
-                    "share the same physical space.",
+                    "share the same physical space. If one mask image is larger than the other, it would be wise to "
+                    "use that one as MASK1.",
         formatter_class=ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(

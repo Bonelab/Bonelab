@@ -62,6 +62,7 @@ def create_parser() -> ArgumentParser:
                     "or blRegistrationDemons will point from the MOVING to FIXED domain. If you want to transform "
                     "an image or mask the other direction, you can give this program the FIXED image/mask as the "
                     "MOVING argument and then give the `--invert-transform` option to invert the transformation.",
+        epilog="",
         formatter_class=ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
