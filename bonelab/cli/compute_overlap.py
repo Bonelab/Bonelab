@@ -66,7 +66,7 @@ def compute_overlap(args: Namespace):
     # resample mask2 onto mask1 so they share the same physical space
     # use nearest neighbour because we do not want to "smear out" labels
     if not args.silent:
-        message("Resampling mask1 onto mask2.")
+        message("Resampling mask 2 onto mask 1.")
     mask2 = sitk.Resample(mask2, mask1, sitk.Transform(), sitk.sitkNearestNeighbor)
     if args.class_labels is None:
         if not args.silent:
@@ -79,22 +79,22 @@ def compute_overlap(args: Namespace):
 
 def create_parser() -> ArgumentParser:
     parser = ArgumentParser(
-        description="blComputeOverlap: SimpleITK Overlap Computing Tool.",
+        description="This tool allows you to compute the Dice and Jaccard of two masks contained in two image files. "
+                    "The masks can either be binary or have integer values where each value corresponds to a separate "
+                    "class - in that case Dice and Jaccard will be computed for each class. NOTE: MASK2 will be "
+                    "resampled onto MASK1 so be aware of how that might affect your metrics if your two masks do not "
+                    "share the same physical space.",
         formatter_class=ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
         "mask1", type=str, metavar="MASK1",
         help=f"Provide mask 1 input filename ({', '.join(INPUT_EXTENSIONS)}). "
              f"Should contain either a binary mask or an integer image where the values at each voxel are class labels."
-             f" NOTE: MASK2 will be resampled onto MASK1 so be aware of how that might affect your metrics if your "
-             f"two masks do not share the same physical space"
     )
     parser.add_argument(
         "mask2", type=str, metavar="MASK2",
         help=f"Provide mask2 input filename ({', '.join(INPUT_EXTENSIONS)}). "
              f"Should contain either a binary mask or an integer image where the values at each voxel are class labels."
-             f" NOTE: MASK2 will be resampled onto MASK1 so be aware of how that might affect your metrics if your "
-             f"two masks do not share the same physical space"
     )
     parser.add_argument(
         "output", type=str, metavar="OUTPUT",
@@ -106,7 +106,7 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "--class-labels", "-cl", default=None, type=int, nargs="+", metavar="N",
-        help="the class labels to calculate overlap metrics for. If nothing is provided then the images will be"
+        help="the class labels to calculate overlap metrics for. If nothing is provided then the images will be "
              "binarized and only a single value for each metric will be calculated."
     )
     parser.add_argument(
