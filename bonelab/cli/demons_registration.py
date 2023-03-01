@@ -237,7 +237,13 @@ def demons_registration(args: Namespace):
 def create_parser() -> ArgumentParser:
 
     parser = ArgumentParser(
-        description='blDemonsRegistration: Demons Registration Tool',
+        description="This tool allows you to do a deformable registration using the SimpleITK Demons registration "
+                    "filters. Options are provided to configure the type of Demons filter, the amount of "
+                    "regularization applied, and whether or how to do a multiscale registration. "
+                    "Additionally, you can export an image visualizing the deformable registration on a typical "
+                    "grid image. "
+                    "NOTE: The resulting transformation will transform points from the MOVING frame to the FIXED "
+                    "frame, so keep that in mind when using the transformation to transform images or masks.",
         formatter_class=ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
