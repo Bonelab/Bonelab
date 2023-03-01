@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from glob import glob
 from pathlib import Path
 
@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 import numpy as np
 
 
-def create_parser() -> Namespace:
+def create_parser() -> ArgumentParser:
     parser = ArgumentParser(
         description='ITK-Snap Annotation File Parsing Script',
         formatter_class=ArgumentDefaultsHelpFormatter

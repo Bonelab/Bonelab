@@ -5,6 +5,7 @@ import subprocess
 
 from tests.config_cli import cfg
 
+
 class TestCommandLineInterfeceSetup(unittest.TestCase):
     '''Test command line interface setup
 
@@ -84,9 +85,38 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
         '''Can run `blRegBCtransformresults`'''
         self.runner('blRegBCtransformresults')
 
-    def test_blAtocontour(self):
+    def test_blAutocontour(self):
         ''' Can run `blAutocontour` '''
         self.runner('blAutocontour')
+
+    def test_blRegistration(self):
+        ''' Can run `blRegistration` '''
+        self.runner('blRegistration')
+
+    def test_blRegistrationDemons(self):
+        ''' Can run `blRegistrationDemons` '''
+        self.runner('blRegistrationDemons')
+
+    def test_blITKSnapAnnotParser(self):
+        ''' Can run `blITKSnapAnnotParser` '''
+        self.runner('blITKSnapAnnotParser')
+
+    def test_blImageFilter(self):
+        ''' Can run `blImageFilter` '''
+        self.runner('blImageFilter')
+
+    def test_blPanningVideo(self):
+        ''' Can run `blPanningVideo` '''
+        self.runner('blPanningVideo')
+
+    def test_blRegistrationApplyTransform(self):
+        ''' Can run `blRegistrationApplyTransform` '''
+        self.runner('blRegistrationApplyTransform')
+
+    def test_blComputeOverlap(self):
+        ''' Can run `blImageComputeOverlap` '''
+        self.runner('blImageComputeOverlap')
+
 
 if __name__ == '__main__':
     unittest.main()

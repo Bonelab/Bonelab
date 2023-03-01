@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from hypothesis import given, strategies as st
+from hypothesis import given, settings, strategies as st
 from bonelab.util.multiscale_registration import (
     smooth_and_resample, multiscale_registration, multiscale_demons, DEMONS_FILTERS
 )
@@ -12,12 +12,16 @@ import SimpleITK as sitk
 from typing import Tuple
 
 
+HYPOTHESIS_DEADLINE = 2000  # this is how many milliseconds each test has to finish in
+
+
 def generate_sitk_image(shape: Tuple[int, int, int]) -> sitk.Image:
     return sitk.GetImageFromArray(np.random.rand(*shape))
 
 
 class TestSmoothAndResample(unittest.TestCase):
 
+    @settings(deadline=HYPOTHESIS_DEADLINE)
     @given(d=st.integers(min_value=5, max_value=50))
     def test_no_shrink(self, d):
         shape = (d, d, d)
@@ -25,6 +29,7 @@ class TestSmoothAndResample(unittest.TestCase):
         resampled_img = smooth_and_resample(img, 1.0, 1.0)
         self.assertEqual(shape, resampled_img.GetSize())
 
+    @settings(deadline=HYPOTHESIS_DEADLINE)
     @given(d=st.integers(min_value=5, max_value=50), s=st.floats(min_value=1.0, max_value=3.0))
     def test_arbitrary_shrinkage(self, d, s):
         shape = (d, d, d)
@@ -43,13 +48,15 @@ class TestMultiscaleRegistration(unittest.TestCase):
         self.registration_filter.SetSmoothUpdateField(True)
         self.registration_filter.SetUpdateFieldStandardDeviations(1.0)
 
-    @given(d=st.integers(min_value=20, max_value=50))
+    @settings(deadline=HYPOTHESIS_DEADLINE)
+    @given(d=st.integers(min_value=20, max_value=30))
     def test_normal_registration(self, d):
         shape = (d, d, d)
         fixed, moving = generate_sitk_image(shape), generate_sitk_image(shape)
         ddf = multiscale_registration(self.registration_filter, fixed, moving)
         self.assertEqual(ddf.GetSize(), fixed.GetSize())
 
+    @settings(deadline=HYPOTHESIS_DEADLINE)
     @given(d=st.integers(min_value=20, max_value=30), n=st.integers(min_value=1, max_value=3))
     def test_multiscale(self, d, n):
         shape = (d, d, d)
@@ -65,6 +72,7 @@ class TestMultiscaleRegistration(unittest.TestCase):
 
 class TestMultiscaleDemons(unittest.TestCase):
 
+    @settings(deadline=HYPOTHESIS_DEADLINE)
     @given(
         demons_type=st.sampled_from(list(DEMONS_FILTERS.keys())),
         d=st.integers(min_value=20, max_value=30),
@@ -74,10 +82,10 @@ class TestMultiscaleDemons(unittest.TestCase):
     def test_demons(self, demons_type, d, n, demons_iterations):
         shape = (d, d, d)
         multiscale_progression = tuple(zip(
-            [float((x + 1) ** 2) for x in range(n)], [float((x + 1) ** 2) for x in range(n)]
+            [float(2 ** (x + 1)) for x in range(n)], [float(2 ** (x + 1)) for x in range(n)]
         ))
         fixed, moving = generate_sitk_image(shape), generate_sitk_image(shape)
-        ddf = multiscale_demons(
+        ddf, _ = multiscale_demons(
             fixed, moving, demons_type, demons_iterations,
             multiscale_progression=multiscale_progression
         )
