@@ -149,17 +149,39 @@ def write_transform_or_field(fn: str, field: sitk.Image, silent: bool) -> None:
     raise ValueError(f"`output`, {fn}, does not have a valid extension and it was not caught.")
 
 
+def write_displacement_visualization(
+        fn: str,
+        field: sitk.Image,
+        grid_spacing: int,
+        grid_sigma: float,
+        silent: bool
+) -> None:
+    if not silent:
+        message(f"Writing displacement field visualization to {fn}")
+    dim = field.GetDimension()
+    grid_image = sitk.GridSource(
+        size=field.GetSize(),
+        sigma=tuple([grid_sigma] * dim),
+        gridSpacing=tuple([grid_spacing] * dim)
+    )
+    sitk.WriteImage(sitk.Resample(grid_image, sitk.DisplacementFieldTransform(field)), fn)
+
+
 def demons_registration(args: Namespace):
     # get the base of the output, so we can construct the filenames of the auxiliary outputs
     output_base = get_output_base(args.output, TRANSFORM_EXTENSIONS+IMAGE_EXTENSIONS, args.silent)
     output_yaml = f"{output_base}.yaml"
     output_metric_csv = f"{output_base}_metric_history.csv"
     output_metric_png = f"{output_base}_metric_history.png"
+    output_displacement_visualization = f"{output_base}_deformation_visualization.nii"
     # check that the inputs actually exist
     check_inputs_exist([args.fixed_image, args.moving_image, args.initial_transform], args.silent)
     # check if we're going to overwrite some outputs
     check_for_output_overwrite(
-        [args.output, output_yaml, output_metric_csv, output_metric_png],
+        [
+            args.output, output_yaml, output_metric_csv, output_metric_png,
+            output_displacement_visualization
+        ],
         args.overwrite, args.silent
     )
     # save the arguments of this registration to a yaml file
@@ -201,6 +223,15 @@ def demons_registration(args: Namespace):
     # optionally, create a plot of the metric history and save it
     if args.plot_metric_history:
         create_and_save_metrics_plot(output_metric_png, metric_history, args.silent)
+    # optionally, write the deformation visualization image
+    if args.write_displacement_visualization:
+        write_displacement_visualization(
+            output_displacement_visualization,
+            displacement_field,
+            args.visualization_grid_spacing,
+            args.visualization_grid_sigma,
+            args.silent
+        )
 
 
 def create_parser() -> ArgumentParser:
@@ -276,6 +307,18 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--plot-metric-history", "-pmh", default=False, action="store_true",
         help="enable this flag to save a plot of the metric history to file in addition to the raw data"
+    )
+    parser.add_argument(
+        "--write-displacement-visualization", "-wdv", default=False, action="store_true",
+        help="enable this flag to write an image showing the deformation applied to a grid"
+    )
+    parser.add_argument(
+        "--visualization-grid-spacing", "-vgsp", default=10, type=int, metavar="N",
+        help="spacing of grid lines on the deformation visualization image"
+    )
+    parser.add_argument(
+        "--visualization-grid-sigma", "-vgsg", default=0.1, type=float, metavar="X",
+        help="sigma of filter applied to the deformation visualization image"
     )
     parser.add_argument(
         "--silent", "-s", default=False, action="store_true",

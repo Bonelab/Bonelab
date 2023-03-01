@@ -140,8 +140,8 @@ def multiscale_registration(
             message(f"Multiscale progression starting | There will be {len(multiscale_progression):d} steps.")
         for (i, (shrink_factor, smoothing_sigma)) in enumerate(multiscale_progression):
             if not silent:
-                print(f"Step {i+1:d} of {len(multiscale_progression):d} "
-                      f"| Shrink factor: {shrink_factor:0.2f}, Sigma: {smoothing_sigma:0.2f} | Starting:")
+                message(f"Step {i+1:d} of {len(multiscale_progression):d} "
+                        f"| Shrink factor: {shrink_factor:0.2f}, Sigma: {smoothing_sigma:0.2f} | Starting:")
             resampled_fixed_image = smooth_and_resample(fixed_image, shrink_factor, smoothing_sigma)
             resampled_moving_image = smooth_and_resample(moving_image, shrink_factor, smoothing_sigma)
             displacement_field = registration_algorithm.Execute(

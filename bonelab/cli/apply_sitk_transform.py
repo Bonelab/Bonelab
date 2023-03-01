@@ -17,7 +17,7 @@ from bonelab.cli.demons_registration import IMAGE_EXTENSIONS
 
 def read_transform(fn: str, invert: bool, silent: bool) -> sitk.Transform:
     if not silent:
-        message("Reading transform.")
+        message(f"Reading transform from {fn}.")
     for ext in TRANSFORM_EXTENSIONS:
         if fn.lower().endswith(ext):
             transform = sitk.ReadTransform(fn)
