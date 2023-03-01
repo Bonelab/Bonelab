@@ -111,7 +111,7 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "--silent", "-s", default=False, action="store_true",
-        help="enable this flag to suppress terminal output about how the registration is proceeding"
+        help="enable this flag to suppress terminal output about how the program is proceeding"
     )
     return parser
 

@@ -56,7 +56,12 @@ def apply_sitk_transform(args: Namespace):
 
 def create_parser() -> ArgumentParser:
     parser = ArgumentParser(
-        description="blApplyTransform: SimpleITK Transformation Tool.",
+        description="This tool allows you to apply a transformation to an image using SimpleITK. The transformation "
+                    "can be either a rigid transformation stored in a transformation file, or it could be a deformable "
+                    "registration stored in an image. Remember that a transformation obtained using blRegistration "
+                    "or blRegistrationDemons will point from the MOVING to FIXED domain. If you want to transform "
+                    "an image or mask the other direction, you can give this program the FIXED image/mask as the "
+                    "MOVING argument and then give the `--invert-transform` option to invert the transformation.",
         formatter_class=ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
@@ -89,7 +94,7 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--invert-transform", "-it", default=False, action="store_true",
         help="enable this flag to invert the transform before applying it. you would want to do this if you registered "
-             "image A (fixed) to image B (moving) but now you want to transform something from the coordindate system "
+             "image A (fixed) to image B (moving) but now you want to transform something from the coordinate system "
              "of image B to image A"
     )
     parser.add_argument(
@@ -99,7 +104,7 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "--silent", "-s", default=False, action="store_true",
-        help="enable this flag to suppress terminal output about how the registration is proceeding"
+        help="enable this flag to suppress terminal output about how the program is proceeding"
     )
     return parser
 
