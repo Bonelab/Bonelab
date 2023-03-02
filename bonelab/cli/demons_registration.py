@@ -162,7 +162,10 @@ def write_displacement_visualization(
     grid_image = sitk.GridSource(
         size=field.GetSize(),
         sigma=tuple([grid_sigma] * dim),
-        gridSpacing=tuple([grid_spacing] * dim)
+        gridSpacing=tuple([grid_spacing] * dim),
+        origin=field.GetOrigin(),
+        spacing=field.GetSpacing(),
+        direction=field.GetDirection()
     )
     sitk.WriteImage(sitk.Resample(grid_image, sitk.DisplacementFieldTransform(field)), fn)
 
