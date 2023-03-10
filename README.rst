@@ -126,6 +126,8 @@ with the :code:`bl` environment activated.
      - convert a sequence of 2D images (including some DICOMs) to a 3D image
    * - :code:`blImageComputeOverlap`
      - compute Dice and Jaccard with two images containing masks (can be multi-class)
+   * - :code:`blImageMirror`
+     - mirror an image across a plane normal to one of the axes
    * - :code:`blMuscle`
      - segment and quantitatively analyze muscle in calibrated CT
    * - :code:`blPseudoCT`
