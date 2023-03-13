@@ -65,7 +65,7 @@ class TestApplySitkTransform(unittest.TestCase):
         args = [f"{fixed_image}", f"{transform}", f"{output}", "-s", "-ow"]
         if moving_image is not None:
             moving_image = self.random_images[moving_image]
-            args += ["-mi", f"{moving_image}"]
+            args += ["-fi", f"{moving_image}"]
         if invert:
             args += ["-it"]
         args += ["-int", f"{interpolator}"]
