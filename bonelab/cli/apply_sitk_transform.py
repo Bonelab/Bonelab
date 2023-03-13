@@ -84,7 +84,7 @@ def create_parser() -> ArgumentParser:
         help="enable this flag to overwrite existing files, if they exist at output targets"
     )
     parser.add_argument(
-        "--fixed_image", "-mi", type=create_file_extension_checker(INPUT_EXTENSIONS, "moving_image"),
+        "--fixed-image", "-fi", type=create_file_extension_checker(INPUT_EXTENSIONS, "moving_image"),
         default=None, metavar="FIXED",
         help=f"Optionally provide fixed image input filename ({', '.join(INPUT_EXTENSIONS)}). "
              "If given, the fixed image will be resampled onto the moving image using the transform. If you do not "
