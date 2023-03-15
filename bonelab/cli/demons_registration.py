@@ -201,8 +201,8 @@ def demons_registration(args: Namespace):
         args.initial_transform, fixed_image, moving_image, args.centering_initialization, args.silent
     )
     if not args.silent:
-        message("Resampling fixed image onto the moving image using initial transform.")
-    fixed_image = sitk.Resample(fixed_image, moving_image, initial_transform)
+        message("Resampling moving image onto the fixed image using initial transform.")
+    moving_image = sitk.Resample(moving_image, fixed_image, initial_transform)
     multiscale_progression = construct_multiscale_progression(
         args.shrink_factors, args.smoothing_sigmas, args.silent
     )
