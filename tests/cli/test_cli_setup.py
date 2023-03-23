@@ -113,6 +113,10 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
         ''' Can run `blRegistrationApplyTransform` '''
         self.runner('blRegistrationApplyTransform')
 
+    def test_blRegistrationCreateAtlas(self):
+        ''' Can run `blRegistrationCreateAtlas` '''
+        self.runner('blRegistrationCreateAtlas')
+
     def test_blComputeOverlap(self):
         ''' Can run `blImageComputeOverlap` '''
         self.runner('blImageComputeOverlap')
