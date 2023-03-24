@@ -3,6 +3,8 @@ from __future__ import annotations
 # external imports
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace
 import SimpleITK as sitk
+from scipy import stats
+from typing import Tuple, List
 
 # internal imports
 from bonelab.cli.registration import (
@@ -16,11 +18,19 @@ from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_r
 
 
 # functions
-def create_initial_average_atlas() -> sitk.Image:
+def affine_registration(atlas: sitk.Image, image: sitk.Image) -> sitk.Transform:
     pass
 
 
-def update_average_atlas() -> sitk.Image:
+def create_initial_average_atlas(fns: List[str]) -> Tuple[sitk.Image, List[sitk.Transform]]:
+    pass
+
+
+def deformable_registration(atlas: sitk.Image, image: sitk.Image, transform: sitk.Image) -> sitk.Image:
+    pass
+
+
+def update_average_atlas(atlas: sitk.Image, fns: List[str], transforms: List[sitk.Transform]) -> Tuple[sitk.Image, List[sitk.Transform]]:
     pass
 
 
@@ -28,8 +38,17 @@ def get_atlas_difference(atlas: sitk.Image, prior_atlas: sitk.Image) -> float:
     pass
 
 
-def create_atlas_segmentation() -> sitk.Image:
-    pass
+def create_atlas_segmentation(atlas: sitk.Image, fns: List[str], transforms: List[sitk.Transform]) -> sitk.Image:
+    segmentations = []
+    # loop through all the segmentations, transform to the atlas frame, append to a list
+    for fn, transform in zip(fns, transforms):
+        segmentations.append(
+            sitk.GetArrayFromImage(sitk.Resample(sitk.ReadImage(fn), atlas, transform, sitk.sitkNearestNeighbor))
+        )
+    # use simple voting to get voxel labels using stack and mode functions, convert to an image, copy atlas information
+    atlas_segmentation = sitk.GetImageFromArray(stats.mode(np.stack(segmentations))[0][0, ...])
+    atlas_segmentation.CopyInformation(atlas)
+    return atlas_segmentation
 
 
 def create_atlas(args: Namespace) -> None:
@@ -52,22 +71,21 @@ def create_atlas(args: Namespace) -> None:
     # write args to yaml file
     write_args_to_yaml(output_yaml, args, args.silent)
     # create the first atlas using affine registration
-    prior_atlas = create_atlas_segmentation()
+    atlas = create_atlas_segmentation()
     # iteratively update the atlas until convergence
     differences = []
     for i in range(args.atlas_iterations):
+        prior_atlas = atlas
         atlas = update_average_atlas()
         differences.append(get_atlas_difference(atlas, prior_atlas))
         if differences[-1] < args.atlas_convergence_threshold:
             if not args.silent:
                 message(f"Average atlas converged after {i+1} iterations.")
             break
-        else:
-            prior_atlas = atlas
     else:
         if not args.silent:
             message(f"Average atlas did not converge after {args.atlas_iterations} iterations."
-                    f"Final residual was {atlas_residual}, threshold was {args.atlas_convergence_threshold}.")
+                    f"Final difference was {differences[-1]}, threshold was {args.atlas_convergence_threshold}.")
     # get the atlas segmentation
     atlas_segmentation = create_atlas_segmentation()
     # write outputs
@@ -154,13 +172,14 @@ def create_parser() -> ArgumentParser:
         "--atlas-convergence-threshold", "-act", default=1e-3, type=float, metavar="X",
         help="threshold for convergence of atlas updates"
     )
-    # deformable registration specs
+    # affine registration specs
     parser.add_argument(
         "--centering-initialization", "-ci", default="Geometry", metavar="STR",
         type=create_string_argument_checker(["Geometry", "Moments"], "centering-initialization"),
         help="if no initial transform provided, the centering initialization to use. "
              "options: `Geometry`, `Moments`"
     )
+    # deformable registration specs
     parser.add_argument(
         "--demons-type", "-dt", default="demons", type=demons_type_checker, metavar="STR",
         help=f"type of demons algorithm to use. options: {list(DEMONS_FILTERS.keys())}"
