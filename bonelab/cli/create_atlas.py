@@ -10,32 +10,118 @@ from typing import Tuple, List
 from bonelab.cli.registration import (
     read_image, check_inputs_exist, check_for_output_overwrite, write_args_to_yaml,
     create_file_extension_checker, create_string_argument_checker,
-    INPUT_EXTENSIONS, get_output_base, write_metrics_to_csv, create_and_save_metrics_plot
+    INPUT_EXTENSIONS, get_output_base, write_metrics_to_csv, create_and_save_metrics_plot,
+    setup_optimizer, setup_interpolator, setup_similarity_metric, setup_multiscale_progression,
+    check_percentage, check_image_size_and_shrink_factors, INTERPOLATORS
 )
-from bonelab.cli.demons_registration import IMAGE_EXTENSIONS, DEMONS_FILTERS, demons_type_checker
+from bonelab.cli.demons_registration import (
+    IMAGE_EXTENSIONS, DEMONS_FILTERS, demons_type_checker, construct_multiscale_progression
+)
 from bonelab.util.time_stamp import message
-from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_resample
+from bonelab.util.multiscale_registration import multiscale_demons
 
 
 # functions
-def affine_registration(atlas: sitk.Image, image: sitk.Image) -> sitk.Transform:
-    pass
+def affine_registration(atlas: sitk.Image, image: sitk.Image, args: Namespace) -> sitk.Transform:
+    if not args.silent:
+        message("Affinely registering...")
+    registration_method = sitk.ImageRegistrationMethod()
+    # hard-code to use the moments initialization of the transform
+    registration_method.SetInitialTransform(
+        sitk.CenteredTransformInitializer(
+            atlas, image,
+            sitk.AffineTransform(atlas.GetDimension()),
+            sitk.CenteredTransformInitializerFilter.MOMENTS
+        )
+    )
+    # but set up the optimizer, similarity metric, interpolator, and multiscale progression as normal using args
+    registration_method = setup_optimizer(
+        registration_method,
+        args.max_affine_iterations,
+        args.gradient_descent_learning_rate,
+        args.gradient_descent_convergence_min_value,
+        args.gradient_descent_convergence_window_size,
+        args.powell_max_line_iterations,
+        args.powell_step_length,
+        args.powell_step_tolerance,
+        args.powell_value_tolerance,
+        args.optimizer,
+        args.silent
+    )
+    registration_method = setup_similarity_metric(
+        registration_method,
+        args.similarity_metric,
+        args.mutual_information_num_histogram_bins,
+        args.joint_mutual_information_joint_smoothing_variance,
+        args.similarity_metric_sampling_strategy,
+        args.similarity_metric_sampling_rate,
+        args.similarity_metric_sampling_seed,
+        args.silent
+    )
+    registration_method = setup_interpolator(registration_method, args.interpolator, args.silent)
+    registration_method = setup_multiscale_progression(
+        registration_method,
+        args.shrink_factors, args.smoothing_sigmas,
+        args.silent
+    )
+    return registration_method.Execute(fixed_image, moving_image)
 
 
-def create_initial_average_atlas(fns: List[str]) -> Tuple[sitk.Image, List[sitk.Transform]]:
-    pass
+def create_initial_average_atlas(fns: List[str], args: Namespace) -> Tuple[sitk.Image, List[sitk.Transform]]:
+    atlas = read_image(fns[0], "image 0", args.silent)
+    average_image = sitk.Image()
+    average_image.CopyInformation(atlas)
+    average_image = sitk.Add(average_image, atlas)
+    # the first image starts out with a identity transform because it is the first reference image
+    transforms = [sitk.Transform()]
+    for i, fn in enumerate(fns[1:]):
+        image = read_image(fn, f"image {i}", args.silent)
+        if not args.silent:
+            message("registering to atlas...")
+        transform = affine_registration(atlas, image, args)
+        if not args.silent:
+            message("Adding transformed image to average image...")
+        average_image = sitk.Add(average_image, sitk.Resample(image, atlas, transform, sitk.sitkLinear))
+        transforms.append(transform)
+    if not args.silent:
+        message("Dividing accumulated average image by number of images...")
+    return sitk.Divide(average_image, len(fns)), transforms
 
 
-def deformable_registration(atlas: sitk.Image, image: sitk.Image, transform: sitk.Image) -> sitk.Image:
-    pass
-
-
-def update_average_atlas(atlas: sitk.Image, fns: List[str], transforms: List[sitk.Transform]) -> Tuple[sitk.Image, List[sitk.Transform]]:
-    pass
+def update_average_atlas(
+        atlas: sitk.Image, fns: List[str], transforms: List[sitk.Transform], args: Namespace
+) -> Tuple[sitk.Image, List[sitk.Transform]]:
+    average_image = sitk.Image()
+    average_image.CopyInformation(atlas)
+    updated_transforms = []
+    for i, (fn, transform) in enumerate(zip(fns, transforms)):
+        image = read_image(fn, f"image {i}", args.silent)
+        if not args.silent:
+            message("registering to atlas...")
+        transform, _ = multiscale_demons(
+            atlas, image,
+            demons_type=args.demons_type,
+            demons_iterations=args.max_demons_iterations,
+            demons_displacement_field_smooth_std=args.displacement_smoothing_std,
+            demons_update_field_smooth_std=args.update_smoothing_std,
+            initial_transform=transform,
+            multiscale_progression=construct_multiscale_progression(
+                args.shrink_factors, args.smoothing_sigmas, args.silent
+            ),
+            silent=args.silent
+        )
+        if not args.silent:
+            message("Adding transformed image to average image...")
+        average_image = sitk.Add(average_image, sitk.Resample(image, atlas, transform, sitk.sitkLinear))
+        updated_transforms.append(transform)
+    if not args.silent:
+        message("Dividing accumulated average image by number of images...")
+    return sitk.Divide(average_image, len(fns)), updated_transforms
 
 
 def get_atlas_difference(atlas: sitk.Image, prior_atlas: sitk.Image) -> float:
-    pass
+    # get the difference between the two images, take the mean of the absolute value of the differences
+    return sitk.GetArrayFromImage(sitk.Subtract(atlas, prior_atlas)).abs().mean()
 
 
 def create_atlas_segmentation(atlas: sitk.Image, fns: List[str], transforms: List[sitk.Transform]) -> sitk.Image:
@@ -71,12 +157,12 @@ def create_atlas(args: Namespace) -> None:
     # write args to yaml file
     write_args_to_yaml(output_yaml, args, args.silent)
     # create the first atlas using affine registration
-    atlas = create_atlas_segmentation()
+    atlas, transforms = create_initial_average_atlas(args.images, args)
     # iteratively update the atlas until convergence
     differences = []
     for i in range(args.atlas_iterations):
         prior_atlas = atlas
-        atlas = update_average_atlas()
+        atlas, transforms = update_average_atlas(atlas, args.images, transforms, args)
         differences.append(get_atlas_difference(atlas, prior_atlas))
         if differences[-1] < args.atlas_convergence_threshold:
             if not args.silent:
@@ -87,7 +173,7 @@ def create_atlas(args: Namespace) -> None:
             message(f"Average atlas did not converge after {args.atlas_iterations} iterations."
                     f"Final difference was {differences[-1]}, threshold was {args.atlas_convergence_threshold}.")
     # get the atlas segmentation
-    atlas_segmentation = create_atlas_segmentation()
+    atlas_segmentation = create_atlas_segmentation(atlas, args.segmentations, transforms)
     # write outputs
     write_metrics_to_csv(differences_csv, differences, args.silent)
     if args.plot_metric_history:
@@ -98,12 +184,6 @@ def create_atlas(args: Namespace) -> None:
     if not args.silent:
         message(f"Writing atlas segmentation to {args.atlas_segmentation}")
     sitk.WriteImage(atlas_segmentation, args.atlas_segmentation)
-
-    # step 6: use the converged transformations to transform all segmentations to the atlas
-    # step 7: use STAPLE to generate the final atlas segmentation
-    # step 8: write the atlas image and segmentation to file
-
-    pass
 
 
 # parser
@@ -172,21 +252,104 @@ def create_parser() -> ArgumentParser:
         "--atlas-convergence-threshold", "-act", default=1e-3, type=float, metavar="X",
         help="threshold for convergence of atlas updates"
     )
+    # shared registration parameters
+    parser.add_argument(
+        "--shrink-factors", "-sf", default=None, type=float, nargs="+", metavar="X",
+        help="factors by which to shrink the fixed and moving image at each stage of the multiscale progression. you "
+             "must give the same number of arguments here as you do for `smoothing-sigmas`"
+    )
+    parser.add_argument(
+        "--smoothing-sigmas", "-ss", default=None, type=float, nargs="+", metavar="X",
+        help="sigmas for the Gaussians used to smooth the fixed and moving image at each stage of the multiscale "
+             "progression. you must give the same number of arguments here as you do for `shrink-factors`"
+    )
     # affine registration specs
     parser.add_argument(
-        "--centering-initialization", "-ci", default="Geometry", metavar="STR",
-        type=create_string_argument_checker(["Geometry", "Moments"], "centering-initialization"),
-        help="if no initial transform provided, the centering initialization to use. "
-             "options: `Geometry`, `Moments`"
+        "--max-affine-iterations", "-mi", default=100, type=int, metavar="N",
+        help="number of iterations to run registration algorithm for at each stage in the affine registration"
+    )
+    parser.add_argument(
+        "--optimizer", "-opt", default="GradientDescent", metavar="STR",
+        type=create_string_argument_checker(["GradientDescent", "Powell"], "optimizer"),
+        help="the optimizer to use, options: `GradientDescent`, `Powell`"
+    )
+    parser.add_argument(
+        "--gradient-descent-learning-rate", "-gdlr", default=1e-3, type=float, metavar="X",
+        help="learning rate when using gradient descent optimizer"
+    )
+    parser.add_argument(
+        "--gradient-descent-convergence-min-value", "-gdcmv", default=1e-6, type=float, metavar="X",
+        help="minimum value for convergence when using gradient descent optimizer"
+    )
+    parser.add_argument(
+        "--gradient-descent-convergence-window-size", "-gdcws", default=10, type=int, metavar="N",
+        help="window size for checking for convergence when using gradient descent optimizer"
+    )
+    parser.add_argument(
+        "--powell_max_line_iterations", "-pmli", default=100, type=int, metavar="N",
+        help="maximum number of line iterations when using Powell optimizer"
+    )
+    parser.add_argument(
+        "--powell_step_length", "-psl", default=1.0, type=float, metavar="X",
+        help="maximum step length when using Powell optimizer"
+    )
+    parser.add_argument(
+        "--powell_step_tolerance", "-pst", default=1e-6, type=float, metavar="X",
+        help="step tolerance when using Powell optimizer"
+    )
+    parser.add_argument(
+        "--powell_value_tolerance", "-pvt", default=1e-6, type=float, metavar="X",
+        help="value tolerance when using Powell optimizer"
+    )
+    parser.add_argument(
+        "--similarity-metric", "-sm", default="MeanSquares", metavar="STR",
+        type=create_string_argument_checker(
+            ["MeanSquares", "Correlation", "JointHistogramMutualInformation", "MattesMutualInformation"],
+            "similarity-metric"
+        ),
+        help="the similarity metric to use, options: `MeanSquares`, `Correlation`, "
+             "`JointHistogramMutualInformation`, `MattesMutualInformation`"
+    )
+    parser.add_argument(
+        "--similarity-metric-sampling-strategy", "-smss", default="None", metavar="STR",
+        type=create_string_argument_checker(["None", "Regular", "Random"], "similarity-metric-sampling-strategy"),
+        help="sampling strategy for similarity metric, options: "
+             "`None` -> use all points, "
+             "`Regular` -> sample on a regular grid with specified sampling rate, "
+             "`Random` -> sample randomly with specified sampling rate."
+    )
+    parser.add_argument(
+        "--similarity-metric-sampling-rate", "-smsr", default=0.2, type=check_percentage, metavar="P",
+        help="sampling rate for similarity metric, must be between 0.0 and 1.0"
+    )
+    parser.add_argument(
+        "--similarity-metric-sampling-seed", "-smssd", default=None, type=int, metavar="N",
+        help="the seed for random sampling, leave as `None` if you want a random seed. Can be useful if you want a "
+             "deterministic registration with random sampling for debugging/testing. Don't go crazy and use huge "
+             "numbers since SITK might report an OverflowError. I found keeping it <=255 worked."
+    )
+    parser.add_argument(
+        "--mutual-information-num-histogram-bins", "-minhb", default=20, type=int, metavar="N",
+        help="number of bins in histogram when using joint histogram or Mattes mutual information similarity metrics"
+    )
+    parser.add_argument(
+        "--joint-mutual-information-joint-smoothing-variance", "-jmijsv", default=1.5, type=float, metavar="X",
+        help="variance to use when smoothing the joint PDF when using the joint histogram mutual information "
+             "similarity metric"
+    )
+    parser.add_argument(
+        "--interpolator", "-int", default="Linear", metavar="STR",
+        type=create_string_argument_checker(list(INTERPOLATORS.keys()), "interpolator"),
+        help="the interpolator to use, options: `Linear`, `NearestNeighbour`, `BSpline`"
     )
     # deformable registration specs
     parser.add_argument(
-        "--demons-type", "-dt", default="demons", type=demons_type_checker, metavar="STR",
-        help=f"type of demons algorithm to use. options: {list(DEMONS_FILTERS.keys())}"
+        "--max-demons-iterations", "-mi", default=100, type=int, metavar="N",
+        help="number of iterations to run registration algorithm for at each stage in the demons registration"
     )
     parser.add_argument(
-        "--max-iterations", "-mi", default=100, type=int, metavar="N",
-        help="number of iterations to run registration algorithm for at each stage"
+        "--demons-type", "-dt", default="demons", type=demons_type_checker, metavar="STR",
+        help=f"type of demons algorithm to use. options: {list(DEMONS_FILTERS.keys())}"
     )
     parser.add_argument(
         "--displacement-smoothing-std", "-ds", default=1.0, type=float, metavar="X",
@@ -197,16 +360,6 @@ def create_parser() -> ArgumentParser:
         "--update-smoothing-std", "-us", default=1.0, type=float, metavar="X",
         help="standard deviation for the Gaussian smoothing applied to the update field at each step."
              "this is how you control the viscosity of the smoothing of the deformation"
-    )
-    parser.add_argument(
-        "--shrink-factors", "-sf", default=None, type=float, nargs="+", metavar="X",
-        help="factors by which to shrink the fixed and moving image at each stage of the multiscale progression. you "
-             "must give the same number of arguments here as you do for `smoothing-sigmas`"
-    )
-    parser.add_argument(
-        "--smoothing-sigmas", "-ss", default=None, type=float, nargs="+", metavar="X",
-        help="sigmas for the Gaussians used to smooth the fixed and moving image at each stage of the multiscale "
-             "progression. you must give the same number of arguments here as you do for `shrink-factors`"
     )
     # output flags
     parser.add_argument(
