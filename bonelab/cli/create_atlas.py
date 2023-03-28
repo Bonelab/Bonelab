@@ -215,7 +215,7 @@ def create_parser() -> ArgumentParser:
                     "space of the atlas image, re-compute the average image, and set this as the new atlas "
                     "image, (6) repeat steps 4 and 5 until the atlas image has converged, (7) deformably register "
                     "all images to the final atlas image, (8) transform all segmentations to the atlas space "
-                    "using nearest neighbour interpolation, (9) use STAPLE to generate the atlas segmentation, "
+                    "using nearest neighbour interpolation, (9) use voting to generate the atlas segmentation, "
                     "(10) write the average-atlas and atlas segmentation to file. "
                     "The user is given all of of the necessary command line options to configure both the affine and "
                     "deformable registration parameters so that the method of atlas generation can be consistent with "
