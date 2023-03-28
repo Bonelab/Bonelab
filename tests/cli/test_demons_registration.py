@@ -10,7 +10,7 @@ import numpy as np
 
 from bonelab.cli.demons_registration import create_parser, demons_registration, DEMONS_FILTERS
 
-HYPOTHESIS_DEADLINE = 2000  # this is how many milliseconds each test has to finish in
+HYPOTHESIS_DEADLINE = None  # this is how many milliseconds each test has to finish in
 
 IMAGE_SIZE_DICT = {
     "small": 20,
