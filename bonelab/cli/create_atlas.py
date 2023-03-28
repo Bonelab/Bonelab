@@ -3,6 +3,8 @@ from __future__ import annotations
 # external imports
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace
 import SimpleITK as sitk
+import numpy as np
+import math
 from scipy import stats
 from typing import Tuple, List
 
@@ -64,18 +66,23 @@ def affine_registration(atlas: sitk.Image, image: sitk.Image, args: Namespace) -
         args.shrink_factors, args.smoothing_sigmas,
         args.silent
     )
-    return registration_method.Execute(fixed_image, moving_image)
+    if not args.silent:
+        message("Starting registration.")
+    transform = registration_method.Execute(atlas, image)
+    if not args.silent:
+        message(f"Registration stopping condition: {registration_method.GetOptimizerStopConditionDescription()}")
+    return transform
 
 
 def create_initial_average_atlas(fns: List[str], args: Namespace) -> Tuple[sitk.Image, List[sitk.Transform]]:
     atlas = read_image(fns[0], "image 0", args.silent)
-    average_image = sitk.Image()
+    average_image = sitk.Image(*atlas.GetSize(), atlas.GetPixelID())
     average_image.CopyInformation(atlas)
     average_image = sitk.Add(average_image, atlas)
     # the first image starts out with a identity transform because it is the first reference image
     transforms = [sitk.Transform()]
     for i, fn in enumerate(fns[1:]):
-        image = read_image(fn, f"image {i}", args.silent)
+        image = read_image(fn, f"image {i+1}", args.silent)
         if not args.silent:
             message("registering to atlas...")
         transform = affine_registration(atlas, image, args)
@@ -91,14 +98,14 @@ def create_initial_average_atlas(fns: List[str], args: Namespace) -> Tuple[sitk.
 def update_average_atlas(
         atlas: sitk.Image, fns: List[str], transforms: List[sitk.Transform], args: Namespace
 ) -> Tuple[sitk.Image, List[sitk.Transform]]:
-    average_image = sitk.Image()
+    average_image = sitk.Image(*atlas.GetSize(), atlas.GetPixelID())
     average_image.CopyInformation(atlas)
     updated_transforms = []
     for i, (fn, transform) in enumerate(zip(fns, transforms)):
         image = read_image(fn, f"image {i}", args.silent)
         if not args.silent:
             message("registering to atlas...")
-        transform, _ = multiscale_demons(
+        displacement, _ = multiscale_demons(
             atlas, image,
             demons_type=args.demons_type,
             demons_iterations=args.max_demons_iterations,
@@ -110,6 +117,7 @@ def update_average_atlas(
             ),
             silent=args.silent
         )
+        transform = sitk.DisplacementFieldTransform(displacement)
         if not args.silent:
             message("Adding transformed image to average image...")
         average_image = sitk.Add(average_image, sitk.Resample(image, atlas, transform, sitk.sitkLinear))
@@ -121,7 +129,9 @@ def update_average_atlas(
 
 def get_atlas_difference(atlas: sitk.Image, prior_atlas: sitk.Image) -> float:
     # get the difference between the two images, take the mean of the absolute value of the differences
-    return sitk.GetArrayFromImage(sitk.Subtract(atlas, prior_atlas)).abs().mean()
+    atlas = sitk.GetArrayFromImage(atlas)
+    prior_atlas = sitk.GetArrayFromImage(prior_atlas)
+    return math.sqrt(((atlas-prior_atlas)**2).mean()) / atlas.max()
 
 
 def create_atlas_segmentation(atlas: sitk.Image, fns: List[str], transforms: List[sitk.Transform]) -> sitk.Image:
@@ -158,6 +168,8 @@ def create_atlas(args: Namespace) -> None:
     write_args_to_yaml(output_yaml, args, args.silent)
     # create the first atlas using affine registration
     atlas, transforms = create_initial_average_atlas(args.images, args)
+    if args.write_intermediate_atlases:
+        sitk.WriteImage(atlas, f"{output_base}_affine.nii")
     # iteratively update the atlas until convergence
     differences = []
     for i in range(args.atlas_iterations):
@@ -168,6 +180,11 @@ def create_atlas(args: Namespace) -> None:
             if not args.silent:
                 message(f"Average atlas converged after {i+1} iterations.")
             break
+        else:
+            if not args.silent:
+                message(f"Iteration {i} complete. Difference is {differences[-1]}")
+            if args.write_intermediate_atlases:
+                sitk.WriteImage(atlas, f"{output_base}_iteration_{i}.nii")
     else:
         if not args.silent:
             message(f"Average atlas did not converge after {args.atlas_iterations} iterations."
@@ -206,17 +223,20 @@ def create_parser() -> ArgumentParser:
         epilog="(1) DOI: 10.1109/MMBIA.2001.991733, (2) DOI: 10.1016/j.neuroimage.2003.11.010 ",
         formatter_class=ArgumentDefaultsHelpFormatter
     )
+    # inputs and outputs
     parser.add_argument(
-        "images",
+        "--images", "-img",
         type=create_file_extension_checker(INPUT_EXTENSIONS, "images"), nargs="+",
         metavar="IMAGES",
-        help=f"Provide image filenames ({', '.join(INPUT_EXTENSIONS)})."
+        help=f"Provide image filenames ({', '.join(INPUT_EXTENSIONS)}).",
+        required=True
     )
     parser.add_argument(
-        "segmentations",
+        "--segmentations", "-seg",
         type=create_file_extension_checker(INPUT_EXTENSIONS, "segmentations"), nargs="+",
         metavar="SEGMENTATIONS",
-        help=f"Provide image filenames ({', '.join(INPUT_EXTENSIONS)})."
+        help=f"Provide image filenames ({', '.join(INPUT_EXTENSIONS)}).",
+        required=True
     )
     parser.add_argument(
         "atlas_average",
@@ -252,9 +272,13 @@ def create_parser() -> ArgumentParser:
         "--atlas-convergence-threshold", "-act", default=1e-3, type=float, metavar="X",
         help="threshold for convergence of atlas updates"
     )
+    parser.add_argument(
+        "--write-intermediate-atlases", "-wia", default=False, action="store_true",
+        help="enable this flag to write out the average atlas image at the end of each iteration"
+    )
     # shared registration parameters
     parser.add_argument(
-        "--shrink-factors", "-sf", default=None, type=float, nargs="+", metavar="X",
+        "--shrink-factors", "-sf", default=None, type=int, nargs="+", metavar="X",
         help="factors by which to shrink the fixed and moving image at each stage of the multiscale progression. you "
              "must give the same number of arguments here as you do for `smoothing-sigmas`"
     )
@@ -265,7 +289,7 @@ def create_parser() -> ArgumentParser:
     )
     # affine registration specs
     parser.add_argument(
-        "--max-affine-iterations", "-mi", default=100, type=int, metavar="N",
+        "--max-affine-iterations", "-mai", default=100, type=int, metavar="N",
         help="number of iterations to run registration algorithm for at each stage in the affine registration"
     )
     parser.add_argument(
@@ -344,7 +368,7 @@ def create_parser() -> ArgumentParser:
     )
     # deformable registration specs
     parser.add_argument(
-        "--max-demons-iterations", "-mi", default=100, type=int, metavar="N",
+        "--max-demons-iterations", "-mdi", default=100, type=int, metavar="N",
         help="number of iterations to run registration algorithm for at each stage in the demons registration"
     )
     parser.add_argument(

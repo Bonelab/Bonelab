@@ -165,7 +165,7 @@ def multiscale_demons(
     initial_transform: Optional[sitk.Transform] = None,
     multiscale_progression: Optional[List[Tuple[float, float]]] = None,
     silent: bool = True
-) -> Tuple[sitk.DisplacementFieldTransform, List[float]]:
+) -> Tuple[sitk.Image, List[float]]:
     """
     Perform a multiscale registration using a given registration algorithm and fixed/moving image pair. You can
     optionally pass in an initial transform and the multiscale progression.
