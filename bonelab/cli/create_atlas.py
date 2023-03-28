@@ -20,11 +20,24 @@ from bonelab.cli.demons_registration import (
     IMAGE_EXTENSIONS, DEMONS_FILTERS, demons_type_checker, construct_multiscale_progression
 )
 from bonelab.util.time_stamp import message
-from bonelab.util.multiscale_registration import multiscale_demons
+from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_resample
 
 
 # functions
 def affine_registration(atlas: sitk.Image, image: sitk.Image, args: Namespace) -> sitk.Transform:
+    if (args.downsampling_shrink_factor is not None) and (args.downsampling_smoothing_sigma is not None):
+        if not args.silent:
+            message("Downsampling...")
+        atlas = smooth_and_resample(
+            atlas,
+            args.downsampling_shrink_factor,
+            args.downsampling_smoothing_sigma
+        )
+        image = smooth_and_resample(
+            image,
+            args.downsampling_shrink_factor,
+            args.downsampling_smoothing_sigma
+        )
     if not args.silent:
         message("Affinely registering...")
     registration_method = sitk.ImageRegistrationMethod()
@@ -95,6 +108,48 @@ def create_initial_average_atlas(fns: List[str], args: Namespace) -> Tuple[sitk.
     return sitk.Divide(average_image, len(fns)), transforms
 
 
+def deformable_registration(
+        atlas: sitk.Image, image: sitk.Image, transform: sitk.Transform, args: Namespace
+) -> sitk.Transform:
+    if (args.downsampling_shrink_factor is not None) and (args.downsampling_smoothing_sigma is not None):
+        if not args.silent:
+            message("Downsampling...")
+        atlas = smooth_and_resample(
+            atlas,
+            args.downsampling_shrink_factor,
+            args.downsampling_smoothing_sigma
+        )
+        image = smooth_and_resample(
+            image,
+            args.downsampling_shrink_factor,
+            args.downsampling_smoothing_sigma
+        )
+    image = sitk.Resample(image, atlas, transform)
+    displacement, _ = multiscale_demons(
+        atlas, image,
+        demons_type=args.demons_type,
+        demons_iterations=args.max_demons_iterations,
+        demons_displacement_field_smooth_std=args.displacement_smoothing_std,
+        demons_update_field_smooth_std=args.update_smoothing_std,
+        initial_transform=None,
+        multiscale_progression=construct_multiscale_progression(
+            args.shrink_factors, args.smoothing_sigmas, args.silent
+        ),
+        silent=args.silent
+    )
+    return sitk.DisplacementFieldTransform(sitk.Add(
+        displacement,
+        sitk.TransformToDisplacementField(
+            transform,
+            displacement.GetPixelID(),
+            displacement.GetSize(),
+            displacement.GetOrigin(),
+            displacement.GetSpacing(),
+            displacement.GetDirection()
+        )
+    ))
+
+
 def update_average_atlas(
         atlas: sitk.Image, fns: List[str], transforms: List[sitk.Transform], args: Namespace
 ) -> Tuple[sitk.Image, List[sitk.Transform]]:
@@ -105,19 +160,7 @@ def update_average_atlas(
         image = read_image(fn, f"image {i}", args.silent)
         if not args.silent:
             message("registering to atlas...")
-        displacement, _ = multiscale_demons(
-            atlas, image,
-            demons_type=args.demons_type,
-            demons_iterations=args.max_demons_iterations,
-            demons_displacement_field_smooth_std=args.displacement_smoothing_std,
-            demons_update_field_smooth_std=args.update_smoothing_std,
-            initial_transform=transform,
-            multiscale_progression=construct_multiscale_progression(
-                args.shrink_factors, args.smoothing_sigmas, args.silent
-            ),
-            silent=args.silent
-        )
-        transform = sitk.DisplacementFieldTransform(displacement)
+        transform = deformable_registration(atlas, image, transform, args)
         if not args.silent:
             message("Adding transformed image to average image...")
         average_image = sitk.Add(average_image, sitk.Resample(image, atlas, transform, sitk.sitkLinear))

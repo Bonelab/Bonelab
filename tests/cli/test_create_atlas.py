@@ -90,7 +90,8 @@ class TestCreateAtlas(unittest.TestCase):
             "-img", *self.img_list,
             "-seg", *self.mask_list,
             "-ow", "-s", "-opt", "Powell",
-            "-ai", "10", "-mai", "10", "-mdi", "10"
+            "-ai", "10", "-mai", "10", "-mdi", "10",
+            "-dss", "1", "-dsf", "2"
         ]
         create_atlas(create_parser().parse_args(args=args))
 
