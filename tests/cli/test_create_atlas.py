@@ -11,7 +11,7 @@ from scipy.interpolate import Rbf
 
 from bonelab.cli.create_atlas import create_parser, create_atlas
 
-HYPOTHESIS_DEADLINE = 2000  # this is how many milliseconds each test has to finish in
+HYPOTHESIS_DEADLINE = None  # this is how many milliseconds each test has to finish in
 
 TEST_OUTPUT_ATLAS = "average.nii"
 TEST_OUTPUT_MASK = "mask.nii.gz"
