@@ -164,6 +164,8 @@ with the :code:`bl` environment activated.
      - perform deformable registration on two images
    * - :code:`blRegistrationApplyTransform`
      - apply a transformation to an image
+   * - :code:`blRegistrationCreateAtlas`
+     - construct an average atlas from a set of images with segmentations
 
 Running Tests
 =============
