@@ -25,6 +25,7 @@ from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_r
 
 # functions
 def affine_registration(atlas: sitk.Image, image: sitk.Image, args: Namespace) -> sitk.Transform:
+    atlas, image = sitk.Cast(atlas, sitk.sitkFloat32), sitk.Cast(image, sitk.sitkFloat32)
     if (args.downsampling_shrink_factor is not None) and (args.downsampling_smoothing_sigma is not None):
         if not args.silent:
             message("Downsampling...")
