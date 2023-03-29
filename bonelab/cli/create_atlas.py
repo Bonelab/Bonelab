@@ -91,7 +91,6 @@ def create_initial_average_atlas(fns: List[str], args: Namespace) -> Tuple[sitk.
     atlas = read_image(fns[0], "image 0", args.silent)
     average_image = sitk.Image(*atlas.GetSize(), atlas.GetPixelID())
     average_image.CopyInformation(atlas)
-    average_image = sitk.Add(average_image, atlas)
     # the first image starts out with a identity transform because it is the first reference image
     transforms = [sitk.Transform()]
     for i, fn in enumerate(fns[1:]):
@@ -105,7 +104,7 @@ def create_initial_average_atlas(fns: List[str], args: Namespace) -> Tuple[sitk.
         transforms.append(transform)
     if not args.silent:
         message("Dividing accumulated average image by number of images...")
-    return sitk.Divide(average_image, len(fns)), transforms
+    return sitk.Divide(average_image, len(fns) - 1), transforms
 
 
 def deformable_registration(
@@ -219,6 +218,13 @@ def create_atlas(args: Namespace) -> None:
         prior_atlas = atlas
         atlas, transforms = update_average_atlas(atlas, args.images, transforms, args)
         differences.append(get_atlas_difference(atlas, prior_atlas))
+        # apply successive over-relaxation
+        atlas = sitk.Add(
+            prior_atlas, sitk.Multiply(
+                sitk.Subtract(atlas, prior_atlas),
+                args.atlas_sor_alpha
+            )
+        )
         if differences[-1] < args.atlas_convergence_threshold:
             if not args.silent:
                 message(f"Average atlas converged after {i+1} iterations.")
@@ -310,6 +316,11 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--atlas-iterations", "-ai", default=100, type=int, metavar="N",
         help="number of iterations when updating the atlas"
+    )
+    parser.add_argument(
+        "--atlas-sor-alpha", "-sora", default=1.0, type=float, metavar="X",
+        help="alpha value for successive over-relaxation (sor) of atlas update. must be >0. decrease to improve "
+             "stability (but slow it down) or increase to speed up convergence (but risk instability).  "
     )
     parser.add_argument(
         "--atlas-convergence-threshold", "-act", default=1e-3, type=float, metavar="X",
