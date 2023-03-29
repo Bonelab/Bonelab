@@ -20,11 +20,24 @@ from bonelab.cli.demons_registration import (
     IMAGE_EXTENSIONS, DEMONS_FILTERS, demons_type_checker, construct_multiscale_progression
 )
 from bonelab.util.time_stamp import message
-from bonelab.util.multiscale_registration import multiscale_demons
+from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_resample
 
 
 # functions
 def affine_registration(atlas: sitk.Image, image: sitk.Image, args: Namespace) -> sitk.Transform:
+    if (args.downsampling_shrink_factor is not None) and (args.downsampling_smoothing_sigma is not None):
+        if not args.silent:
+            message("Downsampling...")
+        atlas = smooth_and_resample(
+            atlas,
+            args.downsampling_shrink_factor,
+            args.downsampling_smoothing_sigma
+        )
+        image = smooth_and_resample(
+            image,
+            args.downsampling_shrink_factor,
+            args.downsampling_smoothing_sigma
+        )
     if not args.silent:
         message("Affinely registering...")
     registration_method = sitk.ImageRegistrationMethod()
@@ -78,7 +91,6 @@ def create_initial_average_atlas(fns: List[str], args: Namespace) -> Tuple[sitk.
     atlas = read_image(fns[0], "image 0", args.silent)
     average_image = sitk.Image(*atlas.GetSize(), atlas.GetPixelID())
     average_image.CopyInformation(atlas)
-    average_image = sitk.Add(average_image, atlas)
     # the first image starts out with a identity transform because it is the first reference image
     transforms = [sitk.Transform()]
     for i, fn in enumerate(fns[1:]):
@@ -92,7 +104,49 @@ def create_initial_average_atlas(fns: List[str], args: Namespace) -> Tuple[sitk.
         transforms.append(transform)
     if not args.silent:
         message("Dividing accumulated average image by number of images...")
-    return sitk.Divide(average_image, len(fns)), transforms
+    return sitk.Divide(average_image, len(fns) - 1), transforms
+
+
+def deformable_registration(
+        atlas: sitk.Image, image: sitk.Image, transform: sitk.Transform, args: Namespace
+) -> sitk.Transform:
+    if (args.downsampling_shrink_factor is not None) and (args.downsampling_smoothing_sigma is not None):
+        if not args.silent:
+            message("Downsampling...")
+        atlas = smooth_and_resample(
+            atlas,
+            args.downsampling_shrink_factor,
+            args.downsampling_smoothing_sigma
+        )
+        image = smooth_and_resample(
+            image,
+            args.downsampling_shrink_factor,
+            args.downsampling_smoothing_sigma
+        )
+    image = sitk.Resample(image, atlas, transform)
+    displacement, _ = multiscale_demons(
+        atlas, image,
+        demons_type=args.demons_type,
+        demons_iterations=args.max_demons_iterations,
+        demons_displacement_field_smooth_std=args.displacement_smoothing_std,
+        demons_update_field_smooth_std=args.update_smoothing_std,
+        initial_transform=None,
+        multiscale_progression=construct_multiscale_progression(
+            args.shrink_factors, args.smoothing_sigmas, args.silent
+        ),
+        silent=args.silent
+    )
+    return sitk.DisplacementFieldTransform(sitk.Add(
+        displacement,
+        sitk.TransformToDisplacementField(
+            transform,
+            displacement.GetPixelID(),
+            displacement.GetSize(),
+            displacement.GetOrigin(),
+            displacement.GetSpacing(),
+            displacement.GetDirection()
+        )
+    ))
 
 
 def update_average_atlas(
@@ -105,19 +159,7 @@ def update_average_atlas(
         image = read_image(fn, f"image {i}", args.silent)
         if not args.silent:
             message("registering to atlas...")
-        displacement, _ = multiscale_demons(
-            atlas, image,
-            demons_type=args.demons_type,
-            demons_iterations=args.max_demons_iterations,
-            demons_displacement_field_smooth_std=args.displacement_smoothing_std,
-            demons_update_field_smooth_std=args.update_smoothing_std,
-            initial_transform=transform,
-            multiscale_progression=construct_multiscale_progression(
-                args.shrink_factors, args.smoothing_sigmas, args.silent
-            ),
-            silent=args.silent
-        )
-        transform = sitk.DisplacementFieldTransform(displacement)
+        transform = deformable_registration(atlas, image, transform, args)
         if not args.silent:
             message("Adding transformed image to average image...")
         average_image = sitk.Add(average_image, sitk.Resample(image, atlas, transform, sitk.sitkLinear))
@@ -176,6 +218,13 @@ def create_atlas(args: Namespace) -> None:
         prior_atlas = atlas
         atlas, transforms = update_average_atlas(atlas, args.images, transforms, args)
         differences.append(get_atlas_difference(atlas, prior_atlas))
+        # apply successive over-relaxation
+        atlas = sitk.Add(
+            prior_atlas, sitk.Multiply(
+                sitk.Subtract(atlas, prior_atlas),
+                args.atlas_sor_alpha
+            )
+        )
         if differences[-1] < args.atlas_convergence_threshold:
             if not args.silent:
                 message(f"Average atlas converged after {i+1} iterations.")
@@ -267,6 +316,11 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--atlas-iterations", "-ai", default=100, type=int, metavar="N",
         help="number of iterations when updating the atlas"
+    )
+    parser.add_argument(
+        "--atlas-sor-alpha", "-sora", default=1.0, type=float, metavar="X",
+        help="alpha value for successive over-relaxation (sor) of atlas update. must be >0. decrease to improve "
+             "stability (but slow it down) or increase to speed up convergence (but risk instability).  "
     )
     parser.add_argument(
         "--atlas-convergence-threshold", "-act", default=1e-3, type=float, metavar="X",
