@@ -97,7 +97,6 @@ def SliceViewer(input_filename, window, level, nThreads, image_orientation, slic
     print('Percent slice set to {:.1f}%'.format(slice_percent))
     camera = renderer.GetActiveCamera()
     fp = list(camera.GetFocalPoint())
-    print(fp)
     if image_orientation == 'sagittal': # 'x' key
         fp[0] = (image_bounds[1] - image_bounds[0]) * slice_percent / 100.0
     elif image_orientation == 'coronal': # 'y' key
