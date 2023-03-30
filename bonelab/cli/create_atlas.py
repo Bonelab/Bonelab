@@ -89,13 +89,13 @@ def affine_registration(atlas: sitk.Image, image: sitk.Image, args: Namespace) -
 
 
 def create_initial_average_atlas(fns: List[str], args: Namespace) -> Tuple[sitk.Image, List[sitk.Transform]]:
-    atlas = read_image(fns[0], "image 0", args.silent)
+    atlas = sitk.Cast(read_image(fns[0], "image 0", args.silent), sitk.sitkFloat32)
     average_image = sitk.Image(*atlas.GetSize(), atlas.GetPixelID())
     average_image.CopyInformation(atlas)
     # the first image starts out with a identity transform because it is the first reference image
     transforms = [sitk.Transform()]
     for i, fn in enumerate(fns[1:]):
-        image = read_image(fn, f"image {i+1}", args.silent)
+        image = sitk.Cast(read_image(fn, f"image {i+1}", args.silent), sitk.sitkFloat32)
         if not args.silent:
             message("registering to atlas...")
         transform = affine_registration(atlas, image, args)
@@ -157,7 +157,7 @@ def update_average_atlas(
     average_image.CopyInformation(atlas)
     updated_transforms = []
     for i, (fn, transform) in enumerate(zip(fns, transforms)):
-        image = read_image(fn, f"image {i}", args.silent)
+        image = sitk.Cast(read_image(fn, f"image {i}", args.silent), sitk.sitkFloat32)
         if not args.silent:
             message("registering to atlas...")
         transform = deformable_registration(atlas, image, transform, args)
