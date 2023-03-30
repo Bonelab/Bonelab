@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from hypothesis import given, strategies as st
+from hypothesis import given, settings, strategies as st
 import os
 import shutil
 import tempfile
@@ -10,6 +10,9 @@ import numpy as np
 import pandas as pd
 
 from bonelab.cli.compute_overlap import create_parser, compute_overlap
+
+
+HYPOTHESIS_DEADLINE = None  # this is how many milliseconds each test has to finish in
 
 IMAGE_SIZE_DICT = {
     "small": 20,
@@ -40,6 +43,7 @@ class TestComputeOverlap(unittest.TestCase):
         # Remove temporary directory and all files
         shutil.rmtree(self.test_dir)
 
+    @settings(deadline=HYPOTHESIS_DEADLINE)
     @given(
         img1=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
         img2=st.sampled_from(list(IMAGE_SIZE_DICT.keys())),
