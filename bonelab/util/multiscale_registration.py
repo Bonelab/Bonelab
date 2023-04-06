@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import SimpleITK as sitk
 from typing import Callable, Optional, List
-from memory_profiler import profile
-from copy import deepcopy
 
 from bonelab.util.time_stamp import message
 
@@ -97,7 +95,6 @@ def smooth_and_resample(image: sitk.Image, shrink_factor: float, smoothing_sigma
     )
 
 
-@profile()
 def multiscale_registration(
     registration_algorithm: sitk.ImageFilter,
     fixed_image: sitk.Image,
@@ -177,7 +174,6 @@ def multiscale_registration(
     return transform
 
 
-@profile()
 def multiscale_demons(
     fixed_image: sitk.Image,
     moving_image: sitk.Image,

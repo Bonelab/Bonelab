@@ -7,7 +7,6 @@ import numpy as np
 import math
 from scipy import stats
 from typing import Tuple, List
-from memory_profiler import profile
 
 # internal imports
 from bonelab.cli.registration import (
@@ -110,7 +109,6 @@ def create_initial_average_atlas(
     return sitk.Divide(average_image, len(data) - 1), transforms
 
 
-@profile()
 def deformable_registration(
         atlas: sitk.Image, image: sitk.Image, transform: sitk.Transform, args: Namespace
 ) -> sitk.Transform:
@@ -153,7 +151,6 @@ def deformable_registration(
     ))
 
 
-@profile()
 def update_average_atlas(
         atlas: sitk.Image, data: List[Tuple[sitk.Image, sitk.Image]], transforms: List[sitk.Transform], args: Namespace
 ) -> Tuple[sitk.Image, List[sitk.Transform]]:
@@ -195,7 +192,6 @@ def create_atlas_segmentation(
     return atlas_segmentation
 
 
-@profile()
 def create_atlas(args: Namespace) -> None:
     # error checking
     output_base = get_output_base(args.atlas_average, INPUT_EXTENSIONS, args.silent)
