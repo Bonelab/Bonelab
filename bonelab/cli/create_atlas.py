@@ -7,6 +7,7 @@ import numpy as np
 import math
 from scipy import stats
 from typing import Tuple, List
+from memory_profiler import profile
 
 # internal imports
 from bonelab.cli.registration import (
@@ -88,14 +89,15 @@ def affine_registration(atlas: sitk.Image, image: sitk.Image, args: Namespace) -
     return transform
 
 
-def create_initial_average_atlas(fns: List[str], args: Namespace) -> Tuple[sitk.Image, List[sitk.Transform]]:
-    atlas = sitk.Cast(read_image(fns[0], "image 0", args.silent), sitk.sitkFloat32)
+def create_initial_average_atlas(
+        data: List[Tuple[sitk.Image, sitk.Image]], args: Namespace
+) -> Tuple[sitk.Image, List[sitk.Transform]]:
+    atlas = data[0][0]
     average_image = sitk.Image(*atlas.GetSize(), atlas.GetPixelID())
     average_image.CopyInformation(atlas)
     # the first image starts out with a identity transform because it is the first reference image
     transforms = [sitk.Transform()]
-    for i, fn in enumerate(fns[1:]):
-        image = sitk.Cast(read_image(fn, f"image {i+1}", args.silent), sitk.sitkFloat32)
+    for i, (image, _) in enumerate(data[1:]):
         if not args.silent:
             message("registering to atlas...")
         transform = affine_registration(atlas, image, args)
@@ -105,9 +107,10 @@ def create_initial_average_atlas(fns: List[str], args: Namespace) -> Tuple[sitk.
         transforms.append(transform)
     if not args.silent:
         message("Dividing accumulated average image by number of images...")
-    return sitk.Divide(average_image, len(fns) - 1), transforms
+    return sitk.Divide(average_image, len(data) - 1), transforms
 
 
+@profile()
 def deformable_registration(
         atlas: sitk.Image, image: sitk.Image, transform: sitk.Transform, args: Namespace
 ) -> sitk.Transform:
@@ -150,24 +153,24 @@ def deformable_registration(
     ))
 
 
+@profile()
 def update_average_atlas(
-        atlas: sitk.Image, fns: List[str], transforms: List[sitk.Transform], args: Namespace
+        atlas: sitk.Image, data: List[Tuple[sitk.Image, sitk.Image]], transforms: List[sitk.Transform], args: Namespace
 ) -> Tuple[sitk.Image, List[sitk.Transform]]:
     average_image = sitk.Image(*atlas.GetSize(), atlas.GetPixelID())
     average_image.CopyInformation(atlas)
     updated_transforms = []
-    for i, (fn, transform) in enumerate(zip(fns, transforms)):
-        image = sitk.Cast(read_image(fn, f"image {i}", args.silent), sitk.sitkFloat32)
+    for i, ((image, _), transform) in enumerate(zip(data, transforms)):
         if not args.silent:
             message("registering to atlas...")
-        transform = deformable_registration(atlas, image, transform, args)
+        updated_transform = deformable_registration(atlas, image, transform, args)
         if not args.silent:
             message("Adding transformed image to average image...")
-        average_image = sitk.Add(average_image, sitk.Resample(image, atlas, transform, sitk.sitkLinear))
-        updated_transforms.append(transform)
+        average_image = sitk.Add(average_image, sitk.Resample(image, atlas, updated_transform, sitk.sitkLinear))
+        updated_transforms.append(updated_transform)
     if not args.silent:
         message("Dividing accumulated average image by number of images...")
-    return sitk.Divide(average_image, len(fns)), updated_transforms
+    return sitk.Divide(average_image, len(data)), updated_transforms
 
 
 def get_atlas_difference(atlas: sitk.Image, prior_atlas: sitk.Image) -> float:
@@ -177,19 +180,22 @@ def get_atlas_difference(atlas: sitk.Image, prior_atlas: sitk.Image) -> float:
     return math.sqrt(((atlas-prior_atlas)**2).mean()) / atlas.max()
 
 
-def create_atlas_segmentation(atlas: sitk.Image, fns: List[str], transforms: List[sitk.Transform]) -> sitk.Image:
-    segmentations = []
+def create_atlas_segmentation(
+        atlas: sitk.Image, data: List[Tuple[sitk.Image, sitk.Image]], transforms: List[sitk.Transform]
+) -> sitk.Image:
+    segmentations_np = []
     # loop through all the segmentations, transform to the atlas frame, append to a list
-    for fn, transform in zip(fns, transforms):
-        segmentations.append(
-            sitk.GetArrayFromImage(sitk.Resample(sitk.ReadImage(fn), atlas, transform, sitk.sitkNearestNeighbor))
+    for (_, segmentation), transform in zip(data, transforms):
+        segmentations_np.append(
+            sitk.GetArrayFromImage(sitk.Resample(segmentation, atlas, transform, sitk.sitkNearestNeighbor))
         )
     # use simple voting to get voxel labels using stack and mode functions, convert to an image, copy atlas information
-    atlas_segmentation = sitk.GetImageFromArray(stats.mode(np.stack(segmentations))[0][0, ...])
+    atlas_segmentation = sitk.GetImageFromArray(stats.mode(np.stack(segmentations_np))[0][0, ...])
     atlas_segmentation.CopyInformation(atlas)
     return atlas_segmentation
 
 
+@profile()
 def create_atlas(args: Namespace) -> None:
     # error checking
     output_base = get_output_base(args.atlas_average, INPUT_EXTENSIONS, args.silent)
@@ -209,15 +215,20 @@ def create_atlas(args: Namespace) -> None:
     )
     # write args to yaml file
     write_args_to_yaml(output_yaml, args, args.silent)
+    # load all the images and masks right away, so we aren't slowed down by constant file IO
+    data = [
+        (sitk.Cast(read_image(img_fn, f"image {i}", args.silent), sitk.sitkFloat32), sitk.ReadImage(seg_fn))
+        for i, (img_fn, seg_fn) in enumerate(zip(args.images, args.segmentations))
+    ]
     # create the first atlas using affine registration
-    atlas, transforms = create_initial_average_atlas(args.images, args)
+    atlas, transforms = create_initial_average_atlas(data, args)
     if args.write_intermediate_atlases:
         sitk.WriteImage(atlas, f"{output_base}_affine.nii")
     # iteratively update the atlas until convergence
     differences = []
     for i in range(args.atlas_iterations):
         prior_atlas = atlas
-        atlas, transforms = update_average_atlas(atlas, args.images, transforms, args)
+        atlas, transforms = update_average_atlas(atlas, data, transforms, args)
         differences.append(get_atlas_difference(atlas, prior_atlas))
         # apply successive over-relaxation
         atlas = sitk.Add(
@@ -240,7 +251,7 @@ def create_atlas(args: Namespace) -> None:
             message(f"Average atlas did not converge after {args.atlas_iterations} iterations."
                     f"Final difference was {differences[-1]}, threshold was {args.atlas_convergence_threshold}.")
     # get the atlas segmentation
-    atlas_segmentation = create_atlas_segmentation(atlas, args.segmentations, transforms)
+    atlas_segmentation = create_atlas_segmentation(atlas, data, transforms)
     # write outputs
     write_metrics_to_csv(differences_csv, differences, args.silent)
     if args.plot_metric_history:

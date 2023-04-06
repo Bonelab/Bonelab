@@ -13,7 +13,7 @@ import os
 from bonelab.util.time_stamp import message
 from bonelab.util.vtk_util import vtkImageData_to_numpy
 from bonelab.io.vtk_helpers import get_vtk_reader
-from bonelab.util.multiscale_registration import smooth_and_resample, create_metric_tracking_callback
+from bonelab.util.multiscale_registration import smooth_and_resample, MetricTrackingCallback
 
 # define an interpolators dict
 INTERPOLATORS = {
@@ -426,11 +426,8 @@ def registration(args: Namespace):
         args.silent
     )
     # monitor the metric over time - init the list and add the callback
-    metric_history = []
-    registration_method.AddCommand(
-        sitk.sitkIterationEvent,
-        create_metric_tracking_callback(registration_method, metric_history, silent=args.silent, demons=False)
-    )
+    metric_callback = MetricTrackingCallback(registration_method, args.silent, False)
+    registration_method.AddCommand(sitk.sitkIterationEvent, metric_callback)
     # do the registration
     if not args.silent:
         message("Starting registration.")
@@ -442,10 +439,10 @@ def registration(args: Namespace):
         message(f"Writing transformation to {args.output}")
     sitk.WriteTransform(transform, args.output)
     # save the metric history
-    write_metrics_to_csv(output_metric_csv, metric_history, args.silent)
+    write_metrics_to_csv(output_metric_csv, metric_callback.metric_history, args.silent)
     # optionally, create a plot of the metric history and save it
     if args.plot_metric_history:
-        create_and_save_metrics_plot(output_metric_png, metric_history, args.silent)
+        create_and_save_metrics_plot(output_metric_png, metric_callback.metric_history, args.silent)
 
 
 def create_parser() -> ArgumentParser:
