@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import SimpleITK as sitk
 from typing import Callable, Optional, List
+from memory_profiler import profile
+from copy import deepcopy
 
 from bonelab.util.time_stamp import message
 
@@ -21,27 +23,42 @@ DEMONS_FILTERS = {
 }
 
 
-def create_metric_tracking_callback(
-        registration_filter: sitk.ImageFilter,
-        metric_history: List[float],
-        silent: bool = True,
-        demons: bool = True
-) -> Callable:
+class MetricTrackingCallback:
 
-    def metric_tracking_callback() -> None:
-        if demons:
-            metric = registration_filter.GetMetric()
+    def __init__(self, registration_filter: sitk.ImageFilter, silent: bool = True, demons: bool = True):
+        self._registration_filter = registration_filter
+        self._silent = silent
+        self._demons = demons
+        self._metric_history = []
+
+    @property
+    def metric_history(self) -> List[float]:
+        return self._metric_history
+
+    @property
+    def silent(self) -> bool:
+        return self._silent
+
+    @property
+    def demons(self) -> bool:
+        return self._demons
+
+    @property
+    def registration_filter(self) -> sitk.ImageFilter:
+        return self._registration_filter
+
+    def __call__(self):
+        if self._demons:
+            metric = self._registration_filter.GetMetric()
         else:
-            metric = registration_filter.GetMetricValue()
-        metric_history.append(metric)
-        if not silent:
-            if demons:
-                iteration = registration_filter.GetElapsedIterations()
+            metric = self._registration_filter.GetMetricValue()
+        self._metric_history.append(metric)
+        if not self._silent:
+            if self._demons:
+                iteration = self._registration_filter.GetElapsedIterations()
             else:
-                iteration = registration_filter.GetOptimizerIteration()
+                iteration = self._registration_filter.GetOptimizerIteration()
             message(f"Iteration: {iteration:d}, Metric: {metric:0.5e}")
-
-    return metric_tracking_callback
 
 
 def smooth_and_resample(image: sitk.Image, shrink_factor: float, smoothing_sigma: float) -> sitk.Image:
@@ -80,6 +97,7 @@ def smooth_and_resample(image: sitk.Image, shrink_factor: float, smoothing_sigma
     )
 
 
+@profile()
 def multiscale_registration(
     registration_algorithm: sitk.ImageFilter,
     fixed_image: sitk.Image,
@@ -152,9 +170,14 @@ def multiscale_registration(
     # Finish off by doing one registration at full resolution
     if not silent:
         message("Final registration at full resolution:")
-    return registration_algorithm.Execute(fixed_image, moving_image, sitk.Resample(displacement_field, fixed_image))
+    transform = registration_algorithm.Execute(
+        fixed_image, moving_image,
+        sitk.Resample(displacement_field, fixed_image)
+    )
+    return transform
 
 
+@profile()
 def multiscale_demons(
     fixed_image: sitk.Image,
     moving_image: sitk.Image,
@@ -232,9 +255,10 @@ def multiscale_demons(
         demons.SetUpdateFieldStandardDeviations(demons_update_field_smooth_std)
     else:
         demons.SetSmoothUpdateField(False)
-    metric_history = []
-    demons.AddCommand(sitk.sitkIterationEvent, create_metric_tracking_callback(demons, metric_history, silent))
+    metric_callback = MetricTrackingCallback(demons, silent, True)
+    demons.AddCommand(sitk.sitkIterationEvent, metric_callback)
     deformation_field = multiscale_registration(
         demons, fixed_image, moving_image, initial_transform, multiscale_progression, silent
     )
-    return deformation_field, metric_history
+    demons.RemoveAllCommands()
+    return deformation_field, metric_callback.metric_history
