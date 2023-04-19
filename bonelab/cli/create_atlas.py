@@ -24,21 +24,31 @@ from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_r
 
 
 # functions
+def read_image_and_mask(
+        img_fn: str,
+        seg_fn: str,
+        label: str,
+        shrink_factor: Optional[float] = None,
+        smoothing_sigma: Optional[float] = None,
+        silent: bool = False
+) -> Tuple[sitk.Image, sitk.Image]:
+    image = sitk.Cast(read_image(img_fn, label, silent), sitk.sitkFloat32)
+    mask = sitk.ReadImage(seg_fn)
+    if (shrink_factor is not None) and (smoothing_sigma is not None):
+        image = smooth_and_resample(image, shrink_factor, smoothing_sigma)
+        new_size = [int(sz / float(shrink_factor) + 0.5) for sz in image.GetSize()]
+        new_spacing = [
+            ((osz - 1) * osp) / (nsz - 1)
+            for (osz, osp, nsz) in zip(image.GetSize(), image.GetSpacing(), new_size)
+        ]
+        mask = sitk.Resample(
+            mask, new_size, sitk.Transform(), sitk.sitkNearestNeighbor, mask.GetOrigin(),
+            new_spacing, mask.GetDirection(), 0.0, mask.GetPixelID()
+        )
+    return image, mask
+
+
 def affine_registration(atlas: sitk.Image, image: sitk.Image, args: Namespace) -> sitk.Transform:
-    atlas, image = sitk.Cast(atlas, sitk.sitkFloat32), sitk.Cast(image, sitk.sitkFloat32)
-    if (args.downsampling_shrink_factor is not None) and (args.downsampling_smoothing_sigma is not None):
-        if not args.silent:
-            message("Downsampling...")
-        atlas = smooth_and_resample(
-            atlas,
-            args.downsampling_shrink_factor,
-            args.downsampling_smoothing_sigma
-        )
-        image = smooth_and_resample(
-            image,
-            args.downsampling_shrink_factor,
-            args.downsampling_smoothing_sigma
-        )
     if not args.silent:
         message("Affinely registering...")
     registration_method = sitk.ImageRegistrationMethod()
@@ -112,19 +122,6 @@ def create_initial_average_atlas(
 def deformable_registration(
         atlas: sitk.Image, image: sitk.Image, transform: sitk.Transform, args: Namespace
 ) -> sitk.Transform:
-    if (args.downsampling_shrink_factor is not None) and (args.downsampling_smoothing_sigma is not None):
-        if not args.silent:
-            message("Downsampling...")
-        atlas = smooth_and_resample(
-            atlas,
-            args.downsampling_shrink_factor,
-            args.downsampling_smoothing_sigma
-        )
-        image = smooth_and_resample(
-            image,
-            args.downsampling_shrink_factor,
-            args.downsampling_smoothing_sigma
-        )
     image = sitk.Resample(image, atlas, transform)
     displacement, _ = multiscale_demons(
         atlas, image,
@@ -213,7 +210,11 @@ def create_atlas(args: Namespace) -> None:
     write_args_to_yaml(output_yaml, args, args.silent)
     # load all the images and masks right away, so we aren't slowed down by constant file IO
     data = [
-        (sitk.Cast(read_image(img_fn, f"image {i}", args.silent), sitk.sitkFloat32), sitk.ReadImage(seg_fn))
+        read_image_and_mask(
+            img_fn, seg_fn, f"image {i}",
+            args.downsampling_shrink_factor, args.downsampling_smoothing_sigma,
+            args.silent
+        )
         for i, (img_fn, seg_fn) in enumerate(zip(args.images, args.segmentations))
     ]
     # create the first atlas using affine registration
