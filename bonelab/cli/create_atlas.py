@@ -30,6 +30,7 @@ def read_image_and_mask(
         label: str,
         shrink_factor: Optional[float] = None,
         smoothing_sigma: Optional[float] = None,
+        binarize_segmentation: bool = False,
         silent: bool = False
 ) -> Tuple[sitk.Image, sitk.Image]:
     image = sitk.Cast(read_image(img_fn, label, silent), sitk.sitkFloat32)
@@ -45,6 +46,8 @@ def read_image_and_mask(
             mask, new_size, sitk.Transform(), sitk.sitkNearestNeighbor, mask.GetOrigin(),
             new_spacing, mask.GetDirection(), 0.0, mask.GetPixelID()
         )
+        if binarize_segmentation:
+            mask = sitk.BinaryThreshold(mask, 1, 1e6)
     return image, mask
 
 
@@ -213,7 +216,7 @@ def create_atlas(args: Namespace) -> None:
         read_image_and_mask(
             img_fn, seg_fn, f"image {i}",
             args.downsampling_shrink_factor, args.downsampling_smoothing_sigma,
-            args.silent
+            args.binarize_segmentations, args.silent
         )
         for i, (img_fn, seg_fn) in enumerate(zip(args.images, args.segmentations))
     ]
@@ -313,6 +316,10 @@ def create_parser() -> ArgumentParser:
         help="enable this flag to overwrite existing files, if they exist at output targets"
     )
     # image pre-processing
+    parser.add_argument(
+        "--binarize-segmentations", "-bs", action="store_true", default=False,
+        help="enable this flag to combine all masks into a binary segmentation for all images"
+    )
     parser.add_argument(
         "--downsampling-shrink-factor", "-dsf", type=float, default=None, metavar="X",
         help="the shrink factor to apply to the fixed and moving image before starting the registration"
