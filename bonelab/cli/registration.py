@@ -157,6 +157,7 @@ def read_and_downsample_images(
         moving_image: str,
         downsampling_shrink_factor: float,
         downsampling_smoothing_sigma: float,
+        moving_is_downsampled_atlas: bool,
         silent: bool
 ) -> Tuple[sitk.Image, sitk.Image]:
     if not silent:
@@ -172,9 +173,10 @@ def read_and_downsample_images(
         fixed_image = smooth_and_resample(
             fixed_image, downsampling_shrink_factor, downsampling_smoothing_sigma
         )
-        moving_image = smooth_and_resample(
-            moving_image, downsampling_shrink_factor, downsampling_smoothing_sigma
-        )
+        if not moving_is_downsampled_atlas:
+            moving_image = smooth_and_resample(
+                moving_image, downsampling_shrink_factor, downsampling_smoothing_sigma
+            )
     elif (downsampling_shrink_factor is None) and (downsampling_smoothing_sigma is None):
         # do not downsample fixed and moving images
         if not silent:
@@ -384,7 +386,7 @@ def registration(args: Namespace):
     fixed_image, moving_image = read_and_downsample_images(
         args.fixed_image, args.moving_image,
         args.downsampling_shrink_factor, args.downsampling_smoothing_sigma,
-        args.silent
+        args.moving_is_downsampled_atlas, args.silent
     )
     check_image_size_and_shrink_factors(fixed_image, moving_image, args.shrink_factors, args.silent)
     # create the object
@@ -474,6 +476,11 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--overwrite", "-ow", default=False, action="store_true",
         help="enable this flag to overwrite existing files, if they exist at output targets"
+    )
+    parser.add_argument(
+        "--moving-is-downsampled-atlas", "-mida", action="store_true", default=False,
+        help="enable this flag if the moving image is an atlas that is already downsampled and does not need to be "
+             "downsampled further."
     )
     parser.add_argument(
         "--downsampling-shrink-factor", "-dsf", type=float, default=None, metavar="X",

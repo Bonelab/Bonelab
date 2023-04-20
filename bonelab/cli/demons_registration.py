@@ -194,7 +194,7 @@ def demons_registration(args: Namespace):
     fixed_image, moving_image = read_and_downsample_images(
         args.fixed_image, args.moving_image,
         args.downsampling_shrink_factor, args.downsampling_smoothing_sigma,
-        args.silent
+        args.moving_is_downsampled_atlas, args.silent
     )
     check_image_size_and_shrink_factors(fixed_image, moving_image, args.shrink_factors, args.silent)
     initial_transform = get_initial_transform(
@@ -264,6 +264,11 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--overwrite", "-ow", default=False, action="store_true",
         help="enable this flag to overwrite existing files, if they exist at output targets"
+    )
+    parser.add_argument(
+        "--moving-is-downsampled-atlas", "-mida", action="store_true", default=False,
+        help="enable this flag if the moving image is an atlas that is already downsampled and does not need to be "
+             "downsampled further."
     )
     parser.add_argument(
         "--downsampling-shrink-factor", "-dsf", type=float, default=None, metavar="X",
