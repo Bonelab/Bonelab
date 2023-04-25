@@ -229,14 +229,12 @@ def create_atlas(args: Namespace) -> None:
     for i in range(args.atlas_iterations):
         prior_atlas = atlas
         atlas, transforms = update_average_atlas(atlas, data, transforms, args)
-        differences.append(get_atlas_difference(atlas, prior_atlas))
         # apply successive over-relaxation
         atlas = sitk.Add(
-            prior_atlas, sitk.Multiply(
-                sitk.Subtract(atlas, prior_atlas),
-                args.atlas_sor_alpha
-            )
+            sitk.Multiply(prior_atlas, (1 - args.atlas_sor_alpha)),
+            sitk.Multiply(atlas, args.atlas_sor_alpha)
         )
+        differences.append(get_atlas_difference(atlas, prior_atlas))
         if differences[-1] < args.atlas_convergence_threshold:
             if not args.silent:
                 message(f"Average atlas converged after {i+1} iterations.")
