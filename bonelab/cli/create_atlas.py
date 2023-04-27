@@ -88,11 +88,6 @@ def affine_registration(atlas: sitk.Image, image: sitk.Image, args: Namespace) -
         args.silent
     )
     registration_method = setup_interpolator(registration_method, args.interpolator, args.silent)
-    #registration_method = setup_multiscale_progression(
-    #    registration_method,
-    #    args.shrink_factors, args.smoothing_sigmas,
-    #    args.silent
-    #)
     if not args.silent:
         message("Starting registration.")
     transform = registration_method.Execute(atlas, image)
