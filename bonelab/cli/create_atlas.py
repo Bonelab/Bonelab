@@ -120,6 +120,11 @@ def create_initial_average_atlas(
 def deformable_registration(
         atlas: sitk.Image, image: sitk.Image, transform: sitk.Transform, args: Namespace
 ) -> sitk.Transform:
+    if not args.cumulative_transforms:
+        transform = sitk.CenteredTransformInitializer(
+            atlas, image,
+            sitk.Euler3DTransform(), sitk.CenteredTransformInitializerFilter.MOMENTS
+        )
     image = sitk.Resample(image, atlas, transform)
     displacement, _ = multiscale_demons(
         atlas, image,
@@ -338,6 +343,11 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--write-intermediate-atlases", "-wia", default=False, action="store_true",
         help="enable this flag to write out the average atlas image at the end of each iteration"
+    )
+    parser.add_argument(
+        "--cumulative-transforms", "-ct", default=False, action="store_true",
+        help="enable this flag to cumulatively deform transforms between iterations, the default behaviour "
+             "is to start over with a new centered deformable transform for each image at each iteration"
     )
     # shared registration parameters
     parser.add_argument(
