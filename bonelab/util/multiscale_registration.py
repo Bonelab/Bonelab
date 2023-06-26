@@ -7,6 +7,7 @@ Modified slightly but mechanically the same as the source. Also some extra stuff
 from __future__ import annotations
 
 import SimpleITK as sitk
+import numpy as np
 from typing import Callable, Optional, List
 
 from bonelab.util.time_stamp import message
@@ -23,10 +24,19 @@ DEMONS_FILTERS = {
 
 class MetricTrackingCallback:
 
-    def __init__(self, registration_filter: sitk.ImageFilter, silent: bool = True, demons: bool = True):
+    def __init__(self,
+                 registration_filter: sitk.ImageFilter,
+                 silent: bool = True,
+                 demons: bool = True,
+                 patience: int = 20,
+                 rolling_average_window: int = 10
+                 ):
         self._registration_filter = registration_filter
         self._silent = silent
         self._demons = demons
+        self._patience = patience
+        self._patience_counter = 0
+        self._rolling_average_window = rolling_average_window
         self._metric_history = []
 
     @property
@@ -45,18 +55,55 @@ class MetricTrackingCallback:
     def registration_filter(self) -> sitk.ImageFilter:
         return self._registration_filter
 
+    @property
+    def patience(self) -> int:
+        return self._patience
+
+    @property
+    def rolling_average_window(self) -> int:
+        return self._rolling_average_window
+
+    @property
+    def patience_counter(self) -> int:
+        return self._patience_counter
+
+    def reset_patience(self):
+        self._patience_counter = 0
+
     def __call__(self):
+        # get the metric value
         if self._demons:
             metric = self._registration_filter.GetMetric()
         else:
             metric = self._registration_filter.GetMetricValue()
         self._metric_history.append(metric)
+        # check for convergence
+        is_converged = False
+        metric_bound_low = np.NAN
+        metric_bound_upp = np.NAN
+        if not(
+                (self._patience_counter < self._patience)
+                or (len(self._metric_history) < self._rolling_average_window)
+        ):
+            metric_window = np.asarray(self._metric_history[-self._rolling_average_window:])
+            metric_bound_low = metric_window.mean() - 2*metric_window.std()
+            metric_bound_upp = metric_window.mean() + 2*metric_window.std()
+            if (metric > metric_bound_low) and (metric < metric_bound_upp):
+                is_converged = True
+        if is_converged:
+            self._registration_filter.StopRegistration()
+
+        # terminal messages
         if not self._silent:
             if self._demons:
                 iteration = self._registration_filter.GetElapsedIterations()
             else:
                 iteration = self._registration_filter.GetOptimizerIteration()
-            message(f"Iteration: {iteration:d}, Metric: {metric:0.5e}")
+            message(f"Iter: {iteration:d}, Metric: {metric:0.5e}."
+                    f" Metric rolling average bounds: ({metric_bound_low:0.5e}, {metric_bound_upp:0.5e})."
+                    f" Converged: {is_converged}")
+
+        self._patience_counter += 1
 
 
 def smooth_and_resample(image: sitk.Image, shrink_factor: float, smoothing_sigma: float) -> sitk.Image:
@@ -253,6 +300,7 @@ def multiscale_demons(
         demons.SetSmoothUpdateField(False)
     metric_callback = MetricTrackingCallback(demons, silent, True)
     demons.AddCommand(sitk.sitkIterationEvent, metric_callback)
+    demons.AddCommand(sitk.sitkStartEvent, metric_callback.reset_patience)
     deformation_field = multiscale_registration(
         demons, fixed_image, moving_image, initial_transform, multiscale_progression, silent
     )

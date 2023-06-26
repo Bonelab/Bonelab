@@ -24,33 +24,6 @@ from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_r
 
 
 # functions
-def read_image_and_mask(
-        img_fn: str,
-        seg_fn: str,
-        label: str,
-        shrink_factor: Optional[float] = None,
-        smoothing_sigma: Optional[float] = None,
-        binarize_segmentation: bool = False,
-        silent: bool = False
-) -> Tuple[sitk.Image, sitk.Image]:
-    image = sitk.Cast(read_image(img_fn, label, silent), sitk.sitkFloat32)
-    mask = sitk.ReadImage(seg_fn)
-    if (shrink_factor is not None) and (smoothing_sigma is not None):
-        image = smooth_and_resample(image, shrink_factor, smoothing_sigma)
-        new_size = [int(sz / float(shrink_factor) + 0.5) for sz in image.GetSize()]
-        new_spacing = [
-            ((osz - 1) * osp) / (nsz - 1)
-            for (osz, osp, nsz) in zip(image.GetSize(), image.GetSpacing(), new_size)
-        ]
-        mask = sitk.Resample(
-            mask, new_size, sitk.Transform(), sitk.sitkNearestNeighbor, mask.GetOrigin(),
-            new_spacing, mask.GetDirection(), 0.0, mask.GetPixelID()
-        )
-        if binarize_segmentation:
-            mask = sitk.BinaryThreshold(mask, 1, 1e6)
-    return image, mask
-
-
 def affine_registration(atlas: sitk.Image, image: sitk.Image, args: Namespace) -> sitk.Transform:
     if not args.silent:
         message("Affinely registering...")
@@ -97,14 +70,14 @@ def affine_registration(atlas: sitk.Image, image: sitk.Image, args: Namespace) -
 
 
 def create_initial_average_atlas(
-        data: List[Tuple[sitk.Image, sitk.Image]], args: Namespace
+        data: List[sitk.Image], args: Namespace
 ) -> Tuple[sitk.Image, List[sitk.Transform]]:
-    atlas = data[0][0]
+    atlas = data[0]
     average_image = sitk.Image(*atlas.GetSize(), atlas.GetPixelID())
     average_image.CopyInformation(atlas)
     # the first image starts out with a identity transform because it is the first reference image
     transforms = [sitk.Transform()]
-    for i, (image, _) in enumerate(data[1:]):
+    for i, image in enumerate(data[1:]):
         if not args.silent:
             message("registering to atlas...")
         transform = affine_registration(atlas, image, args)
@@ -152,12 +125,12 @@ def deformable_registration(
 
 
 def update_average_atlas(
-        atlas: sitk.Image, data: List[Tuple[sitk.Image, sitk.Image]], transforms: List[sitk.Transform], args: Namespace
+        atlas: sitk.Image, data: List[sitk.Image], transforms: List[sitk.Transform], args: Namespace
 ) -> Tuple[sitk.Image, List[sitk.Transform]]:
     average_image = sitk.Image(*atlas.GetSize(), atlas.GetPixelID())
     average_image.CopyInformation(atlas)
     updated_transforms = []
-    for i, ((image, _), transform) in enumerate(zip(data, transforms)):
+    for i, (image, transform) in enumerate(zip(data, transforms)):
         if not args.silent:
             message("registering to atlas...")
         updated_transform = deformable_registration(atlas, image, transform, args)
@@ -177,48 +150,26 @@ def get_atlas_difference(atlas: sitk.Image, prior_atlas: sitk.Image) -> float:
     return math.sqrt(((atlas-prior_atlas)**2).mean()) / atlas.max()
 
 
-def create_atlas_segmentation(
-        atlas: sitk.Image, data: List[Tuple[sitk.Image, sitk.Image]], transforms: List[sitk.Transform]
-) -> sitk.Image:
-    segmentations_np = []
-    # loop through all the segmentations, transform to the atlas frame, append to a list
-    for (_, segmentation), transform in zip(data, transforms):
-        segmentations_np.append(
-            sitk.GetArrayFromImage(sitk.Resample(segmentation, atlas, transform, sitk.sitkNearestNeighbor))
-        )
-    # use simple voting to get voxel labels using stack and mode functions, convert to an image, copy atlas information
-    atlas_segmentation = sitk.GetImageFromArray(stats.mode(np.stack(segmentations_np))[0][0, ...])
-    atlas_segmentation.CopyInformation(atlas)
-    return atlas_segmentation
-
-
 def create_atlas(args: Namespace) -> None:
     # error checking
     output_base = get_output_base(args.atlas_average, INPUT_EXTENSIONS, args.silent)
     output_yaml = f"{output_base}.yaml"
     differences_csv = f"{output_base}_atlas_differences.csv"
     differences_png = f"{output_base}_atlas_differences.png"
-    # check same number of images and segmentations and that there are at least 2 reference images
-    if len(args.images) != len(args.segmentations):
-        raise ValueError("Number of input images and segmentations do not match.")
     if len(args.images) < 2:
         raise ValueError(f"Cannot construct an average atlas with less than 2 reference images, "
                          f"given {len(args.images)}")
-    check_inputs_exist(args.images + args.segmentations, args.silent)
+    check_inputs_exist(args.images, args.silent)
     check_for_output_overwrite(
-        [args.atlas_average, args.atlas_segmentation, output_yaml, differences_csv, differences_png],
+        [args.atlas_average, output_yaml, differences_csv, differences_png],
         args.overwrite, args.silent
     )
     # write args to yaml file
     write_args_to_yaml(output_yaml, args, args.silent)
-    # load all the images and masks right away, so we aren't slowed down by constant file IO
+    # load all the images right away, so we aren't slowed down by constant file IO
     data = [
-        read_image_and_mask(
-            img_fn, seg_fn, f"image {i}",
-            args.downsampling_shrink_factor, args.downsampling_smoothing_sigma,
-            args.binarize_segmentations, args.silent
-        )
-        for i, (img_fn, seg_fn) in enumerate(zip(args.images, args.segmentations))
+        sitk.Cast(read_image(img_fn, f"image {i}", args.silent), sitk.sitkFloat32)
+        for i, img_fn in enumerate(args.images)
     ]
     # create the first atlas using affine registration
     atlas, transforms = create_initial_average_atlas(data, args)
@@ -248,8 +199,6 @@ def create_atlas(args: Namespace) -> None:
         if not args.silent:
             message(f"Average atlas did not converge after {args.atlas_iterations} iterations."
                     f"Final difference was {differences[-1]}, threshold was {args.atlas_convergence_threshold}.")
-    # get the atlas segmentation
-    atlas_segmentation = create_atlas_segmentation(atlas, data, transforms)
     # write outputs
     write_metrics_to_csv(differences_csv, differences, args.silent)
     if args.plot_metric_history:
@@ -257,9 +206,6 @@ def create_atlas(args: Namespace) -> None:
     if not args.silent:
         message(f"Writing average atlas to {args.atlas_average}")
     sitk.WriteImage(atlas, args.atlas_average)
-    if not args.silent:
-        message(f"Writing atlas segmentation to {args.atlas_segmentation}")
-    sitk.WriteImage(atlas_segmentation, args.atlas_segmentation)
 
 
 # parser
@@ -291,40 +237,14 @@ def create_parser() -> ArgumentParser:
         required=True
     )
     parser.add_argument(
-        "--segmentations", "-seg",
-        type=create_file_extension_checker(INPUT_EXTENSIONS, "segmentations"), nargs="+",
-        metavar="SEGMENTATIONS",
-        help=f"Provide image filenames ({', '.join(INPUT_EXTENSIONS)}).",
-        required=True
-    )
-    parser.add_argument(
         "atlas_average",
         type=create_file_extension_checker(IMAGE_EXTENSIONS, "atlas_average"),
         metavar="ATLAS_AVERAGE",
         help=f"Provide output filename for the average-atlas image ({', '.join(IMAGE_EXTENSIONS)})."
     )
     parser.add_argument(
-        "atlas_segmentation",
-        type=create_file_extension_checker(IMAGE_EXTENSIONS, "atlas_segmentation"),
-        metavar="ATLAS_SEGMENTATION",
-        help=f"Provide output filename for the atlas segmentation image ({', '.join(IMAGE_EXTENSIONS)})."
-    )
-    parser.add_argument(
         "--overwrite", "-ow", default=False, action="store_true",
         help="enable this flag to overwrite existing files, if they exist at output targets"
-    )
-    # image pre-processing
-    parser.add_argument(
-        "--binarize-segmentations", "-bs", action="store_true", default=False,
-        help="enable this flag to combine all masks into a binary segmentation for all images"
-    )
-    parser.add_argument(
-        "--downsampling-shrink-factor", "-dsf", type=float, default=None, metavar="X",
-        help="the shrink factor to apply to the fixed and moving image before starting the registration"
-    )
-    parser.add_argument(
-        "--downsampling-smoothing-sigma", "-dss", type=float, default=None, metavar="X",
-        help="the smoothing sigma to apply to the fixed and moving image before starting the registration"
     )
     # atlas iteration parameters
     parser.add_argument(

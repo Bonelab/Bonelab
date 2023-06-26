@@ -11,6 +11,7 @@ from enum import Enum
 
 # internal imports
 from bonelab.util.time_stamp import message
+from bonelab.util.echo_arguments import echo_arguments
 from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_resample, DEMONS_FILTERS
 from bonelab.cli.registration import (
     read_and_downsample_images, create_and_save_metrics_plot, write_metrics_to_csv, get_output_base,
@@ -171,6 +172,8 @@ def write_displacement_visualization(
 
 
 def demons_registration(args: Namespace):
+    # echo arguments
+    print(echo_arguments("Demons Registration", vars(args)))
     # get the base of the output, so we can construct the filenames of the auxiliary outputs
     output_base = get_output_base(args.output, TRANSFORM_EXTENSIONS+IMAGE_EXTENSIONS, args.silent)
     output_yaml = f"{output_base}.yaml"
