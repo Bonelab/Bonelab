@@ -28,7 +28,7 @@ class MetricTrackingCallback:
                  registration_filter: sitk.ImageFilter,
                  silent: bool = True,
                  demons: bool = True,
-                 patience: int = 20,
+                 patience: int = 100,
                  rolling_average_window: int = 10
                  ):
         self._registration_filter = registration_filter
