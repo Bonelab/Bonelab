@@ -205,7 +205,10 @@ def demons_registration(args: Namespace):
     )
     if not args.silent:
         message("Resampling moving image onto the fixed image using initial transform.")
-    moving_image = sitk.Resample(moving_image, fixed_image, initial_transform)
+    moving_image = sitk.Resample(
+        moving_image, fixed_image, initial_transform,
+        defaultPixelValue=args.background_value
+    )
     multiscale_progression = construct_multiscale_progression(
         args.shrink_factors, args.smoothing_sigmas, args.silent
     )
@@ -336,6 +339,10 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--visualization-grid-sigma", "-vgsg", default=0.1, type=float, metavar="X",
         help="sigma of filter applied to the deformation visualization image"
+    )
+    parser.add_argument(
+        "--background-value", "-bv", default=0, type=float, metavar="X",
+        help="default value to set voxels to when outside of the image domain when resampling the moving image"
     )
     parser.add_argument(
         "--silent", "-s", default=False, action="store_true",
