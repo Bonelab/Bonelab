@@ -28,7 +28,7 @@ class MetricTrackingCallback:
                  registration_filter: sitk.ImageFilter,
                  silent: bool = True,
                  demons: bool = True,
-                 patience: int = 100,
+                 patience: int = 50,
                  rolling_average_window: int = 10
                  ):
         self._registration_filter = registration_filter
@@ -79,16 +79,12 @@ class MetricTrackingCallback:
         self._metric_history.append(metric)
         # check for convergence
         is_converged = False
-        metric_bound_low = np.NAN
-        metric_bound_upp = np.NAN
         if not(
                 (self._patience_counter < self._patience)
                 or (len(self._metric_history) < self._rolling_average_window)
         ):
             metric_window = np.asarray(self._metric_history[-self._rolling_average_window:])
-            metric_bound_low = metric_window.mean() - 2*metric_window.std()
-            metric_bound_upp = metric_window.mean() + 2*metric_window.std()
-            if (metric > metric_bound_low) and (metric < metric_bound_upp):
+            if metric > metric_window.mean():
                 is_converged = True
         if is_converged:
             self._registration_filter.StopRegistration()
@@ -100,7 +96,6 @@ class MetricTrackingCallback:
             else:
                 iteration = self._registration_filter.GetOptimizerIteration()
             message(f"Iter: {iteration:d}, Metric: {metric:0.5e}."
-                    f" Metric rolling average bounds: ({metric_bound_low:0.5e}, {metric_bound_upp:0.5e})."
                     f" Converged: {is_converged}")
 
         self._patience_counter += 1
