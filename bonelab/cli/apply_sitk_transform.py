@@ -44,7 +44,10 @@ def apply_sitk_transform(args: Namespace):
         fixed_image = read_image(args.fixed_image, "fixed_image", args.silent)
         if not args.silent:
             message("Resampling moving image onto fixed image using given transform.")
-        transformed_image = sitk.Resample(moving_image, fixed_image, transform, INTERPOLATORS[args.interpolator])
+        transformed_image = sitk.Resample(
+            moving_image, fixed_image, transform, INTERPOLATORS[args.interpolator],
+            defaultPixelValue=args.background_value
+        )
     else:
         if not args.silent:
             message("Resampling moving image onto itself using given transform.")
@@ -102,6 +105,10 @@ def create_parser() -> ArgumentParser:
         "--interpolator", "-int", default="Linear", metavar="STR",
         type=create_string_argument_checker(list(INTERPOLATORS.keys()), "interpolator"),
         help="the interpolator to use, options: `Linear`, `NearestNeighbour`, `BSpline`"
+    )
+    parser.add_argument(
+        "--background-value", "-bv", default=0, type=float, metavar="X",
+        help="default value to set voxels to when outside of the image domain when resampling the moving image"
     )
     parser.add_argument(
         "--silent", "-s", default=False, action="store_true",

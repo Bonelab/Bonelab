@@ -11,6 +11,7 @@ from enum import Enum
 
 # internal imports
 from bonelab.util.time_stamp import message
+from bonelab.util.echo_arguments import echo_arguments
 from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_resample, DEMONS_FILTERS
 from bonelab.cli.registration import (
     read_and_downsample_images, create_and_save_metrics_plot, write_metrics_to_csv, get_output_base,
@@ -171,6 +172,8 @@ def write_displacement_visualization(
 
 
 def demons_registration(args: Namespace):
+    # echo arguments
+    print(echo_arguments("Demons Registration", vars(args)))
     # get the base of the output, so we can construct the filenames of the auxiliary outputs
     output_base = get_output_base(args.output, TRANSFORM_EXTENSIONS+IMAGE_EXTENSIONS, args.silent)
     output_yaml = f"{output_base}.yaml"
@@ -194,7 +197,7 @@ def demons_registration(args: Namespace):
     fixed_image, moving_image = read_and_downsample_images(
         args.fixed_image, args.moving_image,
         args.downsampling_shrink_factor, args.downsampling_smoothing_sigma,
-        args.silent
+        args.moving_is_downsampled_atlas, args.silent
     )
     check_image_size_and_shrink_factors(fixed_image, moving_image, args.shrink_factors, args.silent)
     initial_transform = get_initial_transform(
@@ -202,7 +205,10 @@ def demons_registration(args: Namespace):
     )
     if not args.silent:
         message("Resampling moving image onto the fixed image using initial transform.")
-    moving_image = sitk.Resample(moving_image, fixed_image, initial_transform)
+    moving_image = sitk.Resample(
+        moving_image, fixed_image, initial_transform,
+        defaultPixelValue=args.background_value
+    )
     multiscale_progression = construct_multiscale_progression(
         args.shrink_factors, args.smoothing_sigmas, args.silent
     )
@@ -264,6 +270,11 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--overwrite", "-ow", default=False, action="store_true",
         help="enable this flag to overwrite existing files, if they exist at output targets"
+    )
+    parser.add_argument(
+        "--moving-is-downsampled-atlas", "-mida", action="store_true", default=False,
+        help="enable this flag if the moving image is an atlas that is already downsampled and does not need to be "
+             "downsampled further."
     )
     parser.add_argument(
         "--downsampling-shrink-factor", "-dsf", type=float, default=None, metavar="X",
@@ -328,6 +339,10 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--visualization-grid-sigma", "-vgsg", default=0.1, type=float, metavar="X",
         help="sigma of filter applied to the deformation visualization image"
+    )
+    parser.add_argument(
+        "--background-value", "-bv", default=0, type=float, metavar="X",
+        help="default value to set voxels to when outside of the image domain when resampling the moving image"
     )
     parser.add_argument(
         "--silent", "-s", default=False, action="store_true",
