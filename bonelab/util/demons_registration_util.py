@@ -22,9 +22,17 @@ DEMONS_FILTERS = {
     "symmetric": sitk.SymmetricForcesDemonsRegistrationFilter,
     "fast_symmetric": sitk.FastSymmetricForcesDemonsRegistrationFilter
 }
+OutputType = Enum("OutputType", ["IMAGE", "TRANSFORM"])
+IMAGE_EXTENSIONS = [".nii", ".nii.gz"]
+TRANSFORM_EXTENSIONS = [".hdf", ".mat"]  # only allow the binary versions, no plain-text displacement fields
 
 
 class MetricTrackingCallback:
+    """
+    A callback class for tracking the metric value of a registration filter. This class is intended to be used with
+    the `AddCommand` method of a registration filter. The `__call__` method of this class will be called at each
+    iteration of the registration filter, and will store the metric value in the `metric_history` property.
+    """
 
     def __init__(self,
                  registration_filter: sitk.ImageFilter,
@@ -33,6 +41,27 @@ class MetricTrackingCallback:
                  patience: int = 50,
                  rolling_average_window: int = 10
                  ):
+        """
+        Initialize the callback class.
+
+        Parameters
+        ----------
+        registration_filter : sitk.ImageFilter
+            The registration filter to track the metric value of.
+
+        silent : bool
+            Whether or not to print out the metric value at each iteration.
+
+        demons : bool
+            Whether or not the registration filter is a demons filter. If it is, then the metric value is accessed
+            with the `GetMetric` method, otherwise it is accessed with the `GetMetricValue` method.
+
+        patience : int
+            The number of iterations to wait before checking for convergence.
+
+        rolling_average_window : int
+            The number of iterations to use for the rolling average when checking for convergence.
+        """
         self._registration_filter = registration_filter
         self._silent = silent
         self._demons = demons
@@ -43,36 +72,108 @@ class MetricTrackingCallback:
 
     @property
     def metric_history(self) -> List[float]:
+        """
+        The history of the metric values.
+
+        Returns
+        -------
+        List[float]
+            The history of the metric values.
+        """
         return self._metric_history
 
     @property
     def silent(self) -> bool:
+        """
+        Whether or not to print out the metric value at each iteration.
+
+        Returns
+        -------
+        bool
+            Whether or not to print out the metric value at each iteration.
+        """
         return self._silent
 
     @property
     def demons(self) -> bool:
+        """
+        Whether or not the registration filter is a demons filter. If it is, then the metric value is accessed
+        with the `GetMetric` method, otherwise it is accessed with the `GetMetricValue` method.
+
+        Returns
+        -------
+        bool
+            Whether or not the registration filter is a demons filter.
+        """
         return self._demons
 
     @property
     def registration_filter(self) -> sitk.ImageFilter:
+        """
+        The registration filter to track the metric value of.
+
+        Returns
+        -------
+        sitk.ImageFilter
+            The registration filter to track the metric value of.
+        """
         return self._registration_filter
 
     @property
     def patience(self) -> int:
+        """
+        The number of iterations to wait before checking for convergence.
+
+        Returns
+        -------
+        int
+            The number of iterations to wait before checking for convergence.
+        """
         return self._patience
 
     @property
     def rolling_average_window(self) -> int:
+        """
+        The number of iterations to use for the rolling average when checking for convergence.
+
+        Returns
+        -------
+        int
+            The number of iterations to use for the rolling average when checking for convergence.
+        """
         return self._rolling_average_window
 
     @property
     def patience_counter(self) -> int:
+        """
+        The number of iterations since the registration began.
+
+        Returns
+        -------
+        int
+            The number of iterations since the registration began.
+        """
         return self._patience_counter
 
     def reset_patience(self):
+        """
+        Reset the patience counter to zero.
+
+        Returns
+        -------
+        None
+        """
         self._patience_counter = 0
 
     def __call__(self):
+        """
+        The method called at each iteration of the registration filter. This method will store the metric value in the
+        `metric_history` property, and will check for convergence.
+
+        Returns
+        -------
+        None
+        """
         # get the metric value
         if self._demons:
             metric = self._registration_filter.GetMetric()
@@ -305,12 +406,20 @@ def multiscale_demons(
     return deformation_field, metric_callback.metric_history
 
 
-OutputType = Enum("OutputType", ["IMAGE", "TRANSFORM"])
-IMAGE_EXTENSIONS = [".nii", ".nii.gz"]
-TRANSFORM_EXTENSIONS = [".hdf", ".mat"]  # only allow the binary versions, no plain-text displacement fields
-
-
 def demons_type_checker(s: str) -> str:
+    """
+    Check that the demons type is valid.
+
+    Parameters
+    ----------
+    s : str
+        The demons type to check.
+
+    Returns
+    -------
+    str
+        The demons type if it is valid.
+    """
     s = str(s)
     if s in DEMONS_FILTERS.keys():
         return s
@@ -318,7 +427,20 @@ def demons_type_checker(s: str) -> str:
         return ValueError(f"Demons type {s}, not valid, please choose from: {list(DEMONS_FILTERS.keys())}")
 
 
-def read_transform(initial_transform: str) -> Optional[sitk.Transform]:
+def read_transform(initial_transform: Optional[str]) -> Optional[sitk.Transform]:
+    """
+    Read a transform from a file.
+
+    Parameters
+    ----------
+    initial_transform : Optional[str]
+        The path to the transform file to read.
+
+    Returns
+    -------
+    Optional[sitk.Transform]
+        The transform if it exists, otherwise None.
+    """
     if initial_transform is not None:
         return sitk.ReadTransform(initial_transform)
     else:
@@ -326,10 +448,29 @@ def read_transform(initial_transform: str) -> Optional[sitk.Transform]:
 
 
 def construct_multiscale_progression(
-        shrink_factors: List[float],
-        smoothing_sigmas: List[float],
+        shrink_factors: Optional[List[float]],
+        smoothing_sigmas: Optional[List[float]],
         silent: bool
 ) -> Optional[List[Tuple[float]]]:
+    """
+    Construct a multiscale progression from the shrink factors and smoothing sigmas.
+
+    Parameters
+    ----------
+    shrink_factors : Optional[List[float]]
+        The shrink factors to use for the multiscale registration.
+
+    smoothing_sigmas : Optional[List[float]]
+        The smoothing sigmas to use for the multiscale registration.
+
+    silent : bool
+        Suppress terminal output.
+
+    Returns
+    -------
+    Optional[List[Tuple[float]]]
+        The multiscale progression.
+    """
     if (shrink_factors is not None) and (smoothing_sigmas is not None):
         if len(shrink_factors) == len(smoothing_sigmas):
             if not silent:
@@ -355,6 +496,28 @@ def create_centering_transform(
         centering_initialization: str,
         silent: bool
 ) -> sitk.Transform:
+    """
+    Create a centering transform.
+
+    Parameters
+    ----------
+    fixed_image : sitk.Image
+        The fixed image.
+
+    moving_image : sitk.Image
+        The moving image.
+
+    centering_initialization : str
+        The type of centering initialization to use.
+
+    silent : bool
+        Suppress terminal output.
+
+    Returns
+    -------
+    sitk.Transform
+        The centering transform.
+    """
     if fixed_image.GetDimension() == 3:
         if not silent:
             message("Initializing a 3D rigid transform")
@@ -382,12 +545,37 @@ def create_centering_transform(
 
 
 def get_initial_transform(
-        initial_transform: str,
+        initial_transform: Optional[str],
         fixed_image: sitk.Image,
         moving_image: sitk.Image,
         centering_initialization: str,
         silent: bool
 ) -> sitk.Transform:
+    """
+    Get the initial transform.
+
+    Parameters
+    ----------
+    initial_transform : str
+        The path to the initial transform.
+
+    fixed_image : sitk.Image
+        The fixed image.
+
+    moving_image : sitk.Image
+        The moving image.
+
+    centering_initialization : str
+        The type of centering initialization to use.
+
+    silent : bool
+        Suppress terminal output.
+
+    Returns
+    -------
+    sitk.Transform
+        The initial transform.
+    """
     if initial_transform is not None:
         if not silent:
             message("Reading initial transform.")
@@ -401,6 +589,25 @@ def add_initial_transform_to_displacement_field(
         transform: sitk.Transform,
         silent: bool
 ) -> sitk.Image:
+    """
+    Add the initial transform to the displacement field.
+
+    Parameters
+    ----------
+    field : sitk.Image
+        The displacement field.
+
+    transform : sitk.Transform
+        The initial transform.
+
+    silent : bool
+        Suppress terminal output.
+
+    Returns
+    -------
+    sitk.Image
+        The displacement field with the initial transform added.
+    """
     if not silent:
         message("Converting initial transform to displacement field and adding it to the Demons displacement field.")
     return sitk.Add(
@@ -417,6 +624,24 @@ def add_initial_transform_to_displacement_field(
 
 
 def write_transform_or_field(fn: str, field: sitk.Image, silent: bool) -> None:
+    """
+    Write the transform or displacement field.
+
+    Parameters
+    ----------
+    fn : str
+        The path to the output file.
+
+    field : sitk.Image
+        The displacement field.
+
+    silent : bool
+        Suppress terminal output.
+
+    Returns
+    -------
+    None
+    """
     for ext in TRANSFORM_EXTENSIONS:
         if fn.lower().endswith(ext):
             if not silent:
@@ -439,6 +664,30 @@ def write_displacement_visualization(
         grid_sigma: float,
         silent: bool
 ) -> None:
+    """
+    Write the displacement field visualization.
+
+    Parameters
+    ----------
+    fn : str
+        The path to the output file.
+
+    field : sitk.Image
+        The displacement field.
+
+    grid_spacing : int
+        The grid spacing for the visualization.
+
+    grid_sigma : float
+        The grid sigma for the visualization.
+
+    silent : bool
+        Suppress terminal output.
+
+    Returns
+    -------
+    None
+    """
     if not silent:
         message(f"Writing displacement field visualization to {fn}")
     dim = field.GetDimension()
