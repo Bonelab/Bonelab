@@ -12,12 +12,11 @@ from enum import Enum
 # internal imports
 from bonelab.util.time_stamp import message
 from bonelab.util.echo_arguments import echo_arguments
-from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_resample, DEMONS_FILTERS
-from bonelab.cli.registration import (
-    read_and_downsample_images, create_and_save_metrics_plot, write_metrics_to_csv, get_output_base,
-    create_string_argument_checker, write_args_to_yaml, check_image_size_and_shrink_factors,
-    create_file_extension_checker, check_inputs_exist, check_for_output_overwrite,
-    INPUT_EXTENSIONS
+from bonelab.util.multiscale_demons_registration_util import multiscale_demons, smooth_and_resample, DEMONS_FILTERS
+from bonelab.util.registration_util import (
+    create_file_extension_checker, create_string_argument_checker,
+    INPUT_EXTENSIONS, get_output_base, write_args_to_yaml, check_inputs_exist, check_for_output_overwrite,
+    write_metrics_to_csv, create_and_save_metrics_plot, read_and_downsample_images, check_image_size_and_shrink_factors
 )
 
 # define output type enum

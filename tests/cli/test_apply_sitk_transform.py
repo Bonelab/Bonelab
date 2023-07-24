@@ -8,7 +8,8 @@ import tempfile
 import SimpleITK as sitk
 import numpy as np
 
-from bonelab.cli.apply_sitk_transform import apply_sitk_transform, create_parser, INTERPOLATORS
+from bonelab.cli.apply_sitk_transform import apply_sitk_transform, create_parser
+from bonelab.util.registration_util import INTERPOLATORS
 
 HYPOTHESIS_DEADLINE = 2000  # this is how many milliseconds each test has to finish in
 

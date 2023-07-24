@@ -10,10 +10,7 @@ from typing import List, Callable
 
 # internal imports
 from bonelab.util.time_stamp import message
-from bonelab.cli.registration import (
-    read_image, check_inputs_exist, check_for_output_overwrite,
-    INPUT_EXTENSIONS
-)
+from bonelab.util.registration_util import INPUT_EXTENSIONS, check_inputs_exist, check_for_output_overwrite, read_image
 
 
 def get_class_labels(class_labels: Optional[List[int]], silent: bool) -> List[int]:

@@ -8,10 +8,8 @@ import numpy as np
 
 # internal imports
 from bonelab.util.time_stamp import message
-from bonelab.cli.registration import (
-    read_image, check_inputs_exist, check_for_output_overwrite,
-    create_file_extension_checker
-)
+from bonelab.util.registration_util import create_file_extension_checker, check_inputs_exist, \
+    check_for_output_overwrite, read_image
 
 # define file extensions that we consider available for input images
 INPUT_EXTENSIONS = [".aim", ".nii", ".nii.gz"]
