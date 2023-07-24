@@ -10,7 +10,7 @@ import yaml
 from matplotlib import pyplot as plt
 
 from bonelab.io.vtk_helpers import get_vtk_reader
-from bonelab.util.multiscale_demons_registration_util import smooth_and_resample
+from bonelab.util.demons_registration_util import smooth_and_resample
 from bonelab.util.time_stamp import message
 from bonelab.util.vtk_util import vtkImageData_to_numpy
 

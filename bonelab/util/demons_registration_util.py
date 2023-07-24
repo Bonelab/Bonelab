@@ -6,9 +6,11 @@ Modified slightly but mechanically the same as the source. Also some extra stuff
 
 from __future__ import annotations
 
+from enum import Enum
+
 import SimpleITK as sitk
 import numpy as np
-from typing import Callable, Optional, List
+from typing import Callable, Optional, List, Tuple
 
 from bonelab.util.time_stamp import message
 
@@ -301,3 +303,151 @@ def multiscale_demons(
     )
     demons.RemoveAllCommands()
     return deformation_field, metric_callback.metric_history
+
+
+OutputType = Enum("OutputType", ["IMAGE", "TRANSFORM"])
+IMAGE_EXTENSIONS = [".nii", ".nii.gz"]
+TRANSFORM_EXTENSIONS = [".hdf", ".mat"]  # only allow the binary versions, no plain-text displacement fields
+
+
+def demons_type_checker(s: str) -> str:
+    s = str(s)
+    if s in DEMONS_FILTERS.keys():
+        return s
+    else:
+        return ValueError(f"Demons type {s}, not valid, please choose from: {list(DEMONS_FILTERS.keys())}")
+
+
+def read_transform(initial_transform: str) -> Optional[sitk.Transform]:
+    if initial_transform is not None:
+        return sitk.ReadTransform(initial_transform)
+    else:
+        return None
+
+
+def construct_multiscale_progression(
+        shrink_factors: List[float],
+        smoothing_sigmas: List[float],
+        silent: bool
+) -> Optional[List[Tuple[float]]]:
+    if (shrink_factors is not None) and (smoothing_sigmas is not None):
+        if len(shrink_factors) == len(smoothing_sigmas):
+            if not silent:
+                message(f"Performing multiscale registration with shrink factors: "
+                        f"{', '.join([str(sf) for sf in shrink_factors])}; "
+                        f"and smoothing sigmas: "
+                        f"{', '.join([str(ss) for ss in smoothing_sigmas])}")
+            return list(zip(shrink_factors, smoothing_sigmas))
+        else:
+            raise ValueError("`shrink-factors` and `smoothing-sigmas` must have same length")
+    elif (shrink_factors is None) and (smoothing_sigmas is None):
+        if not silent:
+            message("Not performing multiscale registration.")
+        return None
+    else:
+        raise ValueError("one of `shrink-factors` or `smoothing-sigmas` have not been specified. you must "
+                         "either leave both as the default `None` or specify both (with equal length)")
+
+
+def create_centering_transform(
+        fixed_image: sitk.Image,
+        moving_image: sitk.Image,
+        centering_initialization: str,
+        silent: bool
+) -> sitk.Transform:
+    if fixed_image.GetDimension() == 3:
+        if not silent:
+            message("Initializing a 3D rigid transform")
+        transform_type = sitk.Euler3DTransform()
+    elif fixed_image.GetDimension() == 2:
+        if not silent:
+            message("Initializing a 2D rigid transform")
+        transform_type = sitk.Euler2DTransform()
+    else:
+        raise ValueError(f"`fixed_image` has dimension of {fixed_image.GetDimension()}, only 2 and 3 supported")
+    if centering_initialization == "Geometry":
+        if not silent:
+            message("Centering the initial transform using geometry")
+        centering_initialization = sitk.CenteredTransformInitializerFilter.GEOMETRY
+    elif centering_initialization == "Moments":
+        if not silent:
+            message("Centering the initial transform using moments")
+        centering_initialization = sitk.CenteredTransformInitializerFilter.MOMENTS
+    else:
+        raise ValueError("`centering_initialization` is invalid and was not caught")
+    return sitk.CenteredTransformInitializer(
+        fixed_image, moving_image,
+        transform_type, centering_initialization
+    )
+
+
+def get_initial_transform(
+        initial_transform: str,
+        fixed_image: sitk.Image,
+        moving_image: sitk.Image,
+        centering_initialization: str,
+        silent: bool
+) -> sitk.Transform:
+    if initial_transform is not None:
+        if not silent:
+            message("Reading initial transform.")
+        return read_transform(initial_transform)
+    else:
+        return create_centering_transform(fixed_image, moving_image, centering_initialization, silent)
+
+
+def add_initial_transform_to_displacement_field(
+        field: sitk.Image,
+        transform: sitk.Transform,
+        silent: bool
+) -> sitk.Image:
+    if not silent:
+        message("Converting initial transform to displacement field and adding it to the Demons displacement field.")
+    return sitk.Add(
+        field,
+        sitk.TransformToDisplacementField(
+            transform,
+            field.GetPixelID(),
+            field.GetSize(),
+            field.GetOrigin(),
+            field.GetSpacing(),
+            field.GetDirection()
+        )
+    )
+
+
+def write_transform_or_field(fn: str, field: sitk.Image, silent: bool) -> None:
+    for ext in TRANSFORM_EXTENSIONS:
+        if fn.lower().endswith(ext):
+            if not silent:
+                message(f"Writing transform to {fn}")
+            sitk.WriteTransform(sitk.DisplacementFieldTransform(field), fn)
+            return
+    for ext in IMAGE_EXTENSIONS:
+        if fn.lower().endswith(ext):
+            if not silent:
+                message(f"Writing displacement field to {fn}")
+            sitk.WriteImage(field, fn)
+            return
+    raise ValueError(f"`output`, {fn}, does not have a valid extension and it was not caught.")
+
+
+def write_displacement_visualization(
+        fn: str,
+        field: sitk.Image,
+        grid_spacing: int,
+        grid_sigma: float,
+        silent: bool
+) -> None:
+    if not silent:
+        message(f"Writing displacement field visualization to {fn}")
+    dim = field.GetDimension()
+    grid_image = sitk.GridSource(
+        size=field.GetSize(),
+        sigma=tuple([grid_sigma] * dim),
+        gridSpacing=tuple([grid_spacing] * dim),
+        origin=field.GetOrigin(),
+        spacing=field.GetSpacing(),
+        direction=field.GetDirection()
+    )
+    sitk.WriteImage(sitk.Resample(grid_image, sitk.DisplacementFieldTransform(field)), fn)

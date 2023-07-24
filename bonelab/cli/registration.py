@@ -13,10 +13,22 @@ from bonelab.util.registration_util import (
     check_image_size_and_shrink_factors
 )
 from bonelab.util.time_stamp import message
-from bonelab.util.multiscale_demons_registration_util import MetricTrackingCallback
+from bonelab.util.demons_registration_util import MetricTrackingCallback
 
 
 def registration(args: Namespace):
+    """
+    Perform a registration between two images.
+
+    Parameters
+    ----------
+    args : Namespace
+        The parsed arguments from the command line.
+
+    Returns
+    -------
+    None
+    """
     # get the base of the output, so we can construct the filenames of the auxiliary outputs
     output_base = get_output_base(args.output, TRANSFORM_EXTENSIONS, args.silent)
     output_yaml = f"{output_base}.yaml"
