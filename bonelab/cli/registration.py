@@ -10,10 +10,9 @@ from bonelab.util.registration_util import (
     INPUT_EXTENSIONS, TRANSFORM_EXTENSIONS, check_percentage, get_output_base, write_args_to_yaml, check_inputs_exist,
     check_for_output_overwrite, write_metrics_to_csv, create_and_save_metrics_plot, read_and_downsample_images,
     setup_optimizer, setup_similarity_metric, setup_interpolator, setup_transform, setup_multiscale_progression,
-    check_image_size_and_shrink_factors
+    check_image_size_and_shrink_factors, MetricTrackingCallback
 )
 from bonelab.util.time_stamp import message
-from bonelab.util.demons_registration_util import MetricTrackingCallback
 
 
 def registration(args: Namespace):
@@ -90,7 +89,7 @@ def registration(args: Namespace):
         args.silent
     )
     # monitor the metric over time - init the list and add the callback
-    metric_callback = MetricTrackingCallback(registration_method, args.silent, False)
+    metric_callback = MetricTrackingCallback(registration_method, args.silent)
     registration_method.AddCommand(sitk.sitkIterationEvent, metric_callback)
     # do the registration
     if not args.silent:
