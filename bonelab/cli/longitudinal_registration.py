@@ -3,15 +3,16 @@ from __future__ import annotations
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace
 import os
 
-import SimpleITK
+import SimpleITK as sitk
 
 from bonelab.util.registration_util import (
     create_file_extension_checker, create_string_argument_checker, INTERPOLATORS,
     INPUT_EXTENSIONS, TRANSFORM_EXTENSIONS, check_percentage, get_output_base, write_args_to_yaml, check_inputs_exist,
     check_for_output_overwrite, write_metrics_to_csv, create_and_save_metrics_plot, read_and_downsample_image,
     setup_optimizer, setup_similarity_metric, setup_interpolator, setup_transform, setup_multiscale_progression,
-    check_image_size_and_shrink_factors, message_s
+    check_image_size_and_shrink_factors, message_s, MetricTrackingCallback
 )
+from bonelab.util.echo_arguments import echo_arguments
 
 
 def longitudinal_registration(args: Namespace):
@@ -28,15 +29,46 @@ def longitudinal_registration(args: Namespace):
     -------
     None
     """
+    print(echo_arguments("Longitudinal Registration", vars(args)))
+    # first check that the labels and filenames lengths match up
+    if len(args.follow_up_images) != len(args.follow_up_labels):
+        raise ValueError(
+            f"The number of follow up images ({len(args.follow_up_images)}) does not match the number of follow up "
+            f"labels ({len(args.follow_up_labels)})."
+        )
+    if args.baseline_masks is not None:
+        if len(args.baseline_masks) != len(args.baseline_mask_labels):
+            raise ValueError(
+                f"The number of baseline masks ({len(args.baseline_masks)}) does not match the number of baseline "
+                f"mask labels ({len(args.baseline_mask_labels)})."
+            )
     check_inputs_exist([args.baseline_image] + args.follow_up_images, args.silent)
     output_common_region_fn = os.path.join(args.output_directory, f"{args.output_label}_common_region.nii.gz")
     output_transformation_fns = [
-        os.path.join(args.output_directory, f"{args.output_label}_transformation_{i}.txt")
-        for i in range(len(args.follow_up_images))
+        os.path.join(args.output_directory, f"{args.output_label}_{follow_up_label}_transform.txt")
+        for follow_up_label in args.follow_up_labels
     ]
+    if args.baseline_masks is not None:
+        output_mask_fn_lists = []
+        for baseline_mask_label in args.baseline_mask_labels:
+            output_mask_fn_lists.append(
+                [
+                    os.path.join(
+                        args.output_directory,
+                        f"{args.output_label}_{follow_up_label}_{baseline_mask_label}.nii.gz"
+                    )
+                    for follow_up_label in args.follow_up_labels
+                ]
+            )
+    else:
+        output_mask_fn_lists = [[]]
     output_yaml_fn = os.path.join(args.output_directory, f"{args.output_label}.yaml")
     check_for_output_overwrite(
-        [output_yaml_fn, output_common_region_fn] + output_transformation_fns,
+        (
+            [output_yaml_fn, output_common_region_fn]
+            + output_transformation_fns
+            + [j for i in output_mask_fn_lists for j in i]
+        ),
         args.overwrite, args.silent
     )
     write_args_to_yaml(output_yaml_fn, args, args.silent)
@@ -45,7 +77,10 @@ def longitudinal_registration(args: Namespace):
         args.downsampling_shrink_factor, args.downsampling_smoothing_sigma,
         args.silent
     )
-    common_region = sitk.Add(sitk.Image(*baseline_image.GetSize(), sitk.sitkUInt8), 1)
+    message_s("Read baseline image at full resolution to use as base for common region image", args.silent)
+    baseline_image_full_res = sitk.ReadImage(args.baseline_image)
+    common_region = sitk.Add(sitk.Image(*baseline_image_full_res.GetSize(), sitk.sitkUInt8), 1)
+    common_region.CopyInformation(baseline_image_full_res)
     registration_method = sitk.ImageRegistrationMethod()
     registration_method = setup_optimizer(
         registration_method,
@@ -76,8 +111,11 @@ def longitudinal_registration(args: Namespace):
         args.shrink_factors, args.smoothing_sigmas,
         args.silent
     )
-    metric_callback = MetricTrackingCallback(registration_method, args.silent, False)
+    metric_callback = MetricTrackingCallback(registration_method, args.silent)
     registration_method.AddCommand(sitk.sitkIterationEvent, metric_callback)
+
+    transforms = []
+
     for i, (follow_up_image_fn, transform_fn) in enumerate(zip(args.follow_up_images, output_transformation_fns)):
         message_s(f"Processing follow-up {i}", args.silent)
         follow_up_image = read_and_downsample_image(
@@ -92,29 +130,58 @@ def longitudinal_registration(args: Namespace):
         registration_method = setup_transform(
             registration_method,
             baseline_image, follow_up_image,
-            args.transform_type, args.centering_initialization,
+            "Euler3D", args.centering_initialization,
             args.silent
-        )
+        )  # hard code to always use rigid transformation for longitudinal registration
         message_s("Starting registration", args.silent)
-        transform = registration_method.Execute(fixed_image, moving_image)
+        transform = registration_method.Execute(baseline_image, follow_up_image)
         message_s(
             f"Registration stopping condition: {registration_method.GetOptimizerStopConditionDescription()}",
             args.silent
         )
+        transforms.append(transform)
         message_s(f"Writing transformation to {transform_fn}", args.silent)
         sitk.WriteTransform(transform, transform_fn)
+        message_s("Reading follow-up image at full resolution to update common region", args.silent)
+        follow_up_image_full_res = sitk.ReadImage(follow_up_image_fn)
         message_s("Transforming follow-up image to baseline space to update common region", args.silent)
-        common_region = SimpleITK.Multiply(
+        follow_up_region = sitk.Add(sitk.Image(*follow_up_image_full_res.GetSize(), sitk.sitkUInt8), 1)
+        follow_up_region.CopyInformation(follow_up_image_full_res)
+        common_region = sitk.Multiply(
             common_region,
             sitk.Resample(
-                sitk.Add(sitk.Image(*baseline_image.GetSize(), sitk.sitkUInt8), 1),
-                baseline_image,
+                follow_up_region,
+                common_region,
                 transform,
                 sitk.sitkNearestNeighbor
             )
         )
 
+    common_region.CopyInformation(baseline_image_full_res)
+    message_s(f"Writing common region to {output_common_region_fn}", args.silent)
+    sitk.WriteImage(common_region, output_common_region_fn)
 
+    if args.baseline_masks is not None:
+        message_s("Transforming baseline masks to follow-up frames, using common region.", args.silent)
+        for (baseline_mask, output_mask_fns) in zip(args.baseline_masks, output_mask_fn_lists):
+            message_s(f"Processing {baseline_mask}", args.silent)
+            message_s("Reading baseline mask", args.silent)
+            mask = sitk.ReadImage(baseline_mask)
+            message_s("Finding intersection of baseline mask and common region", args.silent)
+            mask.CopyInformation(common_region)
+            mask = sitk.Multiply(mask, sitk.Cast(common_region, sitk.sitkInt8))
+            for (follow_up_image_fn, transform, output_mask_fn) in zip(args.follow_up_images, transforms, output_mask_fns):
+                message_s(f"Reading followup image {follow_up_image_fn}", args.silent)
+                follow_up_image = sitk.ReadImage(follow_up_image_fn)
+                message_s("Transforming baseline mask to follow-up frame", args.silent)
+                mask_transformed = sitk.Resample(
+                    mask, follow_up_image, transform.GetInverse(), sitk.sitkNearestNeighbor
+                )
+                message_s(f"Writing transformed baseline mask to {output_mask_fn}", args.silent)
+                sitk.WriteImage(mask_transformed, output_mask_fn)
+
+    else:
+        message_s("No baseline masks provided, skipping baseline mask transformation.", args.silent)
 
 
 def create_parser() -> ArgumentParser:
@@ -128,7 +195,12 @@ def create_parser() -> ArgumentParser:
                     "common region mask in the reference frame of the baseline image.",
         formatter_class=ArgumentDefaultsHelpFormatter
     )
-
+    parser.add_argument(
+        "output_directory", type=str, help="Provide output directory"
+    )
+    parser.add_argument(
+        "output_label", type=str, help="Provide output label"
+    )
     parser.add_argument(
         "baseline_image", type=create_file_extension_checker(INPUT_EXTENSIONS, "baseline_image"),
         help=f"Provide baseline image input filename ({', '.join(INPUT_EXTENSIONS)})"
@@ -138,10 +210,22 @@ def create_parser() -> ArgumentParser:
         help=f"Provide follow-up image input filename ({', '.join(INPUT_EXTENSIONS)})"
     )
     parser.add_argument(
-        "output_directory", type=str, help="Provide output directory"
+        "--follow-up-labels", "-fl", nargs="+", default=None, type=str, required=True,
+        help="Provide follow-up labels. You must provide this, and you must provide as many labels as you do "
+             "follow-up images. The labels will be appended onto the output label to create the transform filenames, "
+             "as such: {output_directory}/{output_label}_{follow-up-label}_transform.txt"
     )
     parser.add_argument(
-        "output_label", type=str, help="Provide output label"
+        "--baseline-masks", "-bm", nargs="+", default=None,
+        type=create_file_extension_checker(INPUT_EXTENSIONS, "baseline_masks"),
+        help=f"Provide baseline mask input filenames ({', '.join(INPUT_EXTENSIONS)})"
+    )
+    parser.add_argument(
+        "--baseline-mask-labels", "-bml", nargs="+", default=None, type=str,
+        help="Provide baseline mask labels. If you provide baseline masks, you must provide this."
+             "The length of this must match the length of baseline masks. This will be combined with the output "
+             "label to create transformed common masks as such: "
+             "{output_directory}/{output_label}_{follow-up-label}_{baseline-mask-label}.nii.gz"
     )
     parser.add_argument(
         "--overwrite", "-ow", default=False, action="store_true",
@@ -255,10 +339,6 @@ def create_parser() -> ArgumentParser:
         "--centering-initialization", "-ci", default="Geometry", metavar="STR",
         type=create_string_argument_checker(["Geometry", "Moments"], "centering-initialization"),
         help="the centering initialization to use, options: `Geometry`, `Moments`"
-    )
-    parser.add_argument(
-        "--silent", "-s", default=False, action="store_true",
-        help="enable this flag to suppress terminal output."
     )
 
     return parser

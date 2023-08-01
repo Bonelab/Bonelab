@@ -26,6 +26,60 @@ INPUT_EXTENSIONS = [".aim", ".nii", ".nii.gz"]
 TRANSFORM_EXTENSIONS = [".txt", ".tfm", ".xfm", ".hdf", ".mat"]
 
 
+# CLASSES #
+class MetricTrackingCallback:
+
+    def __init__(self, registration_method: sitk.ImageRegistrationMethod, silent: bool):
+        """
+        Create a callback that tracks the metrics of the given registration method.
+
+        Parameters
+        ----------
+        registration_method : sitk.ImageRegistrationMethod
+            The registration method to track.
+
+        silent : bool
+            Whether or not to silence the output.
+        """
+        self._registration_method = registration_method
+        self._silent = silent
+
+    @property
+    def registration_method(self) -> sitk.ImageRegistrationMethod:
+        """
+        Get the registration method.
+
+        Returns
+        -------
+        sitk.ImageRegistrationMethod
+            The registration method.
+        """
+        return self._registration_method
+
+    @property
+    def silent(self) -> bool:
+        """
+        Get whether or not to silence the output.
+
+        Returns
+        -------
+        bool
+            Whether or not to silence the output.
+        """
+        return self._silent
+
+    def __call__(self) -> None:
+        """
+        Call the callback.
+
+        Returns
+        -------
+        None
+        """
+        message_s(f"Metric: {self.registration_method.GetMetricValue():0.5e}.", self.silent)
+
+
+
 # FUNCTIONS #
 def create_file_extension_checker(extensions: List[str], argument_name: str) -> Callable[[str], str]:
     """
