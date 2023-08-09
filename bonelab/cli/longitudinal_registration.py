@@ -57,9 +57,16 @@ def longitudinal_registration(args: Namespace):
         for follow_up_label in args.follow_up_labels
     ]
     if args.baseline_masks is not None:
-        output_mask_fn_lists = []
+        output_baseline_mask_fns = [
+            os.path.join(
+                args.output_directory,
+                f"{args.output_label}_{args.baseline_label}_{baseline_mask_label}.nii.gz"
+            )
+            for baseline_mask_label in args.baseline_mask_labels
+        ]
+        output_followup_mask_fn_lists = []
         for baseline_mask_label in args.baseline_mask_labels:
-            output_mask_fn_lists.append(
+            output_followup_mask_fn_lists.append(
                 [
                     os.path.join(
                         args.output_directory,
@@ -69,13 +76,15 @@ def longitudinal_registration(args: Namespace):
                 ]
             )
     else:
-        output_mask_fn_lists = [[]]
+        output_baseline_mask_fns = []
+        output_followup_mask_fn_lists = [[]]
     output_yaml_fn = os.path.join(args.output_directory, f"{args.output_label}.yaml")
     check_for_output_overwrite(
         (
             [output_yaml_fn, output_common_region_fn]
             + output_transformation_fns
-            + [j for i in output_mask_fn_lists for j in i]
+            + [j for i in output_followup_mask_fn_lists for j in i]
+            + output_baseline_mask_fns
             + output_metrics_csv_fns
             + (output_metrics_plots_fns if args.plot_metric_history else [])
         ),
@@ -183,14 +192,18 @@ def longitudinal_registration(args: Namespace):
 
     if args.baseline_masks is not None:
         message_s("Transforming baseline masks to follow-up frames, using common region.", args.silent)
-        for (baseline_mask, output_mask_fns) in zip(args.baseline_masks, output_mask_fn_lists):
+        for (baseline_mask, output_followup_mask_fns, output_baseline_mask_fn) in \
+                zip(args.baseline_masks, output_followup_mask_fn_lists, output_baseline_mask_fns):
             message_s(f"Processing {baseline_mask}", args.silent)
             message_s("Reading baseline mask", args.silent)
             mask = sitk.ReadImage(baseline_mask)
             message_s("Finding intersection of baseline mask and common region", args.silent)
             mask.CopyInformation(common_region)
             mask = sitk.Multiply(mask, sitk.Cast(common_region, sitk.sitkInt8))
-            for (follow_up_image_fn, transform, output_mask_fn) in zip(args.follow_up_images, transforms, output_mask_fns):
+            message_s(f"Writing intersection of baseline mask and common region mask to {output_baseline_mask_fn}", args.silent)
+            sitk.WriteImage(mask, output_baseline_mask_fn)
+            for (follow_up_image_fn, transform, output_mask_fn) in \
+                    zip(args.follow_up_images, transforms, output_followup_mask_fns):
                 message_s(f"Reading followup image {follow_up_image_fn}", args.silent)
                 follow_up_image = sitk.ReadImage(follow_up_image_fn)
                 message_s("Transforming baseline mask to follow-up frame", args.silent)
@@ -228,6 +241,12 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "follow_up_images", nargs="+", type=create_file_extension_checker(INPUT_EXTENSIONS, "follow_up_images"),
         help=f"Provide follow-up image input filename ({', '.join(INPUT_EXTENSIONS)})"
+    )
+    parser.add_argument(
+        "--baseline-label", "-bl", default=None, type=str, required=True,
+        help="Provide baseline label. This will be combined with the output label to create versions of the "
+             "baseline masks that have been combined with the common region mask as such: "
+             "{output_directory}/{output_label}_{baseline-label}_{baseline-mask-label}.nii.gz"
     )
     parser.add_argument(
         "--follow-up-labels", "-fl", nargs="+", default=None, type=str, required=True,
