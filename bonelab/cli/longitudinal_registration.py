@@ -10,7 +10,7 @@ from bonelab.util.registration_util import (
     INPUT_EXTENSIONS, TRANSFORM_EXTENSIONS, check_percentage, get_output_base, write_args_to_yaml, check_inputs_exist,
     check_for_output_overwrite, write_metrics_to_csv, create_and_save_metrics_plot, read_and_downsample_image,
     setup_optimizer, setup_similarity_metric, setup_interpolator, setup_transform, setup_multiscale_progression,
-    check_image_size_and_shrink_factors, message_s, MetricTrackingCallback
+    check_image_size_and_shrink_factors, message_s, MetricTrackingCallback, write_metrics_to_csv
 )
 from bonelab.util.echo_arguments import echo_arguments
 
@@ -48,6 +48,14 @@ def longitudinal_registration(args: Namespace):
         os.path.join(args.output_directory, f"{args.output_label}_{follow_up_label}_transform.txt")
         for follow_up_label in args.follow_up_labels
     ]
+    output_metrics_csv_fns = [
+        os.path.join(args.output_directory, f"{args.output_label}_{follow_up_label}_metrics.csv")
+        for follow_up_label in args.follow_up_labels
+    ]
+    output_metrics_plots_fns = [
+        os.path.join(args.output_directory, f"{args.output_label}_{follow_up_label}_metrics.png")
+        for follow_up_label in args.follow_up_labels
+    ]
     if args.baseline_masks is not None:
         output_mask_fn_lists = []
         for baseline_mask_label in args.baseline_mask_labels:
@@ -68,6 +76,8 @@ def longitudinal_registration(args: Namespace):
             [output_yaml_fn, output_common_region_fn]
             + output_transformation_fns
             + [j for i in output_mask_fn_lists for j in i]
+            + output_metrics_csv_fns
+            + (output_metrics_plots_fns if args.plot_metric_history else [])
         ),
         args.overwrite, args.silent
     )
@@ -116,7 +126,13 @@ def longitudinal_registration(args: Namespace):
 
     transforms = []
 
-    for i, (follow_up_image_fn, transform_fn) in enumerate(zip(args.follow_up_images, output_transformation_fns)):
+    for i, (follow_up_image_fn, transform_fn, metrics_csv_fn, metrics_plot_fn) in \
+            enumerate(zip(
+                args.follow_up_images,
+                output_transformation_fns,
+                output_metrics_csv_fns,
+                output_metrics_plots_fns
+            )):
         message_s(f"Processing follow-up {i}", args.silent)
         follow_up_image = read_and_downsample_image(
             follow_up_image_fn, f"follow-up {i}",
@@ -142,6 +158,9 @@ def longitudinal_registration(args: Namespace):
         transforms.append(transform)
         message_s(f"Writing transformation to {transform_fn}", args.silent)
         sitk.WriteTransform(transform, transform_fn)
+        write_metrics_to_csv(metrics_csv_fn, metric_callback.metric_history, args.silent)
+        if args.plot_metric_history:
+            create_and_save_metrics_plot(metrics_plot_fn, metric_callback.metric_history, args.silent)
         message_s("Reading follow-up image at full resolution to update common region", args.silent)
         follow_up_image_full_res = sitk.ReadImage(follow_up_image_fn)
         message_s("Transforming follow-up image to baseline space to update common region", args.silent)
@@ -156,6 +175,7 @@ def longitudinal_registration(args: Namespace):
                 sitk.sitkNearestNeighbor
             )
         )
+        metric_callback.reset()
 
     common_region.CopyInformation(baseline_image_full_res)
     message_s(f"Writing common region to {output_common_region_fn}", args.silent)

@@ -43,6 +43,8 @@ class MetricTrackingCallback:
         """
         self._registration_method = registration_method
         self._silent = silent
+        self._metric_history = []
+        self._iteration_count = 0
 
     @property
     def registration_method(self) -> sitk.ImageRegistrationMethod:
@@ -68,6 +70,41 @@ class MetricTrackingCallback:
         """
         return self._silent
 
+    @property
+    def metric_history(self) -> List[float]:
+        """
+        Get the metric history.
+
+        Returns
+        -------
+        List[float]
+            The metric history.
+        """
+        return self._metric_history
+
+    @property
+    def iteration_count(self) -> int:
+        """
+        Get the iteration count.
+
+        Returns
+        -------
+        int
+            The iteration count.
+        """
+        return self._iteration_count
+
+    def reset(self) -> None:
+        """
+        Reset the callback.
+
+        Returns
+        -------
+        None
+        """
+        self._metric_history = []
+        self._iteration_count = 0
+
     def __call__(self) -> None:
         """
         Call the callback.
@@ -76,8 +113,13 @@ class MetricTrackingCallback:
         -------
         None
         """
-        message_s(f"Metric: {self.registration_method.GetMetricValue():0.5e}.", self.silent)
-
+        self._iteration_count += 1
+        self._metric_history.append(self.registration_method.GetMetricValue())
+        message_s(
+            f"Iteration: {self._iteration_count}, "
+            f"Metric: {self.registration_method.GetMetricValue():0.5e}.",
+            self.silent
+        )
 
 
 # FUNCTIONS #
