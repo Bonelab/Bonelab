@@ -154,6 +154,8 @@ with the :code:`bl` environment activated.
      - (WIP, do not use!) Re-implementation of Helen Buie's IPL autocontour algorithm
    * - :code:`blImageFilter`
      - read an image and extract a sub-volume, apply thresholding, or examine the intensity distribution and run :code:`aix`
+   * - :code:`blMaskFilter`
+     - read a mask and apply erosion, dilation, opening, or closing
    * - :code:`blPanningVideo`
      - read in an image and create a video or gif panning through 2D slices
    * - :code:`blITKSnapAnnotParser`

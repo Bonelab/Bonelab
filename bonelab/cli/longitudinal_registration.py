@@ -199,7 +199,7 @@ def longitudinal_registration(args: Namespace):
             mask = sitk.ReadImage(baseline_mask)
             message_s("Finding intersection of baseline mask and common region", args.silent)
             mask.CopyInformation(common_region)
-            mask = sitk.Multiply(mask, sitk.Cast(common_region, sitk.sitkInt8))
+            mask = sitk.Multiply(mask, sitk.Cast(common_region, mask.GetPixelID()))
             message_s(f"Writing intersection of baseline mask and common region mask to {output_baseline_mask_fn}", args.silent)
             sitk.WriteImage(mask, output_baseline_mask_fn)
             for (follow_up_image_fn, transform, output_mask_fn) in \
