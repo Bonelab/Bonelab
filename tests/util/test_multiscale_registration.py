@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 from hypothesis import given, settings, strategies as st
-from bonelab.util.multiscale_registration import (
+from bonelab.util.demons_registration_util import (
     smooth_and_resample, multiscale_registration, multiscale_demons, DEMONS_FILTERS
 )
 

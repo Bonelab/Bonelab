@@ -3,179 +3,26 @@ from __future__ import annotations
 # external imports
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace
 import SimpleITK as sitk
-from pathlib import Path
-import csv
-import yaml
-from typing import Tuple, Optional
-from enum import Enum
 
 # internal imports
 from bonelab.util.time_stamp import message
 from bonelab.util.echo_arguments import echo_arguments
-from bonelab.util.multiscale_registration import multiscale_demons, smooth_and_resample, DEMONS_FILTERS
-from bonelab.cli.registration import (
-    read_and_downsample_images, create_and_save_metrics_plot, write_metrics_to_csv, get_output_base,
-    create_string_argument_checker, write_args_to_yaml, check_image_size_and_shrink_factors,
-    create_file_extension_checker, check_inputs_exist, check_for_output_overwrite,
-    INPUT_EXTENSIONS
+from bonelab.util.demons_registration_util import multiscale_demons, DEMONS_FILTERS, \
+    IMAGE_EXTENSIONS, TRANSFORM_EXTENSIONS, demons_type_checker, construct_multiscale_progression, \
+    get_initial_transform, add_initial_transform_to_displacement_field, write_transform_or_field, \
+    write_displacement_visualization
+from bonelab.util.registration_util import (
+    create_file_extension_checker, create_string_argument_checker,
+    INPUT_EXTENSIONS, get_output_base, write_args_to_yaml, check_inputs_exist, check_for_output_overwrite,
+    write_metrics_to_csv, create_and_save_metrics_plot, read_and_downsample_images, check_image_size_and_shrink_factors
 )
-
-# define output type enum
-OutputType = Enum("OutputType", ["IMAGE", "TRANSFORM"])
-
-# define file extensions that we would consider available for saving displacement_fields as images or transforms
-IMAGE_EXTENSIONS = [".nii", ".nii.gz"]
-TRANSFORM_EXTENSIONS = [".hdf", ".mat"]  # only allow the binary versions, no plain-text displacement fields
-
-
-def demons_type_checker(s: str) -> str:
-    s = str(s)
-    if s in DEMONS_FILTERS.keys():
-        return s
-    else:
-        return ValueError(f"Demons type {s}, not valid, please choose from: {list(DEMONS_FILTERS.keys())}")
-
-
-def read_transform(initial_transform: str) -> Optional[sitk.Transform]:
-    if initial_transform is not None:
-        return sitk.ReadTransform(initial_transform)
-    else:
-        return None
-
-
-def construct_multiscale_progression(
-        shrink_factors: List[float],
-        smoothing_sigmas: List[float],
-        silent: bool
-) -> Optional[List[Tuple[float]]]:
-    if (shrink_factors is not None) and (smoothing_sigmas is not None):
-        if len(shrink_factors) == len(smoothing_sigmas):
-            if not silent:
-                message(f"Performing multiscale registration with shrink factors: "
-                        f"{', '.join([str(sf) for sf in shrink_factors])}; "
-                        f"and smoothing sigmas: "
-                        f"{', '.join([str(ss) for ss in smoothing_sigmas])}")
-            return list(zip(shrink_factors, smoothing_sigmas))
-        else:
-            raise ValueError("`shrink-factors` and `smoothing-sigmas` must have same length")
-    elif (shrink_factors is None) and (smoothing_sigmas is None):
-        if not silent:
-            message("Not performing multiscale registration.")
-        return None
-    else:
-        raise ValueError("one of `shrink-factors` or `smoothing-sigmas` have not been specified. you must "
-                         "either leave both as the default `None` or specify both (with equal length)")
-
-
-def create_centering_transform(
-        fixed_image: sitk.Image,
-        moving_image: sitk.Image,
-        centering_initialization: str,
-        silent: bool
-) -> sitk.Transform:
-    if fixed_image.GetDimension() == 3:
-        if not silent:
-            message("Initializing a 3D rigid transform")
-        transform_type = sitk.Euler3DTransform()
-    elif fixed_image.GetDimension() == 2:
-        if not silent:
-            message("Initializing a 2D rigid transform")
-        transform_type = sitk.Euler2DTransform()
-    else:
-        raise ValueError(f"`fixed_image` has dimension of {fixed_image.GetDimension()}, only 2 and 3 supported")
-    if centering_initialization == "Geometry":
-        if not silent:
-            message("Centering the initial transform using geometry")
-        centering_initialization = sitk.CenteredTransformInitializerFilter.GEOMETRY
-    elif centering_initialization == "Moments":
-        if not silent:
-            message("Centering the initial transform using moments")
-        centering_initialization = sitk.CenteredTransformInitializerFilter.MOMENTS
-    else:
-        raise ValueError("`centering_initialization` is invalid and was not caught")
-    return sitk.CenteredTransformInitializer(
-        fixed_image, moving_image,
-        transform_type, centering_initialization
-    )
-
-
-def get_initial_transform(
-        initial_transform: str,
-        fixed_image: sitk.Image,
-        moving_image: sitk.Image,
-        centering_initialization: str,
-        silent: bool
-) -> sitk.Transform:
-    if initial_transform is not None:
-        if not silent:
-            message("Reading initial transform.")
-        return read_transform(initial_transform)
-    else:
-        return create_centering_transform(fixed_image, moving_image, centering_initialization, silent)
-
-
-def add_initial_transform_to_displacement_field(
-        field: sitk.Image,
-        transform: sitk.Transform,
-        silent: bool
-) -> sitk.Image:
-    if not silent:
-        message("Converting initial transform to displacement field and adding it to the Demons displacement field.")
-    return sitk.Add(
-        field,
-        sitk.TransformToDisplacementField(
-            transform,
-            field.GetPixelID(),
-            field.GetSize(),
-            field.GetOrigin(),
-            field.GetSpacing(),
-            field.GetDirection()
-        )
-    )
-
-
-def write_transform_or_field(fn: str, field: sitk.Image, silent: bool) -> None:
-    for ext in TRANSFORM_EXTENSIONS:
-        if fn.lower().endswith(ext):
-            if not silent:
-                message(f"Writing transform to {fn}")
-            sitk.WriteTransform(sitk.DisplacementFieldTransform(field), fn)
-            return
-    for ext in IMAGE_EXTENSIONS:
-        if fn.lower().endswith(ext):
-            if not silent:
-                message(f"Writing displacement field to {fn}")
-            sitk.WriteImage(field, fn)
-            return
-    raise ValueError(f"`output`, {fn}, does not have a valid extension and it was not caught.")
-
-
-def write_displacement_visualization(
-        fn: str,
-        field: sitk.Image,
-        grid_spacing: int,
-        grid_sigma: float,
-        silent: bool
-) -> None:
-    if not silent:
-        message(f"Writing displacement field visualization to {fn}")
-    dim = field.GetDimension()
-    grid_image = sitk.GridSource(
-        size=field.GetSize(),
-        sigma=tuple([grid_sigma] * dim),
-        gridSpacing=tuple([grid_spacing] * dim),
-        origin=field.GetOrigin(),
-        spacing=field.GetSpacing(),
-        direction=field.GetDirection()
-    )
-    sitk.WriteImage(sitk.Resample(grid_image, sitk.DisplacementFieldTransform(field)), fn)
 
 
 def demons_registration(args: Namespace):
     # echo arguments
     print(echo_arguments("Demons Registration", vars(args)))
     # get the base of the output, so we can construct the filenames of the auxiliary outputs
-    output_base = get_output_base(args.output, TRANSFORM_EXTENSIONS+IMAGE_EXTENSIONS, args.silent)
+    output_base = get_output_base(args.output, TRANSFORM_EXTENSIONS + IMAGE_EXTENSIONS, args.silent)
     output_yaml = f"{output_base}.yaml"
     output_metric_csv = f"{output_base}_metric_history.csv"
     output_metric_png = f"{output_base}_metric_history.png"
@@ -264,8 +111,8 @@ def create_parser() -> ArgumentParser:
         help=f"Provide moving image input filename ({', '.join(INPUT_EXTENSIONS)})"
     )
     parser.add_argument(
-        "output", type=create_file_extension_checker(TRANSFORM_EXTENSIONS+IMAGE_EXTENSIONS, "output"), metavar="OUTPUT",
-        help=f"Provide output filename ({', '.join(TRANSFORM_EXTENSIONS+IMAGE_EXTENSIONS)})"
+        "output", type=create_file_extension_checker(TRANSFORM_EXTENSIONS + IMAGE_EXTENSIONS, "output"), metavar="OUTPUT",
+        help=f"Provide output filename ({', '.join(TRANSFORM_EXTENSIONS + IMAGE_EXTENSIONS)})"
     )
     parser.add_argument(
         "--overwrite", "-ow", default=False, action="store_true",

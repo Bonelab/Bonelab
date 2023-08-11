@@ -7,12 +7,9 @@ import SimpleITK as sitk
 # internal imports
 from bonelab.util.time_stamp import message
 from bonelab.io.vtk_helpers import get_vtk_writer
-from bonelab.cli.registration import (
-    INTERPOLATORS, read_image, create_string_argument_checker, create_file_extension_checker,
-    check_inputs_exist, check_for_output_overwrite,
-    INPUT_EXTENSIONS, TRANSFORM_EXTENSIONS
-)
-from bonelab.cli.demons_registration import IMAGE_EXTENSIONS
+from bonelab.util.registration_util import create_file_extension_checker, create_string_argument_checker, INTERPOLATORS, \
+    INPUT_EXTENSIONS, TRANSFORM_EXTENSIONS, check_inputs_exist, check_for_output_overwrite, read_image
+from bonelab.util.demons_registration_util import IMAGE_EXTENSIONS
 
 
 def read_transform(fn: str, invert: bool, silent: bool) -> sitk.Transform:
