@@ -9,7 +9,7 @@ import numpy as np
 # internal imports
 from bonelab.util.time_stamp import message
 from bonelab.util.registration_util import create_file_extension_checker, check_inputs_exist, \
-    check_for_output_overwrite, read_image
+    check_for_output_overwrite, read_image, INTERPOLATORS
 
 # define file extensions that we consider available for input images
 INPUT_EXTENSIONS = [".aim", ".nii", ".nii.gz"]
@@ -38,7 +38,7 @@ def mirror_image(args: Namespace):
     transform.Scale([-1 if i == args.axis else 1 for i in range(img.GetDimension())])
     if not args.silent:
         message("Mirroring image")
-    mirrored = sitk.Resample(img, img, transform, sitk.sitkLinear)
+    mirrored = sitk.Resample(img, img, transform, INTERPOLATORS[args.interpolator])
     if not args.silent:
         message(f"Writing mirrored image to {args.output}")
     sitk.WriteImage(mirrored, args.output)
@@ -60,6 +60,11 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "output", type=create_file_extension_checker(OUTPUT_EXTENSIONS, "output"), metavar="OUTPUT",
         help=f"Provide image output filename ({', '.join(OUTPUT_EXTENSIONS)})"
+    )
+    parser.add_argument(
+        "--interpolator", "-int", default="Linear", metavar="STR",
+        type=create_string_argument_checker(list(INTERPOLATORS.keys()), "interpolator"),
+        help="the interpolator to use, options: `Linear`, `NearestNeighbour`, `BSpline`"
     )
     parser.add_argument(
         "--overwrite", "-ow", default=False, action="store_true",
