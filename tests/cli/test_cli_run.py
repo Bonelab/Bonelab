@@ -113,6 +113,14 @@ class TestCommandLineInterfaceRun(unittest.TestCase):
         self.runner(command)
         self.assertTrue(os.path.exists(f"{out}.mp4") or os.path.exists(f"{out}.gif"))
 
+    def test_blAdaptiveLocalThresholding(self):
+        """Can run `blAdaptiveLocalThresholding`"""
+        aim = os.path.join(self.test_dir, 'test25a.aim')
+        out = os.path.join(self.test_dir, 'test25a_seg.aim')
+        command = ['blAdaptiveLocalThresholding', aim, out, "--aims"]
+        self.runner(command)
+        self.assertTrue(out, 'Cannot find file ' + out)
+
 
 if __name__ == '__main__':
     unittest.main()
