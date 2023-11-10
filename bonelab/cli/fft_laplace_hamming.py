@@ -121,7 +121,7 @@ def fft_laplace_hamming(args: Namespace) -> None:
         processing_log = (
                 reader.GetProcessingLog() + os.linesep +
                 f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]" +
-                echo_arguments("Bone segmentation created by Adaptive Local Thresholding", vars(args))
+                echo_arguments("Bone segmentation created by FFT Laplace Hamming", vars(args))
         )
         writer = vtkboneAIMWriter()
         writer.SetInputData(segmentation_vtk)
