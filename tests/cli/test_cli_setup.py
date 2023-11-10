@@ -121,6 +121,10 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
         ''' Can run `blAdaptiveLocalThresholding` '''
         self.runner('blAdaptiveLocalThresholding')
 
+    def test_blFFTLaplaceHamming(self):
+        ''' Can run `blFFTLaplaceHamming` '''
+        self.runner('blFFTLaplaceHamming')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -121,6 +121,14 @@ class TestCommandLineInterfaceRun(unittest.TestCase):
         self.runner(command)
         self.assertTrue(out, 'Cannot find file ' + out)
 
+    def test_blFFTLaplaceHamming(self):
+        """Can run `blFFTLaplaceHamming`"""
+        aim = os.path.join(self.test_dir, 'test25a.aim')
+        out = os.path.join(self.test_dir, 'test25a_seg.aim')
+        command = ['blFFTLaplaceHamming', aim, out, "--aims"]
+        self.runner(command)
+        self.assertTrue(out, 'Cannot find file ' + out)
+
 
 if __name__ == '__main__':
     unittest.main()

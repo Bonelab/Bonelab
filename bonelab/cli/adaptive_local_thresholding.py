@@ -21,7 +21,7 @@ from bonelab.util.aim_calibration_header import get_aim_density_equation
 from bonelab.io.vtk_helpers import handle_filetype_writing_special_cases
 
 
-def calculate_minmax_threshold_image(density: np.ndarray, footprint: np.ndarray, silent: bool) -> np.ndarray:
+def compute_minmax_threshold_image(density: np.ndarray, footprint: np.ndarray, silent: bool) -> np.ndarray:
     """
     Calculate the minmax threshold image.
 
@@ -49,7 +49,7 @@ def calculate_minmax_threshold_image(density: np.ndarray, footprint: np.ndarray,
     return (min_image + max_image) / 2
 
 
-def calculate_mean_threshold_image(density: np.ndarray, footprint: np.ndarray, silent: bool) -> np.ndarray:
+def compute_mean_threshold_image(density: np.ndarray, footprint: np.ndarray, silent: bool) -> np.ndarray:
     """
     Calculate the mean threshold image.
 
@@ -119,13 +119,13 @@ def compute_adaptive_local_threshold_segmentation(
     """
     message_s(f"Calculating threshold image using mode: {mode}", silent)
     if mode == "mean":
-        threshold_image = calculate_mean_threshold_image(density, footprint, silent)
+        threshold_image = compute_mean_threshold_image(density, footprint, silent)
     elif mode == "minmax":
-        threshold_image = calculate_minmax_threshold_image(density, footprint, silent)
+        threshold_image = compute_minmax_threshold_image(density, footprint, silent)
     elif mode == "both":
         threshold_image = np.minimum(
-            calculate_mean_threshold_image(density, footprint, silent),
-            calculate_minmax_threshold_image(density, footprint, silent)
+            compute_mean_threshold_image(density, footprint, silent),
+            compute_minmax_threshold_image(density, footprint, silent)
         )
     else:
         raise ValueError(f"`mode` must be one of `mean`, `minmax`, or `both`, received {mode}.")

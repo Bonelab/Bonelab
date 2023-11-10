@@ -168,6 +168,8 @@ with the :code:`bl` environment activated.
      - perform (rigid) longitudinal registration on a time series of images
    * - :code:`blAdaptiveLocalThresholding`
      - segment bone from an AIM using adaptive local thresholding
+   * - :code:`blFFTLaplaceHamming`
+     - segment bone from an AIM using FFT Laplace Hamming filtering
 
 Running Tests
 =============
