@@ -8,6 +8,7 @@ from vtk import VTK_CHAR
 import os
 import numpy as np
 from datetime import datetime
+from skimage.morphology import remove_small_objects
 
 # internal imports
 from bonelab.util.registration_util import message_s
@@ -199,14 +200,8 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--min-size", "-ms",
         type=int,
-        default=100,
+        default=64,
         help="The minimum size of the objects to keep."
-    )
-    parser.add_argument(
-        "--silent", "-s",
-        default=False,
-        action="store_true",
-        help="Enable this flag to silence all output."
     )
     parser.add_argument(
         "--convert-to-density", "-cd",
@@ -226,6 +221,7 @@ def create_parser() -> ArgumentParser:
         action="store_true",
         help="Enable this flag to overwrite existing files, if they exist at output targets."
     )
+    return parser
 
 
 def main() -> None:
