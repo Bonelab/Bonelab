@@ -117,6 +117,14 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
         ''' Can run `blImageComputeOverlap` '''
         self.runner('blImageComputeOverlap')
 
+    def test_blAdaptiveLocalThresholding(self):
+        ''' Can run `blAdaptiveLocalThresholding` '''
+        self.runner('blAdaptiveLocalThresholding')
+
+    def test_blFFTLaplaceHamming(self):
+        ''' Can run `blFFTLaplaceHamming` '''
+        self.runner('blFFTLaplaceHamming')
+
 
 if __name__ == '__main__':
     unittest.main()
