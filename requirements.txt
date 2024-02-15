@@ -6,7 +6,7 @@ hypothesis
 
 # Image processing
 vtk
-simpleitk >= 2.1
+simpleitk
 pydicom
 scikit-image
 
