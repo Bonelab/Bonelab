@@ -9,6 +9,7 @@ vtk
 simpleitk
 pydicom
 scikit-image
+pyvista
 
 # Numerics
 numpy
@@ -19,6 +20,7 @@ matplotlib
 pandas
 openpyxl
 pyyaml
+tqdm
 
 # Writing video
 ffmpeg
