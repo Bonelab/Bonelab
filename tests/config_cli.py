@@ -82,33 +82,24 @@ def download_testing_data(filename):
     On success, this function returns the full file path. On failure,
     an empty string is returned.
     '''
-    input_uri = cfg['REGRESSION_DATA_URL']
-    output_uri = cfg['REGRESSION_DATA_DIRECTORY']
 
     # Create output directory if it doesn't exist
     if not os.path.exists(cfg['REGRESSION_DATA_DIRECTORY']):
         os.makedirs(cfg['REGRESSION_DATA_DIRECTORY'])
 
     # If we have already downloaded it, skip
-    if os.path.exists(output_uri):
-        return output_uri
+    if os.path.exists(os.path.join(cfg['REGRESSION_DATA_DIRECTORY'], filename)):
+        return os.path.join(cfg['REGRESSION_DATA_DIRECTORY'], filename)
 
     # Download
-    '''
-    command = ['svn', 'export', input_uri, output_uri]
-    if cfg['RUN_CALL'](command):
-        return output_uri
-    else:
-        return ''
-    '''
-    repo = Repo.clone_from(input_uri, os.path.join(output_uri, "BonelabData"))
-    data_files = os.listdir(os.path.join(output_uri, "BonelabData", "data"))
+    repo = Repo.clone_from(cfg['REGRESSION_DATA_URL'], os.path.join(cfg['REGRESSION_DATA_DIRECTORY'], "BonelabData"))
+    data_files = os.listdir(os.path.join(cfg['REGRESSION_DATA_DIRECTORY'], "BonelabData", "data"))
     shutil.move(
-        os.path.join(output_uri, "BonelabData", "data", filename),
+        os.path.join(cfg['REGRESSION_DATA_DIRECTORY'], "BonelabData", "data", filename),
         cfg['REGRESSION_DATA_DIRECTORY']
     )
-    shutil.rmtree(os.path.join(output_uri, "BonelabData"))
-    print(filename)
-    print(os.listdir(cfg['REGRESSION_DATA_DIRECTORY']))
+    shutil.rmtree(os.path.join(cfg['REGRESSION_DATA_DIRECTORY'], "BonelabData"))
     return os.path.join(cfg['REGRESSION_DATA_DIRECTORY'], filename)
+
+
 cfg['DOWNLOAD_TESTING_DATA'] = download_testing_data
