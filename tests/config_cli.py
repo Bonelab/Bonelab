@@ -109,5 +109,5 @@ def download_testing_data(filename):
             output_uri
         )
     shutil.rmtree(os.path.join(output_uri, "BonelabData"))
-    return os.path.join(cfg['REGRESSION_DATA_URL'], cfg['REGRESSION_DATA_DIRECTORY'])
+    return os.path.join(cfg['REGRESSION_DATA_DIRECTORY'], filename)
 cfg['DOWNLOAD_TESTING_DATA'] = download_testing_data
