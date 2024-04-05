@@ -402,14 +402,6 @@ def treece_thickness(args: Namespace):
     if ~args.silent:
         message("Done.")
 
-    # the steps for the procedure:
-    # 11. compute the mean and st.dev of cortical thickness and save to a log file
-    # STILL NEED TO IMPLEMENT THE LOGGING
-    # LOG THE MEAN AND STANDARD DEVIATION OF THICKNESS
-    # ALSO MAKE NOTE OF ANY THICKNESSES WHICH ARE NEGATIVE OR LARGER THAN THE SAMPLE LINE
-    # MAKE NOTE OF THESE AND THE LOCATION OF THE VOXEL AND NOTE THEM IN THE LOG FILE
-    # OR MAYBE IN A SEPARATE ERROR LOG FILE
-
 
 def create_parser() -> ArgumentParser:
     parser = ArgumentParser(
