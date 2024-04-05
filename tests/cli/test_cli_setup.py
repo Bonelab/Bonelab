@@ -125,6 +125,10 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
         ''' Can run `blFFTLaplaceHamming` '''
         self.runner('blFFTLaplaceHamming')
 
+    def test_blTreeceThickness(self):
+        ''' Can run `blTreeceThickness` '''
+        self.runner('blTreeceThickness')
+
 
 if __name__ == '__main__':
     unittest.main()

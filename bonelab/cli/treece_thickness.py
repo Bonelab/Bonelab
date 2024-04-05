@@ -11,6 +11,7 @@ from tqdm import tqdm
 from skimage.morphology import binary_erosion, binary_dilation
 from matplotlib import pyplot as plt
 from scipy.optimize import least_squares
+from datetime import datetime
 
 # internal
 from bonelab.util.registration_util import (
@@ -255,7 +256,8 @@ def sample_intensity_profile(
 
 
 def treece_thickness(args: Namespace):
-    print(echo_arguments("Treece Thickness", vars(args)))
+    echoed_args = echo_arguments("Treece Thickness", vars(args))
+    print(echoed_args)
     input_fns = [args.bone_mask, args.image]
     if args.sub_mask:
         input_fns.append(args.sub_mask)
@@ -319,6 +321,7 @@ def treece_thickness(args: Namespace):
     if ~args.silent:
         message("Computing the cortical thickness at each boundary voxel...")
     bone_mask["thickness"] = np.zeros((bone_mask.n_points,))
+    problems = []
     for i in tqdm(np.where(bone_mask["boundary"] == 1)[0], disable=args.silent):
         intensities, x = sample_intensity_profile(
             image,
@@ -343,7 +346,20 @@ def treece_thickness(args: Namespace):
         )
         bone_mask["thickness"][i] = x1 - x0
 
-        if args.debug_check_model_fit or (x1 < x0):
+        if (x0 > x1) or (x0 < x.min()) or (x1 > x.max()):
+            problems.append("-"*30)
+            problems.append(f"Problem with voxel {i}.")
+            problems.append(f"Point: {bone_mask.points[i,:]}")
+            problems.append(f"Normal: {bone_mask['Normals'][i,:]}")
+            problems.append(f"x: {x}")
+            problems.append(f"Intensities: {intensities}")
+            problems.append(f"Model Intensities: {model_intensities}")
+            problems.append(f"x bounds: [{x.min()}, {x.max()}]")
+            problems.append(f"[x0, x1]: [{x0}, {x1}]")
+            problems.append(f"thickness: {bone_mask['thickness'][i]}")
+            problems.append("-"*30)
+
+        if args.debug_check_model_fit:
             plt.figure()
             plt.plot(x, intensities, "k-")
             plt.plot(x, model_intensities, "r--")
@@ -361,10 +377,38 @@ def treece_thickness(args: Namespace):
     thickness.SetSpacing(image.spacing)
     thickness.SetOrigin(image.origin)
     sitk.WriteImage(thickness, output_image)
+
+    if ~args.silent:
+        message("Calculate mean and standard deviation of thickness...")
+    thickness = bone_mask["thickness"][bone_mask["boundary"] == 1]
+    mean_thickness = np.mean(thickness)
+    std_thickness = np.std(thickness)
+
+    if ~args.silent:
+        message("Writing log file...")
+
+    with open(output_log, "w") as f:
+        f.write(echoed_args)
+        f.write(f"Date and time: {datetime.now()}\n")
+        f.write("-"*30 + "\n")
+        f.write(f"Mean Thickness: {mean_thickness}\n")
+        f.write(f"Standard Deviation of Thickness: {std_thickness}\n")
+        f.write("-"*30 + "\n")
+        f.write("Problems:\n")
+        for problem in problems:
+            f.write(problem + "\n")
+        f.write("-"*30 + "\n")
+
+    if ~args.silent:
+        message("Done.")
+
     # the steps for the procedure:
-    # 9. use Treece' algorithm to compute the cortical thickness at every voxel on the boundary (and within the sub-mask)
-    # 10. write the cortical thickness image to disk
     # 11. compute the mean and st.dev of cortical thickness and save to a log file
+    # STILL NEED TO IMPLEMENT THE LOGGING
+    # LOG THE MEAN AND STANDARD DEVIATION OF THICKNESS
+    # ALSO MAKE NOTE OF ANY THICKNESSES WHICH ARE NEGATIVE OR LARGER THAN THE SAMPLE LINE
+    # MAKE NOTE OF THESE AND THE LOCATION OF THE VOXEL AND NOTE THEM IN THE LOG FILE
+    # OR MAYBE IN A SEPARATE ERROR LOG FILE
 
 
 def create_parser() -> ArgumentParser:
@@ -454,14 +498,13 @@ def create_parser() -> ArgumentParser:
         help="enable this flag to plot the model fit for one boundary voxel, for debugging purposes"
     )
 
-
-
     return parser
 
 
 def main():
     args = create_parser().parse_args()
     treece_thickness(args)
+
 
 if __name__ == "__main__":
     main()
