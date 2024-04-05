@@ -1,6 +1,7 @@
 # See https://github.com/Numerics88/n88tools/blob/master/tests/regression/config_regression.py for how this file was defined
 
 import os
+import shutil
 import subprocess
 
 '''
@@ -73,9 +74,9 @@ cfg['RUN_CALL'] = run_call
 # Create download script
 def download_testing_data(filename):
     '''Download data used in testing
-    
+
     Typically, this is done for regression testing.
-    
+
     On success, this function returns the full file path. On failure,
     an empty string is returned.
     '''
@@ -85,16 +86,25 @@ def download_testing_data(filename):
     # Create output directory if it doesn't exist
     if not os.path.exists(cfg['REGRESSION_DATA_DIRECTORY']):
         os.makedirs(cfg['REGRESSION_DATA_DIRECTORY'])
-    
+
     # If we have already downloaded it, skip
     if os.path.exists(output_uri):
         return output_uri
 
     # Download
+    '''
     command = ['svn', 'export', input_uri, output_uri]
     if cfg['RUN_CALL'](command):
         return output_uri
     else:
         return ''
+    '''
+    repo = Repo.clone_from(input_uri, os.path.join(output_uri, "BonelabData"))
+    data_files = os.listdir(os.path.join(output_uri, "BonelabData", "data"))
+    for data_file in data_files:
+        shutil.move(
+            os.path.join(output_uri, "BonelabData", "data", data_file),
+            output_uri
+        )
+    shutil.rmtree(os.path.join(output_uri, "BonelabData"))
 cfg['DOWNLOAD_TESTING_DATA'] = download_testing_data
-

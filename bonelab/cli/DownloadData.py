@@ -36,22 +36,6 @@ def DownloadData(url, output_directory, no_verify):
             output_directory
         )
     shutil.rmtree(os.path.join(output_directory, "BonelabData"))
-    '''
-    command = ['svn', 'export', '--force', url, output_directory]
-    failed = False
-    try:
-        output = subprocess.check_output(command)
-    except subprocess.CalledProcessError as e:
-        failed = True
-    except OSError as e:
-        failed = True
-
-    if failed:
-        os.sys.exit('[ERROR] Could not execute download. Do you have SVN installed?')
-
-    if not os.path.isdir(output_directory):
-        os.sys.exit('[ERROR] An unkown error occured where the output directory was not created')
-    '''
 
     print('Successfully downloaded')
 
