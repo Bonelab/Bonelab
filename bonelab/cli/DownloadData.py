@@ -2,7 +2,9 @@
 # Imports
 import argparse
 import os
+import shutil
 import subprocess
+from git import Repo
 
 from bonelab.util.echo_arguments import echo_arguments
 from bonelab.io.download_data import \
@@ -11,7 +13,7 @@ from bonelab.io.download_data import \
 def DownloadData(url, output_directory, no_verify):
     # Python 2/3 compatible input
     from six.moves import input
-    
+
     if not no_verify:
         print('Locations:')
         print('  url:              {}'.format(url))
@@ -26,6 +28,15 @@ def DownloadData(url, output_directory, no_verify):
         os.makedirs(output_directory)
 
     # Run commands
+    repo = Repo.clone_from(url, os.path.join(output_directory, "BonelabData"))
+    data_files = os.listdir(os.path.join(output_directory, "BonelabData", "data"))
+    for data_file in data_files:
+        shutil.move(
+            os.path.join(output_directory, "BonelabData", "data", data_file),
+            output_directory
+        )
+    shutil.rmtree(os.path.join(output_directory, "BonelabData"))
+    '''
     command = ['svn', 'export', '--force', url, output_directory]
     failed = False
     try:
@@ -37,9 +48,10 @@ def DownloadData(url, output_directory, no_verify):
 
     if failed:
         os.sys.exit('[ERROR] Could not execute download. Do you have SVN installed?')
-    
+
     if not os.path.isdir(output_directory):
         os.sys.exit('[ERROR] An unkown error occured where the output directory was not created')
+    '''
 
     print('Successfully downloaded')
 

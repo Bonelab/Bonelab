@@ -3,6 +3,7 @@ pbr
 nose
 six
 hypothesis
+gitpython
 
 # Image processing
 vtk
