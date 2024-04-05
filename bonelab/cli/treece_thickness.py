@@ -48,7 +48,7 @@ def indefinite_integral(x: np.ndarray, dx: float) -> np.ndarray:
     return np.cumsum(x) * dx
 
 def create_treece_model(
-    y1: float, r: float, dx: float
+    y1: float, r: float, dx: float, r_threshold: float = 1e-3
 ) -> Callable[[np.ndarray, float, float, float, float, float], np.ndarray]:
     '''
     Create a model function for Treece' method.
@@ -64,6 +64,9 @@ def create_treece_model(
 
     dx : float
         The spacing between values in x (spatial resolution of the discrete parameterized line).
+
+    r_threshold : float
+        The threshold for the value of r, below which the alternative version of the model is used.
 
     Returns
     -------
@@ -113,7 +116,47 @@ def create_treece_model(
         )
         return y0 + indefinite_integral(indefinite_integral(integrand, dx), dx)
 
-    return model
+    def model_r0(x: np.ndarray, x0: float, x1: float, y0: float, y2: float, sigma: float) -> np.ndarray:
+        '''
+        A model that predicts the intensity at a given location on a parameterized line normal to
+        the cortical surface based on a function with two step functions and some blurring.
+
+        Parameters
+        ----------
+        x : np.ndarray
+            The locations along the parameterized line where the intensities are measured.
+
+        x0 : float
+            The location of the first step function.
+
+        x1 : float
+            The location of the second step function.
+
+        y0 : float
+            The density outside the cortical bone (soft tissue).
+
+        y2 : float
+            The density past the cortical bone (marrow and trabecular bone).
+
+        sigma : float
+            The standard deviation of the Gaussian blur approximating in-plane partial volume effects
+            and other blurring effects from the measurement system.
+
+        Returns
+        -------
+        np.ndarray
+            The predicted intensities at the locations x.
+        '''
+        integrand = (
+            (y1 - y0) / (sigma * sqrtpi) * np.exp(-(x-x0)**2/(sigma**2))
+            + (y2 - y1) / (sigma * sqrtpi) * np.exp(-(x-x1)**2/(sigma**2))
+        )
+        return y0 + indefinite_integral(integrand, dx)
+
+    if r > r_threshold:
+        return model
+    else:
+        return model_r0
 
 
 def create_treece_residual_function(
@@ -174,6 +217,7 @@ def treece_fit(
     y0_initial_guess: float,
     y2_initial_guess: float,
     sigma_initial_guess: float,
+    r_threshold: float = 1e-3
 
 ) -> Tuple[float, float, np.ndarray]:
     '''
@@ -218,6 +262,9 @@ def treece_fit(
         The initial guess for the standard deviation of the Gaussian blur approximating in-plane
         partial volume effects and other blurring effects from the measurement system.
 
+    r_threshold : float
+        The threshold to determine if r is small enough that the alternative model for r=0 should be used.
+
     Returns
     -------
     Tuple[float, float, np.ndarray]
@@ -230,18 +277,41 @@ def treece_fit(
         / np.sqrt(normal[0]**2 + normal[1]**2)
     )
 
-    x0 = [
-        x[list(intensities > cortical_threshold).index(True)],
-        x[list(intensities > cortical_threshold).index(True) + 10],
+    thresholded_intensities = intensities > cortical_threshold
+    if True in thresholded_intensities:
+        x0 = x[list(thresholded_intensities).index(True)]
+        x1 = x[list(thresholded_intensities).index(True)] + dx
+    else:
+        x0, x1 = 0.0, dx
+
+    x0, x1 = 0.0, dx
+
+    initial_guess = [
+        x0, x1,
         y0_initial_guess,
         y2_initial_guess,
         sigma_initial_guess
     ]
 
-    model = create_treece_model(y1, r, dx)
+    lower_bounds = [
+        x.min(), x.min(),
+        0, 0, 0.01
+    ]
+
+    upper_bounds = [
+        x.max(), x.max(),
+        400, 400, 100
+    ]
+
+    model = create_treece_model(y1, r, dx, r_threshold)
     residual_function = create_treece_residual_function(model, intensities, x, residual_boost_factor)
 
-    result = least_squares(residual_function, x0=x0, method="lm")
+    result = least_squares(
+        residual_function,
+        x0=initial_guess,
+        bounds=(lower_bounds, upper_bounds),
+        method="dogbox"
+    )
     return result.x[0], result.x[1], model(x, *result.x)
 
 
@@ -348,6 +418,7 @@ def treece_thickness(args: Namespace) -> None:
         if ~args.silent:
             message("Using only the boundary voxels in the sub-mask...")
         bone_mask["boundary"] = bone_mask["boundary"] * sub_mask["NIFTI"]
+    '''
     if ~args.silent:
         message("Computing the bone surface...")
     bone_surface = bone_mask.contour([1], scalars="NIFTI", progress_bar=~args.silent)
@@ -377,15 +448,41 @@ def treece_thickness(args: Namespace) -> None:
         progress_bar=~args.silent
     )
     bone_mask["Normals"] = bone_mask["Normals"] * bone_mask["boundary"][:,np.newaxis]
+    '''
+    if ~args.silent:
+        message("Computing the surface embedding...")
+    bone_mask_sitk = sitk.GetImageFromArray(bone_mask["NIFTI"].reshape(bone_mask.dimensions, order="F"))
+    embedding = sitk.SignedMaurerDistanceMap(bone_mask_sitk, insideIsPositive=True, squaredDistance=False)
+    if args.embedding_smoothing_sigma:
+        if ~args.silent:
+            message("Smoothing the embedding...")
+        embedding = sitk.RecursiveGaussian(embedding, args.embedding_smoothing_sigma)
+    if ~args.silent:
+        message("Computing the gradient of the embedding...")
+    embedding_gradient = sitk.GetArrayFromImage(sitk.Gradient(embedding))
+    bone_mask["Normals"] = np.zeros((bone_mask.n_points, 3))
+    bone_mask["Normals"][:,0] = embedding_gradient[...,2].flatten(order="F")
+    bone_mask["Normals"][:,1] = embedding_gradient[...,1].flatten(order="F")
+    bone_mask["Normals"][:,2] = embedding_gradient[...,0].flatten(order="F")
     if ~args.silent:
         message("Computing the cortical thickness at each boundary voxel...")
     bone_mask["thickness"] = np.zeros((bone_mask.n_points,))
     problems = []
     for i in tqdm(np.where(bone_mask["boundary"] == 1)[0], disable=args.silent):
+
+        if args.plot_model_fit_for_voxel:
+            i = args.plot_model_fit_for_voxel
+
+        is_problem = False
+
+        normal = bone_mask["Normals"][i,:]
+        if args.constrain_normal_to_xy:
+            normal[2] = 0
+
         intensities, x = sample_intensity_profile(
             image,
             bone_mask.points[i,:],
-            bone_mask["Normals"][i,:],
+            normal,
             args.sample_outside_distance,
             args.sample_inside_distance,
             dx
@@ -393,7 +490,7 @@ def treece_thickness(args: Namespace) -> None:
         x0, x1, model_intensities = treece_fit(
             intensities,
             x,
-            bone_mask["Normals"][i,:],
+            normal,
             dx,
             args.cortical_density,
             args.residual_boost_factor,
@@ -406,6 +503,7 @@ def treece_thickness(args: Namespace) -> None:
         bone_mask["thickness"][i] = x1 - x0
 
         if (x0 > x1) or (x0 < x.min()) or (x1 > x.max()):
+            is_problem = True
             problems.append("-"*30)
             problems.append(f"Problem with voxel {i}.")
             problems.append(f"Point: {bone_mask.points[i,:]}")
@@ -418,16 +516,58 @@ def treece_thickness(args: Namespace) -> None:
             problems.append(f"thickness: {bone_mask['thickness'][i]}")
             problems.append("-"*30)
 
-        if args.debug_check_model_fit:
-            plt.figure()
-            plt.plot(x, intensities, "k-")
-            plt.plot(x, model_intensities, "r--")
-            plt.axvline(x0, color="black", linestyle="--")
-            plt.axvline(x1, color="black", linestyle="--")
-            plt.xlabel("x")
-            plt.ylabel("intensity")
+        if args.debug_check_model_fit or (is_problem and args.debug_on_problem) or args.plot_model_fit_for_voxel:
+
+            print(image)
+
+            indices = np.zeros_like(bone_mask["NIFTI"])
+            indices[i] = 1
+            i, j, k = np.where(indices.reshape(bone_mask.dimensions, order="F"))
+            i, j, k = i[0], j[0], k[0]
+
+            image_slice = image["NIFTI"].reshape(image.dimensions, order="F")[:,:,k]
+            boundary_slice = bone_mask["boundary"].reshape(bone_mask.dimensions, order="F")[:,:,k]
+
+            xx, yy = image.x.reshape(image.dimensions, order="F")[:,:,k], image.y.reshape(image.dimensions, order="F")[:,:,k]
+
+            print(image_slice.shape, xx.shape, yy.shape)
+
+            print(i, j, k)
+
+            print(f"point: ", bone_mask.points[i,:])
+            print(normal)
+
+            fig, axs = plt.subplots(1, 2, figsize=(16, 8))
+            axs[0].plot(x, intensities, "k-")
+            axs[0].plot(x, model_intensities, "r--")
+            axs[0].axvline(x0, color="black", linestyle="--")
+            axs[0].axvline(x1, color="black", linestyle="--")
+            axs[0].set_title(f"x0: {x0}, x1: {x1}")
+            axs[0].set_xlim([x.min(), x.max()])
+            axs[0].set_xlabel("x")
+            axs[0].set_ylabel("intensity")
+
+            axs[1].imshow(image_slice, cmap="gist_gray", origin="lower")
+            axs[1].imshow(boundary_slice, cmap="Reds", alpha=0.5*boundary_slice, origin="lower")
+            #axs[1].quiver([j], [i], [normal[1]], [normal[0]], color="red", scale=10)
+
+            normal_i = normal[0] / np.sqrt(normal[0]**2 + normal[1]**2)
+            normal_j = normal[1] / np.sqrt(normal[0]**2 + normal[1]**2)
+
+            axs[1].plot(
+                [j, j + normal_j*args.sample_inside_distance/image.spacing[0]],
+                [i, i + normal_i*args.sample_inside_distance/image.spacing[1]],
+                "r-"
+            )
+
             plt.show()
-            break
+
+            if args.plot_model_fit_for_voxel:
+                break
+
+            response = input("Continue? [`y` to continue, anything else to quit] ")
+            if response != "y":
+                break
 
     if ~args.silent:
         message("Writing the cortical thickness image to disk...")
@@ -485,7 +625,7 @@ def create_parser() -> ArgumentParser:
         "--sub-mask", type=create_file_extension_checker(INPUT_EXTENSIONS, "sub-mask"), default=None, metavar="SUB_MASK",
         help=f"Provide optional sub-mask input filename ({', '.join(INPUT_EXTENSIONS)})"
     )
-
+    '''
     parser.add_argument(
         "--smooth-surface", "-ss",  default=False, action="store_true",
         help="enable this flag to smooth the bone surface before computing the normals"
@@ -497,6 +637,15 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--surface-smoothing-passband", "-ssp", type=float, default=0.1,
         help="passband for the Taubin surface smoothing"
+    )
+    '''
+    parser.add_argument(
+        "--smooth-surface-embedding", "-sse",  default=False, action="store_true",
+        help="enable this flag to smooth the bone surface embedding before computing the normals"
+    )
+    parser.add_argument(
+        "--embedding-smoothing-sigma", "-ess", type=int, default=15,
+        help="the sigma for the gaussian filter applied to the bone surface embedding"
     )
     parser.add_argument(
         "--cortical-density", "-cd", type=float, default=800,
@@ -537,6 +686,11 @@ def create_parser() -> ArgumentParser:
     )
 
     parser.add_argument(
+        "--constrain-normal-to-xy", "-cnxy", default=False, action="store_true",
+        help="enable this flag to constrain the normal to the xy plane, for radius and tibia scans"
+    )
+
+    parser.add_argument(
         "--overwrite", "-ow", default=False, action="store_true",
         help="enable this flag to overwrite existing files, if they exist at output targets"
     )
@@ -547,6 +701,14 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--debug-check-model-fit", "-dcmf", default=False, action="store_true",
         help="enable this flag to plot the model fit for one boundary voxel, for debugging purposes"
+    )
+    parser.add_argument(
+        "--debug-on-problem", "-dop", default=False, action="store_true",
+        help="enable this flag to plot the model fit for one boundary voxel, for debugging purposes, if there is a flagged problem"
+    )
+    parser.add_argument(
+        "--plot-model-fit-for-voxel", "-pmfv", type=int, default=None,
+        help="plot the model fit for the voxel at the given index, for debugging purposes"
     )
 
     return parser
