@@ -82,8 +82,8 @@ def download_testing_data(filename):
     On success, this function returns the full file path. On failure,
     an empty string is returned.
     '''
-    input_uri = cfg['REGRESSION_DATA_URL'] + filename
-    output_uri = os.path.join(cfg['REGRESSION_DATA_DIRECTORY'], filename)
+    input_uri = cfg['REGRESSION_DATA_URL']
+    output_uri = cfg['REGRESSION_DATA_DIRECTORY']
 
     # Create output directory if it doesn't exist
     if not os.path.exists(cfg['REGRESSION_DATA_DIRECTORY']):
@@ -109,4 +109,5 @@ def download_testing_data(filename):
             output_uri
         )
     shutil.rmtree(os.path.join(output_uri, "BonelabData"))
+    return os.path.join(cfg['REGRESSION_DATA_URL'], cfg['REGRESSION_DATA_DIRECTORY'])
 cfg['DOWNLOAD_TESTING_DATA'] = download_testing_data
