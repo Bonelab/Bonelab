@@ -4,6 +4,8 @@ import os
 import shutil
 import subprocess
 
+from git import Repo
+
 '''
 A set of helper variables and functions for running tests.
 
