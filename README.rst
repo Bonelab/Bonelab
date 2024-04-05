@@ -171,7 +171,7 @@ with the :code:`bl` environment activated.
    * - :code:`blFFTLaplaceHamming`
      - segment bone from an AIM using FFT Laplace Hamming filtering
    * - :code:`blTreeceThickness`
-     - compute cortical thickness from a NiFTI and some masks using the Treece method
+     - compute cortical thickness from an image and bone segmentation using the Treece method
 
 Running Tests
 =============
