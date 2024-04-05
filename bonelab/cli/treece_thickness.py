@@ -144,6 +144,16 @@ def create_treece_residual_function(
     def residual_function(args: Tuple[float, float, float, float, float]) -> np.ndarray:
         '''
         Compute the residuals between the model and the measured intensities.
+
+        Parameters
+        ----------
+        args : Tuple[float, float, float, float, float]
+            The parameters to fit the model: x0, x1, y0, y2, sigma.
+
+        Returns
+        -------
+        np.ndarray
+            The residuals between the modelled and the sampled intensities.
         '''
         modelled_intensities = model(x, *args)
         mult = np.linspace(residual_boost_factor, 1, len(x))
@@ -236,6 +246,19 @@ def treece_fit(
 
 
 def compute_boundary_mask(mask: np.ndarray) -> np.ndarray:
+    '''
+    Compute a mask of the boundary of the input mask.
+
+    Parameters
+    ----------
+    mask : np.ndarray
+        The input mask.
+
+    Returns
+    -------
+    np.ndarray
+        The mask of the boundary of the input mask.
+    '''
     eroded_mask = binary_erosion(mask, selem=np.ones((3,3,3)))
     return mask - eroded_mask
 
@@ -248,6 +271,34 @@ def sample_intensity_profile(
     inside_dist: float,
     dx: float
 ) -> Tuple[np.ndarray, np.ndarray]:
+    '''
+    Sample an intensity profile along a line in the image.
+
+    Parameters
+    ----------
+    image : pv.UniformGrid
+        The image to sample from.
+
+    point : np.ndarray
+        The starting point of the line.
+
+    normal : np.ndarray
+        The normal vector for the line.
+
+    outside_dist : float
+        The distance to start sampling from outside the point along the normal.
+
+    inside_dist : float
+        The distance to sample up to inside the point along the normal.
+
+    dx : float
+        The spacing between sample points.
+
+    Returns
+    -------
+    Tuple[np.ndarray, np.ndarray]
+        The sampled intensities and the x values of the sample points.
+    '''
     normal = normal / np.sqrt((normal**2).sum())
     x = np.arange(-outside_dist, inside_dist, dx)
     sample_points = pv.PolyData(point[np.newaxis,:] + x[:,np.newaxis]*normal[np.newaxis,:])
@@ -255,7 +306,15 @@ def sample_intensity_profile(
     return np.array(sample_points["NIFTI"]), x
 
 
-def treece_thickness(args: Namespace):
+def treece_thickness(args: Namespace) -> None:
+    '''
+    Compute the cortical thickness using the Treece' model.
+
+    Parameters
+    ----------
+    args : Namespace
+        The parsed command line arguments.
+    '''
     echoed_args = echo_arguments("Treece Thickness", vars(args))
     print(echoed_args)
     input_fns = [args.bone_mask, args.image]
