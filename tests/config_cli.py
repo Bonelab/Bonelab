@@ -34,7 +34,7 @@ cfg['REGRESSION_FILES'] = [
     'bpaq_output.csv'
 ]
 
-cfg['REGRESSION_DATA_URL'] = "https://github.com/Bonelab/BonelabData/trunk/data/"
+cfg['REGRESSION_DATA_URL'] = "https://github.com/Bonelab/BonelabData.git"
 
 cfg['REGRESSION_DATA_DIRECTORY'] = os.path.join(
     os.path.dirname(os.path.realpath(__file__)), 'data'
@@ -103,11 +103,12 @@ def download_testing_data(filename):
     '''
     repo = Repo.clone_from(input_uri, os.path.join(output_uri, "BonelabData"))
     data_files = os.listdir(os.path.join(output_uri, "BonelabData", "data"))
-    for data_file in data_files:
-        shutil.move(
-            os.path.join(output_uri, "BonelabData", "data", data_file),
-            output_uri
-        )
+    shutil.move(
+        os.path.join(output_uri, "BonelabData", "data", filename),
+        cfg['REGRESSION_DATA_DIRECTORY']
+    )
     shutil.rmtree(os.path.join(output_uri, "BonelabData"))
+    print(filename)
+    print(os.listdir(cfg['REGRESSION_DATA_DIRECTORY']))
     return os.path.join(cfg['REGRESSION_DATA_DIRECTORY'], filename)
 cfg['DOWNLOAD_TESTING_DATA'] = download_testing_data
