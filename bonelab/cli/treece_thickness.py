@@ -5,13 +5,13 @@ from __future__ import annotations
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace, ArgumentTypeError
 from typing import Callable, Tuple, Optional
 import pyvista as pv
-from vtk import vtkImageConstantPad
 import numpy as np
 import SimpleITK as sitk
 from tqdm import tqdm, trange
 from skimage.morphology import binary_erosion, binary_dilation
 from matplotlib import pyplot as plt
-from scipy.optimize import least_squares, fmin_slsqp
+from scipy.optimize import least_squares
+from scipy.ndimage import gaussian_filter1d
 from datetime import datetime
 import os
 
@@ -215,7 +215,7 @@ def treece_fit(
     x: np.ndarray,
     normal: np.ndarray,
     dx: float,
-    y1: float,
+    y1: Optional[float],
     residual_boost_factor: float,
     slice_thickness: float,
     y0_initial_guess: float,
@@ -244,7 +244,7 @@ def treece_fit(
     dx : float
         The spacing between values in x (spatial resolution of the discrete parameterized line).
 
-    y1 : float
+    y1 : Optional[float]
         The density of the tissue between x0 and x1 (cortical bone).
 
     residual_boost_factor : float
@@ -284,6 +284,10 @@ def treece_fit(
         The distance along the line where the cortical bone starts and ends,
         and the modelled intensities for debug purposes.
     '''
+
+    if y1 is None:
+        y1 = intensities.max()
+
     r = (
         (slice_thickness / 2)
         * np.abs(normal[2])
@@ -608,15 +612,15 @@ def treece_thickness(args: Namespace) -> None:
         args.constrain_normal_to_plane,
         args.silent
     )
-
     for i in tqdm(np.where(surface["use_point"] == 1)[0], disable=args.silent):
         if args.plot_model_fit_for_point:
             i = args.plot_model_fit_for_point
-
         normal = surface.point_data["Normals"][i,:]
         if args.constrain_normal_to_plane:
             normal[args.constrain_normal_to_plane] = 0
-        intensities = intensity_profiles[i]
+        intensities = gaussian_filter1d(
+            intensity_profiles[i], sigma=args.intensity_smoothing_sigma
+        )
         x0, t, model_intensities = treece_fit(
             intensities,
             x,
@@ -700,10 +704,6 @@ def treece_thickness(args: Namespace) -> None:
         f.write("-"*30 + "\n")
         f.write(f"Mean Thickness: {mean_thickness}\n")
         f.write(f"Standard Deviation of Thickness: {std_thickness}\n")
-        f.write("-"*30 + "\n")
-        f.write("Problems:\n")
-        for problem in problems:
-            f.write(problem + "\n")
         f.write("-"*30 + "\n")
 
     if ~args.silent:
