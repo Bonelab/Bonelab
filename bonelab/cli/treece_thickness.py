@@ -683,7 +683,12 @@ def treece_thickness(args: Namespace) -> None:
 def create_parser() -> ArgumentParser:
     parser = ArgumentParser(
         description="Use a modified version of Treece' method (doi:10.1016/j.media.2010.01.003) to compute "
-                    "a cortical thickness map from an image, a bone mask, and an optional sub-mask.",
+                    "a cortical thickness map from an image, a bone mask, and an optional sub-mask."
+                    "The out will be a *.vtk polydata file and a *.log file. The surface can be used to "
+                    "visualize or continue processing the cortical thicknesses. The log file will contain "
+                    "the mean and standard deviation of the thicknesses (for the points where the model "
+                    " could be fit to the data properly) as well as debug information for points where the "
+                    "model failed to fit properly.",
         formatter_class=ArgumentDefaultsHelpFormatter
     )
 
