@@ -13,6 +13,7 @@ from skimage.morphology import binary_erosion, binary_dilation
 from matplotlib import pyplot as plt
 from scipy.optimize import least_squares, fmin_slsqp
 from datetime import datetime
+import os
 
 # internal
 from bonelab.util.registration_util import (
@@ -433,6 +434,30 @@ def debug_surface_viz(surface: pv.PolyData) -> None:
     pl.show()
 
 
+def sample_all_intensity_profiles(
+    image: pv.UniformGrid,
+    points: np.ndarray,
+    normals: np.ndarray,
+    outside_dist: float,
+    inside_dist: float,
+    dx: float,
+    constrain_normal_to_xy: bool,
+    silent: bool
+):
+    if constrain_normal_to_xy:
+        normals[:,2] = 0
+    normals = normals / np.sqrt((normals**2).sum(axis=-1))[:,np.newaxis]
+    x = np.arange(-outside_dist, inside_dist, dx)
+    nx = x.shape[0]
+    x = np.tile(x, points.shape[0])
+    points = np.repeat(points, nx, axis=0)
+    normals = np.repeat(normals, nx, axis=0)
+    sample_points = pv.PolyData(points + x[:,np.newaxis]*normals)
+    sample_points = sample_points.sample(image, progress_bar=~silent)
+    intensities = np.array(sample_points["NIFTI"]).reshape(-1, nx)
+    return intensities, x[:nx]
+
+
 def treece_thickness(args: Namespace) -> None:
     '''
     Compute the cortical thickness using the Treece' model.
@@ -501,6 +526,18 @@ def treece_thickness(args: Namespace) -> None:
     if ~args.silent:
         message("Computing the cortical thickness at each surface point...")
     surface.point_data["thickness"] = np.zeros((surface.n_points,))
+    if ~args.silent:
+        message("Computing all of the intensity profiles in parallel...")
+    intensity_profiles, x = sample_all_intensity_profiles(
+        image,
+        surface.points,
+        surface.point_data["Normals"],
+        args.sample_outside_distance,
+        args.sample_inside_distance,
+        dx,
+        args.constrain_normal_to_xy,
+        args.silent
+    )
     problems = []
     for i in tqdm(np.where(surface["use_point"] == 1)[0], disable=args.silent):
         if args.plot_model_fit_for_point:
@@ -509,6 +546,7 @@ def treece_thickness(args: Namespace) -> None:
         normal = surface["Normals"][i,:]
         if args.constrain_normal_to_xy:
             normal[2] = 0
+        '''
         intensities, x = sample_intensity_profile(
             image,
             surface.points[i,:],
@@ -517,6 +555,8 @@ def treece_thickness(args: Namespace) -> None:
             args.sample_inside_distance,
             dx
         )
+        '''
+        intensities = intensity_profiles[i]
         x0, x1, model_intensities = treece_fit(
             intensities,
             x,
