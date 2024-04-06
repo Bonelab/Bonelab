@@ -444,6 +444,40 @@ def sample_all_intensity_profiles(
     constrain_normal_to_xy: bool,
     silent: bool
 ):
+    '''
+    Sample intensity profiles along lines in the image.
+
+    Parameters
+    ----------
+    image : pv.UniformGrid
+        The image to sample from.
+
+    points : np.ndarray
+        The starting points of the lines.
+
+    normals : np.ndarray
+        The normal vectors for the lines.
+
+    outside_dist : float
+        The distance to start sampling from outside the points along the normals.
+
+    inside_dist : float
+        The distance to sample up to inside the points along the normals.
+
+    dx : float
+        The spacing between sample points.
+
+    constrain_normal_to_xy : bool
+        Whether to constrain the normals to the xy plane.
+
+    silent : bool
+        Set this flag to not show the progress bar.
+
+    Returns
+    -------
+    Tuple[np.ndarray, np.ndarray]
+        The sampled intensities and the x values of the sample points.
+    '''
     if constrain_normal_to_xy:
         normals[:,2] = 0
     normals = normals / np.sqrt((normals**2).sum(axis=-1))[:,np.newaxis]
@@ -543,19 +577,9 @@ def treece_thickness(args: Namespace) -> None:
         if args.plot_model_fit_for_point:
             i = args.plot_model_fit_for_point
         is_problem = False
-        normal = surface["Normals"][i,:]
+        normal = surface.point_data["Normals"][i,:]
         if args.constrain_normal_to_xy:
             normal[2] = 0
-        '''
-        intensities, x = sample_intensity_profile(
-            image,
-            surface.points[i,:],
-            normal,
-            args.sample_outside_distance,
-            args.sample_inside_distance,
-            dx
-        )
-        '''
         intensities = intensity_profiles[i]
         x0, x1, model_intensities = treece_fit(
             intensities,
@@ -632,6 +656,7 @@ def treece_thickness(args: Namespace) -> None:
     if ~args.silent:
         message("Calculate mean and standard deviation of thickness...")
     thickness = surface["thickness"][surface["use_point"] == 1]
+    thickness = thickness[thickness > 0]
     mean_thickness = np.mean(thickness)
     std_thickness = np.std(thickness)
 
