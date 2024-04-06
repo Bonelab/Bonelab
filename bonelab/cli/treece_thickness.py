@@ -3,12 +3,12 @@ from __future__ import annotations
 # IMPORTS
 # external
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace, ArgumentTypeError
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Optional
 import pyvista as pv
 from vtk import vtkImageConstantPad
 import numpy as np
 import SimpleITK as sitk
-from tqdm import tqdm
+from tqdm import tqdm, trange
 from skimage.morphology import binary_erosion, binary_dilation
 from matplotlib import pyplot as plt
 from scipy.optimize import least_squares, fmin_slsqp
@@ -77,7 +77,7 @@ def create_treece_model(
     '''
     sqrtpi = np.sqrt(np.pi)
 
-    def model(x: np.ndarray, x0: float, x1: float, y0: float, y2: float, sigma: float) -> np.ndarray:
+    def model(x: np.ndarray, x0: float, t: float, y0: float, y2: float, sigma: float) -> np.ndarray:
         '''
         A model that predicts the intensity at a given location on a parameterized line normal to
         the cortical surface based on a function with two step functions and some blurring.
@@ -88,10 +88,10 @@ def create_treece_model(
             The locations along the parameterized line where the intensities are measured.
 
         x0 : float
-            The location of the first step function.
+            The middle of the cortical bone.
 
-        x1 : float
-            The location of the second step function.
+        t : float
+            The thickness of the cortical bone.
 
         y0 : float
             The density outside the cortical bone (soft tissue).
@@ -110,15 +110,15 @@ def create_treece_model(
         '''
         integrand = (
             (y1 - y0) / (2*r*sigma*sqrtpi) * (
-                np.exp(-(x+r-x0)**2/(sigma**2)) - np.exp(-(x-r-x0)**2/(sigma**2))
+                np.exp(-(x+r-(x0-t/2))**2/(sigma**2)) - np.exp(-(x-r-(x0-t/2))**2/(sigma**2))
             )
             + (y2 - y1) / (2*r*sigma*sqrtpi) * (
-                np.exp(-(x+r-x1)**2/(sigma**2)) - np.exp(-(x-r-x1)**2/(sigma**2))
+                np.exp(-(x+r-(x0+t/2))**2/(sigma**2)) - np.exp(-(x-r-(x0+t/2))**2/(sigma**2))
             )
         )
         return y0 + indefinite_integral(indefinite_integral(integrand, dx), dx)
 
-    def model_r0(x: np.ndarray, x0: float, x1: float, y0: float, y2: float, sigma: float) -> np.ndarray:
+    def model_r0(x: np.ndarray, x0: float, t: float, y0: float, y2: float, sigma: float) -> np.ndarray:
         '''
         A model that predicts the intensity at a given location on a parameterized line normal to
         the cortical surface based on a function with two step functions and some blurring.
@@ -129,10 +129,10 @@ def create_treece_model(
             The locations along the parameterized line where the intensities are measured.
 
         x0 : float
-            The location of the first step function.
+            The middle of the cortical bone.
 
-        x1 : float
-            The location of the second step function.
+        t : float
+            The thickness of the cortical bone.
 
         y0 : float
             The density outside the cortical bone (soft tissue).
@@ -150,8 +150,8 @@ def create_treece_model(
             The predicted intensities at the locations x.
         '''
         integrand = (
-            (y1 - y0) / (sigma * sqrtpi) * np.exp(-(x-x0)**2/(sigma**2))
-            + (y2 - y1) / (sigma * sqrtpi) * np.exp(-(x-x1)**2/(sigma**2))
+            (y1 - y0) / (sigma * sqrtpi) * np.exp(-(x-(x0-t/2))**2/(sigma**2))
+            + (y2 - y1) / (sigma * sqrtpi) * np.exp(-(x-(x0+t/2))**2/(sigma**2))
         )
         return y0 + indefinite_integral(integrand, dx)
 
@@ -187,8 +187,7 @@ def create_treece_residual_function(
         A function that computes the residuals between the model and the measured intensities.
     '''
     distance_from_middle = np.abs(x) - np.abs(x).min()
-    distance_from_middle = distance_from_middle / distance_from_middle.max()
-    distance_from_middle = 1 - distance_from_middle
+    distance_from_middle = 1 - (distance_from_middle / distance_from_middle.max())
     mult = residual_boost_factor * distance_from_middle
 
     def residual_function(args: Tuple[float, float, float, float, float]) -> np.ndarray:
@@ -219,12 +218,13 @@ def treece_fit(
     y1: float,
     residual_boost_factor: float,
     slice_thickness: float,
-    cortical_threshold: float,
     y0_initial_guess: float,
     y2_initial_guess: float,
     sigma_initial_guess: float,
-    r_threshold: float = 1e-3
-
+    r_threshold: float,
+    y0_bounds: Tuple[float, float],
+    y2_bounds: Tuple[float, float],
+    sigma_bounds: Tuple[float, float]
 ) -> Tuple[float, float, np.ndarray]:
     '''
     Fit the Treece' model to the measured intensities and normal and return the location
@@ -255,9 +255,6 @@ def treece_fit(
     slice_thickness : float
         The thickness of the slice in the direction of the normal.
 
-    cortical_threshold : float
-        The threshold to determine the initial guess for the start of the cortical bone.
-
     y0_initial_guess : float
         The initial guess for the density outside the cortical bone (soft tissue).
 
@@ -271,6 +268,16 @@ def treece_fit(
     r_threshold : float
         The threshold to determine if r is small enough that the alternative model for r=0 should be used.
 
+    y0_bounds : Tuple[float, float]
+        The bounds for the density outside the cortical bone (soft tissue).
+
+    y2_bounds : Tuple[float, float]
+        The bounds for the density past the cortical bone (marrow and trabecular bone).
+
+    sigma_bounds : Tuple[float, float]
+        The bounds for the standard deviation of the Gaussian blur approximating in-plane
+        partial volume effects and other blurring effects from the measurement system.
+
     Returns
     -------
     Tuple[float, float, np.ndarray]
@@ -283,30 +290,23 @@ def treece_fit(
         / np.sqrt(normal[0]**2 + normal[1]**2)
     )
 
-    thresholded_intensities = intensities > cortical_threshold
-    if True in thresholded_intensities:
-        x0 = x[list(thresholded_intensities).index(True)]
-        x1 = x[list(thresholded_intensities).index(True)] + dx
-    else:
-        x0, x1 = 0.0, dx
-
-    x0, x1 = -10*dx, 10*dx
+    x0, t = 0, dx
 
     initial_guess = [
-        x0, x1,
+        x0, t,
         y0_initial_guess,
         y2_initial_guess,
         sigma_initial_guess
     ]
 
     lower_bounds = [
-        x.min(), x.min(),
-        -200, -200, 0.01
+        x.min(), dx,
+        y0_bounds[0], y2_bounds[0], sigma_bounds[0]
     ]
 
     upper_bounds = [
-        x.max(), x.max(),
-        400, 400, 100
+        x.max(), x.max() - x.min(),
+        y0_bounds[1], y2_bounds[1], sigma_bounds[1]
     ]
 
     model = create_treece_model(y1, r, dx, r_threshold)
@@ -422,15 +422,11 @@ def debug_surface_viz(surface: pv.PolyData) -> None:
     -------
     None
     '''
-
     arrows = surface.glyph(orient="Normals", scale="Normals", tolerance=0.02)
-
     pl = pv.Plotter()
-
     pl.subplot(0,0)
     pl.add_mesh(surface, scalars="use_point", opacity=0.1)
     pl.add_mesh(arrows, color="black")
-
     pl.show()
 
 
@@ -441,7 +437,7 @@ def sample_all_intensity_profiles(
     outside_dist: float,
     inside_dist: float,
     dx: float,
-    constrain_normal_to_xy: bool,
+    constrain_normal_to_plane: Optional[int],
     silent: bool
 ):
     '''
@@ -467,8 +463,8 @@ def sample_all_intensity_profiles(
     dx : float
         The spacing between sample points.
 
-    constrain_normal_to_xy : bool
-        Whether to constrain the normals to the xy plane.
+    constrain_normal_to_plane : Optional[int]
+        The index of the axis to constrain the normal vectors to. If None, no constraint is applied.
 
     silent : bool
         Set this flag to not show the progress bar.
@@ -478,8 +474,8 @@ def sample_all_intensity_profiles(
     Tuple[np.ndarray, np.ndarray]
         The sampled intensities and the x values of the sample points.
     '''
-    if constrain_normal_to_xy:
-        normals[:,2] = 0
+    if constrain_normal_to_plane:
+        normals[:,constrain_normal_to_plane] = 0
     normals = normals / np.sqrt((normals**2).sum(axis=-1))[:,np.newaxis]
     x = np.arange(-outside_dist, inside_dist, dx)
     nx = x.shape[0]
@@ -490,6 +486,46 @@ def sample_all_intensity_profiles(
     sample_points = sample_points.sample(image, progress_bar=~silent)
     intensities = np.array(sample_points["NIFTI"]).reshape(-1, nx)
     return intensities, x[:nx]
+
+
+def median_smooth_polydata(pd: pv.PolyData, scalar: str, flag_scalar: str, silent: bool) -> pv.PolyData:
+    '''
+    Smooth the scalar values of a PolyData object using a median filter.
+
+    Parameters
+    ----------
+    pd : pv.PolyData
+        The PolyData object to smooth.
+
+    scalar : str
+        The name of the scalar to smooth.
+
+    flag_scalar : str
+        The name of the flag scalar that determines if the point is used.
+
+    silent : bool
+
+    Returns
+    -------
+    pv.PolyData
+        The smoothed PolyData object.
+    '''
+    neighbours = {}
+    for i in trange(pd.n_points, disable=silent):
+        neighbours[i] = []
+    for i in trange(pd.n_cells, disable=silent):
+        cell_ids = pd.get_cell(i).point_ids
+        for j in cell_ids:
+            neighbours[j].extend(cell_ids)
+    for i in trange(pd.n_points, disable=silent):
+        neighbours[i] = list(set(neighbours[i]))
+    out = pd.copy()
+    for i in tqdm(np.where(pd[flag_scalar] == 1)[0], disable=silent):
+        flag = pd[flag_scalar][neighbours[i]]
+        vals = pd[scalar][neighbours[i]]
+        out[scalar][i] = np.median(vals[flag==1])
+    return out
+
 
 
 def treece_thickness(args: Namespace) -> None:
@@ -569,19 +605,19 @@ def treece_thickness(args: Namespace) -> None:
         args.sample_outside_distance,
         args.sample_inside_distance,
         dx,
-        args.constrain_normal_to_xy,
+        args.constrain_normal_to_plane,
         args.silent
     )
-    problems = []
+
     for i in tqdm(np.where(surface["use_point"] == 1)[0], disable=args.silent):
         if args.plot_model_fit_for_point:
             i = args.plot_model_fit_for_point
-        is_problem = False
+
         normal = surface.point_data["Normals"][i,:]
-        if args.constrain_normal_to_xy:
-            normal[2] = 0
+        if args.constrain_normal_to_plane:
+            normal[args.constrain_normal_to_plane] = 0
         intensities = intensity_profiles[i]
-        x0, x1, model_intensities = treece_fit(
+        x0, t, model_intensities = treece_fit(
             intensities,
             x,
             normal,
@@ -589,38 +625,29 @@ def treece_thickness(args: Namespace) -> None:
             args.cortical_density,
             args.residual_boost_factor,
             image.spacing[2], # assuming that we want the z-spacing for slice thickness
-            args.cortical_threshold,
             args.soft_tissue_intensity_initial_guess,
             args.trabecular_bone_intensity_initial_guess,
             args.model_sigma_initial_guess,
+            args.r_threshold,
+            args.soft_tissue_intensity_bounds,
+            args.trabecular_bone_intensity_bounds,
+            args.model_sigma_bounds
         )
-        is_problem = (x0 > x1) or (x0 < x.min()) or (x1 > x.max())
-        surface["thickness"][i] = x1 - x0 if not is_problem else np.nan
-        if is_problem:
-            problems.append("-"*30)
-            problems.append(f"Problem with point {i}.")
-            problems.append(f"Point: {surface.points[i,:]}")
-            problems.append(f"Normal: {surface['Normals'][i,:]}")
-            problems.append(f"x: {x}")
-            problems.append(f"Intensities: {intensities}")
-            problems.append(f"Model Intensities: {model_intensities}")
-            problems.append(f"x bounds: [{x.min()}, {x.max()}]")
-            problems.append(f"[x0, x1]: [{x0}, {x1}]")
-            problems.append(f"thickness: {x1 - x0}")
-            problems.append("-"*30)
+        surface["thickness"][i] = t
 
-        if args.debug_check_model_fit or (is_problem and args.debug_on_problem) or args.plot_model_fit_for_point:
+        if args.debug_check_model_fit or args.plot_model_fit_for_point:
             point = surface.extract_points([i], include_cells=False)
-            if args.constrain_normal_to_xy:
-                point["Normals"][:,2] = 0
+            if args.constrain_normal_to_plane:
+                point["Normals"][:,args.constrain_normal_to_plane] = 0
             print(f"point: ", surface.points[i,:])
             print(normal)
             plt.figure()
             plt.plot(x, intensities, "k-")
             plt.plot(x, model_intensities, "r--")
-            plt.axvline(x0, color="black", linestyle="--")
-            plt.axvline(x1, color="black", linestyle="--")
-            plt.title(f"x0: {x0}, x1: {x1}")
+            plt.axvline(x0, color="black", linestyle="-")
+            plt.axvline(x0 - t/2, color="black", linestyle="--")
+            plt.axvline(x0 + t/2, color="black", linestyle="--")
+            plt.title(f"x0: {x0}, t: {t}")
             plt.xlim([x.min(), x.max()])
             plt.xlabel("x")
             plt.ylabel("intensity")
@@ -649,6 +676,11 @@ def treece_thickness(args: Namespace) -> None:
             if response != "y":
                 break
 
+    if args.median_smooth_thicknesses:
+        if ~args.silent:
+            message("Smoothing the thickness using a median filter...")
+        surface = median_smooth_polydata(surface, "thickness", "use_point", args.silent)
+
     if ~args.silent:
         message("Writing the cortical thickness surface to disk...")
     surface.save(output_surface)
@@ -656,7 +688,6 @@ def treece_thickness(args: Namespace) -> None:
     if ~args.silent:
         message("Calculate mean and standard deviation of thickness...")
     thickness = surface["thickness"][surface["use_point"] == 1]
-    thickness = thickness[thickness > 0]
     mean_thickness = np.mean(thickness)
     std_thickness = np.std(thickness)
 
@@ -684,7 +715,7 @@ def create_parser() -> ArgumentParser:
     parser = ArgumentParser(
         description="Use a modified version of Treece' method (doi:10.1016/j.media.2010.01.003) to compute "
                     "a cortical thickness map from an image, a bone mask, and an optional sub-mask."
-                    "The out will be a *.vtk polydata file and a *.log file. The surface can be used to "
+                    "The output will be a *.vtk polydata file and a *.log file. The polydata can be used to "
                     "visualize or continue processing the cortical thicknesses. The log file will contain "
                     "the mean and standard deviation of the thicknesses (for the points where the model "
                     " could be fit to the data properly) as well as debug information for points where the "
@@ -720,19 +751,14 @@ def create_parser() -> ArgumentParser:
         "--surface-smoothing-passband", "-ssp", type=float, default=0.1,
         help="passband for the Taubin surface smoothing"
     )
-    '''
     parser.add_argument(
-        "--smooth-surface-embedding", "-sse",  default=False, action="store_true",
-        help="enable this flag to smooth the bone surface embedding before computing the normals"
+        "--intensity-smoothing-sigma", "-iss", type=float, default=1.0,
+        help="sigma for the Gaussian smoothing of the intensity profile"
     )
     parser.add_argument(
-        "--embedding-smoothing-sigma", "-ess", type=int, default=15,
-        help="the sigma for the gaussian filter applied to the bone surface embedding"
-    )
-    '''
-    parser.add_argument(
-        "--cortical-density", "-cd", type=float, default=800,
-        help="prescribed cortical density, in the units of the image, for the model"
+        "--cortical-density", "-cd", type=float, default=None,
+        help="prescribed cortical density, in the units of the image, for the model. If left as None, "
+             "the cortical density for each point will be calculated as the maximum value sampled on the line."
     )
     parser.add_argument(
         "--line-resolution", "-lr", type=float, default=None,
@@ -752,25 +778,42 @@ def create_parser() -> ArgumentParser:
         help="distance inside the boundary to sample the intensities for the Treece' algorithm"
     )
     parser.add_argument(
-        "--cortical-threshold", "-ct", type=float, default=800,
-        help="threshold for the cortical bone, used only to decide where to place the initial guesses for x0, x1"
+        "--r-threshold", "-rt", type=float, default=1e-3,
+        help="threshold for switching between standard and r=0 version of the model"
     )
     parser.add_argument(
         "--soft-tissue-intensity-initial-guess", "-stig", type=float, default=0,
         help="initial guess for the intensity of soft tissue in the model"
     )
     parser.add_argument(
+        "--soft-tissue-intensity-bounds", "-stb", type=float, nargs=2, default=[-200, 400],
+        help="bounds for the intensity of soft tissue in the model"
+    )
+    parser.add_argument(
         "--trabecular-bone-intensity-initial-guess", "-tbig", type=float, default=200,
         help="initial guess for the intensity of trabecular bone in the model"
+    )
+    parser.add_argument(
+        "--trabecular-bone-intensity-bounds", "-tbb", type=float, nargs=2, default=[-200, 400],
+        help="bounds for the intensity of trabecular bone in the model"
     )
     parser.add_argument(
         "--model-sigma-initial-guess", "-msig", type=float, default=1,
         help="initial guess for the sigma of inplane blurring in the model"
     )
+    parser.add_argument(
+        "--model-sigma-bounds", "-msb", type=float, nargs=2, default=[0.1, 100],
+        help="bounds for the sigma of inplane blurring in the model"
+    )
 
     parser.add_argument(
-        "--constrain-normal-to-xy", "-cnxy", default=False, action="store_true",
-        help="enable this flag to constrain the normal to the xy plane, for radius and tibia scans"
+        "--constrain-normal-to-plane", "-cnxy", type=int, default=None,
+        help="Set this to 0, 1, or 2 to zero out the normal in the given direction. For radius and "
+             "tibia images you probably should zero out the normal in axis 2 (axial direction)."
+    )
+    parser.add_argument(
+        "--median-smooth-thicknesses", "-mst", default=False, action="store_true",
+        help="enable this flag to median smooth the thicknesses at the end of the algorithm"
     )
 
     parser.add_argument(
