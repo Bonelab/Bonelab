@@ -5,12 +5,13 @@ from __future__ import annotations
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace, ArgumentTypeError
 from typing import Callable, Tuple
 import pyvista as pv
+from vtk import vtkImageConstantPad
 import numpy as np
 import SimpleITK as sitk
 from tqdm import tqdm
 from skimage.morphology import binary_erosion, binary_dilation
 from matplotlib import pyplot as plt
-from scipy.optimize import least_squares
+from scipy.optimize import least_squares, fmin_slsqp
 from datetime import datetime
 
 # internal
@@ -184,6 +185,11 @@ def create_treece_residual_function(
     Callable[[Tuple[float, float, float, float, float]], np.ndarray]
         A function that computes the residuals between the model and the measured intensities.
     '''
+    distance_from_middle = np.abs(x) - np.abs(x).min()
+    distance_from_middle = distance_from_middle / distance_from_middle.max()
+    distance_from_middle = 1 - distance_from_middle
+    mult = residual_boost_factor * distance_from_middle
+
     def residual_function(args: Tuple[float, float, float, float, float]) -> np.ndarray:
         '''
         Compute the residuals between the model and the measured intensities.
@@ -199,7 +205,6 @@ def create_treece_residual_function(
             The residuals between the modelled and the sampled intensities.
         '''
         modelled_intensities = model(x, *args)
-        mult = np.linspace(residual_boost_factor, 1, len(x))
         return mult * (modelled_intensities - intensities)
 
     return residual_function
@@ -284,7 +289,7 @@ def treece_fit(
     else:
         x0, x1 = 0.0, dx
 
-    x0, x1 = 0.0, dx
+    x0, x1 = -10*dx, 10*dx
 
     initial_guess = [
         x0, x1,
@@ -295,7 +300,7 @@ def treece_fit(
 
     lower_bounds = [
         x.min(), x.min(),
-        0, 0, 0.01
+        -200, -200, 0.01
     ]
 
     upper_bounds = [
@@ -310,7 +315,7 @@ def treece_fit(
         residual_function,
         x0=initial_guess,
         bounds=(lower_bounds, upper_bounds),
-        method="dogbox"
+        method="trf"
     )
     return result.x[0], result.x[1], model(x, *result.x)
 
@@ -376,6 +381,58 @@ def sample_intensity_profile(
     return np.array(sample_points["NIFTI"]), x
 
 
+def dilate_mask(mask: pv.UniformGrid, dilate_amount: int) -> pv.UniformGrid:
+    '''
+    Dilate the mask.
+
+    Parameters
+    ----------
+    mask : pv.UniformGrid
+        The mask to dilate.
+
+    dilate_amount : int
+        The amount to dilate the mask by.
+
+    Returns
+    -------
+    pv.UniformGrid
+        The dilated mask.
+    '''
+    mask[mask.active_scalars_name] = binary_dilation(
+        binary_dilation(
+            binary_dilation(
+                mask[mask.active_scalars_name].reshape(mask.dimensions, order="F"), np.ones((dilate_amount,1,1))
+            ), np.ones((1,dilate_amount,1))
+        ), np.ones((1,1,dilate_amount))
+    ).flatten(order="F")
+    return mask
+
+
+def debug_surface_viz(surface: pv.PolyData) -> None:
+    '''
+    Visualize the surface with normals as arrows.
+
+    Parameters
+    ----------
+    surface : pv.PolyData
+        The surface to visualize.
+
+    Returns
+    -------
+    None
+    '''
+
+    arrows = surface.glyph(orient="Normals", scale="Normals", tolerance=0.02)
+
+    pl = pv.Plotter()
+
+    pl.subplot(0,0)
+    pl.add_mesh(surface, scalars="use_point", opacity=0.1)
+    pl.add_mesh(arrows, color="black")
+
+    pl.show()
+
+
 def treece_thickness(args: Namespace) -> None:
     '''
     Compute the cortical thickness using the Treece' model.
@@ -391,41 +448,40 @@ def treece_thickness(args: Namespace) -> None:
     if args.sub_mask:
         input_fns.append(args.sub_mask)
     check_inputs_exist(input_fns, args.silent)
-    output_image = f"{args.output_base}.nii.gz"
+    output_surface = f"{args.output_base}.vtk"
     output_log = f"{args.output_base}.log"
-    check_for_output_overwrite([output_image, output_log], args.overwrite, args.silent)
+    check_for_output_overwrite([output_surface, output_log], args.overwrite, args.silent)
     if ~args.silent:
         message("Reading in the image...")
-    image = pv.read(args.image) #pv.wrap(reader.GetOutput())
+    image = pv.read(args.image)
     if ~args.silent:
         message("Determining the line resolution, if not given...")
     dx = args.line_resolution if args.line_resolution else min(image.spacing) / 10
     if ~args.silent:
         message("Reading in the bone mask...")
-    bone_mask = pv.read(args.bone_mask) #pv.wrap(reader.GetOutput())
+    bone_mask = pv.read(args.bone_mask)
     if args.sub_mask:
         if ~args.silent:
             message("Reading in the sub-mask...")
-        sub_mask = pv.read(args.sub_mask) #pv.wrap(reader.GetOutput())
+        sub_mask = pv.read(args.sub_mask)
     else:
         if ~args.silent:
             message("No sub-mask provided. Proceeding without it...")
         sub_mask = None
-    if ~args.silent:
-        message("Computing the boundary voxels...")
-    bone_mask["boundary"] = compute_boundary_mask(bone_mask.active_scalars.reshape(bone_mask.dimensions, order="F")).flatten(order="F")
-    if args.sub_mask:
+    if sub_mask:
         if ~args.silent:
-            message("Using only the boundary voxels in the sub-mask...")
-        bone_mask["boundary"] = bone_mask["boundary"] * sub_mask["NIFTI"]
-    '''
+            message("Dilating the sub mask...")
+        sub_mask = dilate_mask(sub_mask, 7)
+        bone_mask["use_point"] = sub_mask["NIFTI"]
+    else:
+        surface["use_point"] = np.ones(surface.n_points)
     if ~args.silent:
-        message("Computing the bone surface...")
-    bone_surface = bone_mask.contour([1], scalars="NIFTI", progress_bar=~args.silent)
+        message("Computing the surface of the bone mask...")
+    surface = bone_mask.contour([1], progress_bar=~args.silent)
     if args.smooth_surface:
         if ~args.silent:
             message("Smoothing the surface...")
-        bone_surface = bone_surface.smooth_taubin(
+        surface = surface.smooth_taubin(
             n_iter=args.surface_smoothing_iterations,
             pass_band=args.surface_smoothing_passband,
             progress_bar=~args.silent
@@ -435,53 +491,27 @@ def treece_thickness(args: Namespace) -> None:
             message("Not smoothing the surface...")
     if ~args.silent:
         message("Computing the normals...")
-    bone_surface = bone_surface.compute_normals(
+    surface = surface.compute_normals(
         auto_orient_normals=True,
         flip_normals=True,
         progress_bar=~args.silent
     )
+    if args.debug_check_model_fit:
+        debug_surface_viz(surface)
     if ~args.silent:
-        message("Resampling the surface normals back to the boundary voxels...")
-    bone_mask = bone_mask.interpolate(
-        bone_surface,
-        strategy="closest_point",
-        progress_bar=~args.silent
-    )
-    bone_mask["Normals"] = bone_mask["Normals"] * bone_mask["boundary"][:,np.newaxis]
-    '''
-    if ~args.silent:
-        message("Computing the surface embedding...")
-    bone_mask_sitk = sitk.GetImageFromArray(bone_mask["NIFTI"].reshape(bone_mask.dimensions, order="F"))
-    embedding = sitk.SignedMaurerDistanceMap(bone_mask_sitk, insideIsPositive=True, squaredDistance=False)
-    if args.embedding_smoothing_sigma:
-        if ~args.silent:
-            message("Smoothing the embedding...")
-        embedding = sitk.RecursiveGaussian(embedding, args.embedding_smoothing_sigma)
-    if ~args.silent:
-        message("Computing the gradient of the embedding...")
-    embedding_gradient = sitk.GetArrayFromImage(sitk.Gradient(embedding))
-    bone_mask["Normals"] = np.zeros((bone_mask.n_points, 3))
-    bone_mask["Normals"][:,0] = embedding_gradient[...,2].flatten(order="F")
-    bone_mask["Normals"][:,1] = embedding_gradient[...,1].flatten(order="F")
-    bone_mask["Normals"][:,2] = embedding_gradient[...,0].flatten(order="F")
-    if ~args.silent:
-        message("Computing the cortical thickness at each boundary voxel...")
-    bone_mask["thickness"] = np.zeros((bone_mask.n_points,))
+        message("Computing the cortical thickness at each surface point...")
+    surface.point_data["thickness"] = np.zeros((surface.n_points,))
     problems = []
-    for i in tqdm(np.where(bone_mask["boundary"] == 1)[0], disable=args.silent):
-
-        if args.plot_model_fit_for_voxel:
-            i = args.plot_model_fit_for_voxel
-
+    for i in tqdm(np.where(surface["use_point"] == 1)[0], disable=args.silent):
+        if args.plot_model_fit_for_point:
+            i = args.plot_model_fit_for_point
         is_problem = False
-
-        normal = bone_mask["Normals"][i,:]
+        normal = surface["Normals"][i,:]
         if args.constrain_normal_to_xy:
             normal[2] = 0
-
         intensities, x = sample_intensity_profile(
             image,
-            bone_mask.points[i,:],
+            surface.points[i,:],
             normal,
             args.sample_outside_distance,
             args.sample_inside_distance,
@@ -500,69 +530,55 @@ def treece_thickness(args: Namespace) -> None:
             args.trabecular_bone_intensity_initial_guess,
             args.model_sigma_initial_guess,
         )
-        bone_mask["thickness"][i] = x1 - x0
-
-        if (x0 > x1) or (x0 < x.min()) or (x1 > x.max()):
-            is_problem = True
+        is_problem = (x0 > x1) or (x0 < x.min()) or (x1 > x.max())
+        surface["thickness"][i] = x1 - x0 if not is_problem else np.nan
+        if is_problem:
             problems.append("-"*30)
-            problems.append(f"Problem with voxel {i}.")
-            problems.append(f"Point: {bone_mask.points[i,:]}")
-            problems.append(f"Normal: {bone_mask['Normals'][i,:]}")
+            problems.append(f"Problem with point {i}.")
+            problems.append(f"Point: {surface.points[i,:]}")
+            problems.append(f"Normal: {surface['Normals'][i,:]}")
             problems.append(f"x: {x}")
             problems.append(f"Intensities: {intensities}")
             problems.append(f"Model Intensities: {model_intensities}")
             problems.append(f"x bounds: [{x.min()}, {x.max()}]")
             problems.append(f"[x0, x1]: [{x0}, {x1}]")
-            problems.append(f"thickness: {bone_mask['thickness'][i]}")
+            problems.append(f"thickness: {x1 - x0}")
             problems.append("-"*30)
 
-        if args.debug_check_model_fit or (is_problem and args.debug_on_problem) or args.plot_model_fit_for_voxel:
-
-            print(image)
-
-            indices = np.zeros_like(bone_mask["NIFTI"])
-            indices[i] = 1
-            i, j, k = np.where(indices.reshape(bone_mask.dimensions, order="F"))
-            i, j, k = i[0], j[0], k[0]
-
-            image_slice = image["NIFTI"].reshape(image.dimensions, order="F")[:,:,k]
-            boundary_slice = bone_mask["boundary"].reshape(bone_mask.dimensions, order="F")[:,:,k]
-
-            xx, yy = image.x.reshape(image.dimensions, order="F")[:,:,k], image.y.reshape(image.dimensions, order="F")[:,:,k]
-
-            print(image_slice.shape, xx.shape, yy.shape)
-
-            print(i, j, k)
-
-            print(f"point: ", bone_mask.points[i,:])
+        if args.debug_check_model_fit or (is_problem and args.debug_on_problem) or args.plot_model_fit_for_point:
+            point = surface.extract_points([i], include_cells=False)
+            if args.constrain_normal_to_xy:
+                point["Normals"][:,2] = 0
+            print(f"point: ", surface.points[i,:])
             print(normal)
-
-            fig, axs = plt.subplots(1, 2, figsize=(16, 8))
-            axs[0].plot(x, intensities, "k-")
-            axs[0].plot(x, model_intensities, "r--")
-            axs[0].axvline(x0, color="black", linestyle="--")
-            axs[0].axvline(x1, color="black", linestyle="--")
-            axs[0].set_title(f"x0: {x0}, x1: {x1}")
-            axs[0].set_xlim([x.min(), x.max()])
-            axs[0].set_xlabel("x")
-            axs[0].set_ylabel("intensity")
-
-            axs[1].imshow(image_slice, cmap="gist_gray", origin="lower")
-            axs[1].imshow(boundary_slice, cmap="Reds", alpha=0.5*boundary_slice, origin="lower")
-            #axs[1].quiver([j], [i], [normal[1]], [normal[0]], color="red", scale=10)
-
-            normal_i = normal[0] / np.sqrt(normal[0]**2 + normal[1]**2)
-            normal_j = normal[1] / np.sqrt(normal[0]**2 + normal[1]**2)
-
-            axs[1].plot(
-                [j, j + normal_j*args.sample_inside_distance/image.spacing[0]],
-                [i, i + normal_i*args.sample_inside_distance/image.spacing[1]],
-                "r-"
+            plt.figure()
+            plt.plot(x, intensities, "k-")
+            plt.plot(x, model_intensities, "r--")
+            plt.axvline(x0, color="black", linestyle="--")
+            plt.axvline(x1, color="black", linestyle="--")
+            plt.title(f"x0: {x0}, x1: {x1}")
+            plt.xlim([x.min(), x.max()])
+            plt.xlabel("x")
+            plt.ylabel("intensity")
+            plt.show(block=False)
+            pl = pv.Plotter()
+            pl.add_mesh(
+                image.slice_orthogonal(
+                    max(surface.points[i,0], dx),
+                    max(surface.points[i,1], dx),
+                    max(surface.points[i,2], dx)
+                ),
+                cmap="gist_gray"
             )
-
+            pl.add_mesh(
+                point.glyph(orient="Normals", scale="Normals"),
+                color="black"
+            )
+            pl.add_axes()
+            pl.show()
             plt.show()
 
-            if args.plot_model_fit_for_voxel:
+            if args.plot_model_fit_for_point:
                 break
 
             response = input("Continue? [`y` to continue, anything else to quit] ")
@@ -570,16 +586,12 @@ def treece_thickness(args: Namespace) -> None:
                 break
 
     if ~args.silent:
-        message("Writing the cortical thickness image to disk...")
-    thickness = bone_mask["thickness"].reshape(bone_mask.dimensions, order="F")
-    thickness = sitk.GetImageFromArray(thickness)
-    thickness.SetSpacing(image.spacing)
-    thickness.SetOrigin(image.origin)
-    sitk.WriteImage(thickness, output_image)
+        message("Writing the cortical thickness surface to disk...")
+    surface.save(output_surface)
 
     if ~args.silent:
         message("Calculate mean and standard deviation of thickness...")
-    thickness = bone_mask["thickness"][bone_mask["boundary"] == 1]
+    thickness = surface["thickness"][surface["use_point"] == 1]
     mean_thickness = np.mean(thickness)
     std_thickness = np.std(thickness)
 
@@ -600,6 +612,7 @@ def treece_thickness(args: Namespace) -> None:
 
     if ~args.silent:
         message("Done.")
+
 
 
 def create_parser() -> ArgumentParser:
@@ -625,7 +638,6 @@ def create_parser() -> ArgumentParser:
         "--sub-mask", type=create_file_extension_checker(INPUT_EXTENSIONS, "sub-mask"), default=None, metavar="SUB_MASK",
         help=f"Provide optional sub-mask input filename ({', '.join(INPUT_EXTENSIONS)})"
     )
-    '''
     parser.add_argument(
         "--smooth-surface", "-ss",  default=False, action="store_true",
         help="enable this flag to smooth the bone surface before computing the normals"
@@ -647,6 +659,7 @@ def create_parser() -> ArgumentParser:
         "--embedding-smoothing-sigma", "-ess", type=int, default=15,
         help="the sigma for the gaussian filter applied to the bone surface embedding"
     )
+    '''
     parser.add_argument(
         "--cortical-density", "-cd", type=float, default=800,
         help="prescribed cortical density, in the units of the image, for the model"
@@ -700,15 +713,15 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "--debug-check-model-fit", "-dcmf", default=False, action="store_true",
-        help="enable this flag to plot the model fit for one boundary voxel, for debugging purposes"
+        help="enable this flag to plot the model fit for one surface point, for debugging purposes"
     )
     parser.add_argument(
         "--debug-on-problem", "-dop", default=False, action="store_true",
-        help="enable this flag to plot the model fit for one boundary voxel, for debugging purposes, if there is a flagged problem"
+        help="enable this flag to plot the model fit for one surface point, for debugging purposes, if there is a flagged problem"
     )
     parser.add_argument(
-        "--plot-model-fit-for-voxel", "-pmfv", type=int, default=None,
-        help="plot the model fit for the voxel at the given index, for debugging purposes"
+        "--plot-model-fit-for-point", "-pmfv", type=int, default=None,
+        help="plot the model fit for the point at the given index, for debugging purposes"
     )
 
     return parser
