@@ -480,7 +480,7 @@ def sample_all_intensity_profiles(
     '''
     if constrain_normal_to_plane:
         normals[:,constrain_normal_to_plane] = 0
-    normals = normals / np.sqrt((normals**2).sum(axis=-1))[:,np.newaxis]
+    normals = normals / (np.sqrt((normals**2).sum(axis=-1))[:,np.newaxis] + 1e-6)
     x = np.arange(-outside_dist, inside_dist, dx)
     nx = x.shape[0]
     x = np.tile(x, points.shape[0])
@@ -543,7 +543,7 @@ def treece_thickness(args: Namespace) -> None:
     '''
     echoed_args = echo_arguments("Treece Thickness", vars(args))
     print(echoed_args)
-    input_fns = [args.bone_mask, args.image]
+    input_fns = args.bone_masks + [args.image]
     if args.sub_mask:
         input_fns.append(args.sub_mask)
     check_inputs_exist(input_fns, args.silent)
@@ -557,12 +557,20 @@ def treece_thickness(args: Namespace) -> None:
         message("Determining the line resolution, if not given...")
     dx = args.line_resolution if args.line_resolution else min(image.spacing) / 10
     if ~args.silent:
-        message("Reading in the bone mask...")
-    bone_mask = pv.read(args.bone_mask)
+        message("Reading in the bone masks...")
+    bone_mask = image.copy()
+    bone_mask["NIFTI"][:] = 0
+    for fn in args.bone_masks:
+        bone_mask["NIFTI"] += pv.read(fn)["NIFTI"]
+    bone_mask["NIFTI"] = (bone_mask["NIFTI"] > 0).astype(int)
     if args.sub_mask:
         if ~args.silent:
             message("Reading in the sub-mask...")
         sub_mask = pv.read(args.sub_mask)
+        if args.sub_mask_label:
+            sub_mask["NIFTI"] = (sub_mask["NIFTI"] == args.sub_mask_label).astype(int)
+        else:
+            sub_mask["NIFTI"] = (sub_mask["NIFTI"] > 0).astype(int)
     else:
         if ~args.silent:
             message("No sub-mask provided. Proceeding without it...")
@@ -599,27 +607,30 @@ def treece_thickness(args: Namespace) -> None:
         debug_surface_viz(surface)
     if ~args.silent:
         message("Computing the cortical thickness at each surface point...")
+    use_indices = np.where(surface["use_point"] == 1)[0]
     surface.point_data["thickness"] = np.zeros((surface.n_points,))
     if ~args.silent:
         message("Computing all of the intensity profiles in parallel...")
     intensity_profiles, x = sample_all_intensity_profiles(
         image,
-        surface.points,
-        surface.point_data["Normals"],
+        surface.points[use_indices,:],
+        surface.point_data["Normals"][use_indices,:],
         args.sample_outside_distance,
         args.sample_inside_distance,
         dx,
         args.constrain_normal_to_plane,
         args.silent
     )
-    for i in tqdm(np.where(surface["use_point"] == 1)[0], disable=args.silent):
+    for j, i in enumerate(tqdm(use_indices, disable=args.silent)):
+        # j is the index into the intensities array
+        # i is the index into the surface points and normals
         if args.plot_model_fit_for_point:
             i = args.plot_model_fit_for_point
         normal = surface.point_data["Normals"][i,:]
         if args.constrain_normal_to_plane:
             normal[args.constrain_normal_to_plane] = 0
         intensities = gaussian_filter1d(
-            intensity_profiles[i], sigma=args.intensity_smoothing_sigma
+            intensity_profiles[j], sigma=args.intensity_smoothing_sigma
         )
         x0, t, model_intensities = treece_fit(
             intensities,
@@ -728,16 +739,23 @@ def create_parser() -> ArgumentParser:
         help=f"Provide image input filename ({', '.join(INPUT_EXTENSIONS)})"
     )
     parser.add_argument(
-        "bone_mask", type=create_file_extension_checker(INPUT_EXTENSIONS, "bone mask"), metavar="BONE_MASK",
-        help=f"Provide bone mask input filename ({', '.join(INPUT_EXTENSIONS)})"
-    )
-    parser.add_argument(
         "output_base", type=str, metavar="OUTPUT",
-        help=f"Provide base for outputs, you will get a file `output`.nii.gz and `output`.log"
+        help=f"Provide base for outputs, you will get a file `output`.vtk and `output`.log"
     )
     parser.add_argument(
-        "--sub-mask", type=create_file_extension_checker(INPUT_EXTENSIONS, "sub-mask"), default=None, metavar="SUB_MASK",
+        "--bone_masks", "-bm", type=create_file_extension_checker(INPUT_EXTENSIONS, "bone mask"),
+        nargs="+", required=True, metavar="BONE_MASK",
+        help=f"Provide bone mask input filename(s) ({', '.join(INPUT_EXTENSIONS)})."
+             f"You can provice multiple because the whole bone mask may be split into "
+             f"multiple masks (e.g. cort, trab)"
+    )
+    parser.add_argument(
+        "--sub-mask", "-sm", type=create_file_extension_checker(INPUT_EXTENSIONS, "sub-mask"), default=None, metavar="SUB_MASK",
         help=f"Provide optional sub-mask input filename ({', '.join(INPUT_EXTENSIONS)})"
+    )
+    parser.add_argument(
+        "--sub-mask-label", "-sml", type=int, default=None,
+        help="Label of the sub-mask to use, if not provided then the sub mask will be binarized (>0 -> 1)."
     )
     parser.add_argument(
         "--smooth-surface", "-ss",  default=False, action="store_true",
