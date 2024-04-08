@@ -525,7 +525,7 @@ def median_smooth_polydata(pd: pv.PolyData, scalar: str, flag_scalar: str, silen
         neighbours[i] = list(set(neighbours[i]))
     out = pd.copy()
     for i in tqdm(np.where(pd[flag_scalar] == 1)[0], disable=silent):
-        flag = pd[flag_scalar][neighbours[i]]
+        flag = pd[flag_scalar][neighbours[i]] * (pd[scalar][neighbours[i]] > 0)
         vals = pd[scalar][neighbours[i]]
         out[scalar][i] = np.median(vals[flag==1])
     return out
@@ -703,8 +703,8 @@ def treece_thickness(args: Namespace) -> None:
     if ~args.silent:
         message("Calculate mean and standard deviation of thickness...")
     thickness = surface["thickness"][surface["use_point"] == 1]
-    mean_thickness = np.mean(thickness)
-    std_thickness = np.std(thickness)
+    mean_thickness = np.mean(thickness[thickness>0])
+    std_thickness = np.std(thickness[thickness>0])
 
     if ~args.silent:
         message("Writing log file...")
