@@ -1,7 +1,10 @@
 # See https://github.com/Numerics88/n88tools/blob/master/tests/regression/config_regression.py for how this file was defined
 
 import os
+import shutil
 import subprocess
+
+from git import Repo
 
 '''
 A set of helper variables and functions for running tests.
@@ -31,7 +34,7 @@ cfg['REGRESSION_FILES'] = [
     'bpaq_output.csv'
 ]
 
-cfg['REGRESSION_DATA_URL'] = "https://github.com/Bonelab/BonelabData/trunk/data/"
+cfg['REGRESSION_DATA_URL'] = "https://github.com/Bonelab/BonelabData.git"
 
 cfg['REGRESSION_DATA_DIRECTORY'] = os.path.join(
     os.path.dirname(os.path.realpath(__file__)), 'data'
@@ -73,28 +76,30 @@ cfg['RUN_CALL'] = run_call
 # Create download script
 def download_testing_data(filename):
     '''Download data used in testing
-    
+
     Typically, this is done for regression testing.
-    
+
     On success, this function returns the full file path. On failure,
     an empty string is returned.
     '''
-    input_uri = cfg['REGRESSION_DATA_URL'] + filename
-    output_uri = os.path.join(cfg['REGRESSION_DATA_DIRECTORY'], filename)
 
     # Create output directory if it doesn't exist
     if not os.path.exists(cfg['REGRESSION_DATA_DIRECTORY']):
         os.makedirs(cfg['REGRESSION_DATA_DIRECTORY'])
-    
+
     # If we have already downloaded it, skip
-    if os.path.exists(output_uri):
-        return output_uri
+    if os.path.exists(os.path.join(cfg['REGRESSION_DATA_DIRECTORY'], filename)):
+        return os.path.join(cfg['REGRESSION_DATA_DIRECTORY'], filename)
 
     # Download
-    command = ['svn', 'export', input_uri, output_uri]
-    if cfg['RUN_CALL'](command):
-        return output_uri
-    else:
-        return ''
-cfg['DOWNLOAD_TESTING_DATA'] = download_testing_data
+    repo = Repo.clone_from(cfg['REGRESSION_DATA_URL'], os.path.join(cfg['REGRESSION_DATA_DIRECTORY'], "BonelabData"))
+    data_files = os.listdir(os.path.join(cfg['REGRESSION_DATA_DIRECTORY'], "BonelabData", "data"))
+    shutil.move(
+        os.path.join(cfg['REGRESSION_DATA_DIRECTORY'], "BonelabData", "data", filename),
+        cfg['REGRESSION_DATA_DIRECTORY']
+    )
+    shutil.rmtree(os.path.join(cfg['REGRESSION_DATA_DIRECTORY'], "BonelabData"))
+    return os.path.join(cfg['REGRESSION_DATA_DIRECTORY'], filename)
 
+
+cfg['DOWNLOAD_TESTING_DATA'] = download_testing_data

@@ -34,7 +34,7 @@ Install
 
     # Activate the environemnt
     conda activate bl
-    
+
     # change directory into the Bonelab repo
     cd Bonelab
 
@@ -170,6 +170,8 @@ with the :code:`bl` environment activated.
      - segment bone from an AIM using adaptive local thresholding
    * - :code:`blFFTLaplaceHamming`
      - segment bone from an AIM using FFT Laplace Hamming filtering
+   * - :code:`blTreeceThickness`
+     - compute cortical thickness from an image and bone segmentation using the Treece method
 
 Running Tests
 =============
@@ -209,4 +211,3 @@ To add a new application, do the following:
 - Add file with main function in bonelab.cli
 - Rerun `pip install -e .`
 - Add tests to tests.cli. test_cli_setup.py and, if appropriate, add other tests.
-

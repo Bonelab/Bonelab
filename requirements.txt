@@ -3,12 +3,14 @@ pbr
 nose
 six
 hypothesis
+gitpython
 
 # Image processing
 vtk
-simpleitk
+simpleitk==2.2
 pydicom
 scikit-image
+pyvista
 
 # Numerics
 numpy
@@ -19,6 +21,7 @@ matplotlib
 pandas
 openpyxl
 pyyaml
+tqdm
 
 # Writing video
 ffmpeg
