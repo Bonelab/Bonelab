@@ -214,7 +214,7 @@ nosetests tests/
 ```
 
 Once you are satisfied with your changes, use the web interface to submit a pull request.
-Get someone more senior / Steve to review your changes, and merge once review is done.
+Get someone more senior (/ Steve) to review your changes, and merge once review is done.
 
 To add a new command-line application, do the following:
 
@@ -225,3 +225,6 @@ To add a new command-line application, do the following:
 
 If you're going to add something, please do add at least unit tests so that as other people 
 edit the repository we can be sure they don't break your code.
+
+Also make sure you document your new cool stuff in the README (this file) so that
+other people in the lab know about it!
