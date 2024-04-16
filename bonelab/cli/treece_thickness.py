@@ -249,7 +249,7 @@ def treece_fit(
         y0_bounds[1], y2_bounds[1], sigma_bounds[1]
     ]
 
-    model = create_treece_model(y1) #create_treece_model(y1, r, dx, r_threshold)
+    model = create_treece_model(y1)
     residual_function = create_treece_residual_function(model, intensities, x, residual_boost_factor)
 
     result = least_squares(
