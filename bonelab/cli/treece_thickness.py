@@ -322,7 +322,7 @@ def sample_intensity_profile(
     return np.array(sample_points["NIFTI"]), x
 
 
-def dilate_mask(mask: pv.UniformGrid, dilate_amount: int) -> pv.UniformGrid:
+def dilate_mask(mask: pv.UniformGrid, dilate_amount: Tuple[int, int, int]) -> pv.UniformGrid:
     '''
     Dilate the mask.
 
@@ -331,21 +331,30 @@ def dilate_mask(mask: pv.UniformGrid, dilate_amount: int) -> pv.UniformGrid:
     mask : pv.UniformGrid
         The mask to dilate.
 
-    dilate_amount : int
-        The amount to dilate the mask by.
+    dilate_amount : Tuple[int, int, int]
+        The amount to dilate the mask by in each dimension.
 
     Returns
     -------
     pv.UniformGrid
         The dilated mask.
     '''
+    '''
     mask[mask.active_scalars_name] = binary_dilation(
         binary_dilation(
             binary_dilation(
-                mask[mask.active_scalars_name].reshape(mask.dimensions, order="F"), np.ones((dilate_amount,1,1))
-            ), np.ones((1,dilate_amount,1))
-        ), np.ones((1,1,dilate_amount))
+                mask[mask.active_scalars_name].reshape(mask.dimensions, order="F"), np.ones((dilate_amount[0],1,1))
+            ), np.ones((1,dilate_amount[1],1))
+        ), np.ones((1,1,dilate_amount[2]))
     ).flatten(order="F")
+    '''
+    mask_np = mask[mask.active_scalars_name].reshape(mask.dimensions, order="F")
+    for i, d in enumerate(dilate_amount):
+        dilation_shape = [1, 1, 1]
+        dilation_shape[i] = 2 * d + 1
+        dilation_shape = tuple(dilation_shape)
+        mask_np = binary_dilation(mask_np, selem=np.ones(dilation_shape))
+    mask[mask.active_scalars_name] = mask_np.flatten(order="F")
     return mask
 
 
@@ -514,7 +523,7 @@ def treece_thickness(args: Namespace) -> None:
     if sub_mask:
         if ~args.silent:
             message("Dilating the sub mask...")
-        sub_mask = dilate_mask(sub_mask, 7)
+        sub_mask = dilate_mask(sub_mask, args.sub_mask_dilation)
         bone_mask["use_point"] = sub_mask["NIFTI"]
     else:
         surface["use_point"] = np.ones(surface.n_points)
@@ -692,6 +701,10 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--sub-mask-label", "-sml", type=int, default=None,
         help="Label of the sub-mask to use, if not provided then the sub mask will be binarized (>0 -> 1)."
+    )
+    parser.add_argument(
+        "--sub-mask-dilation", "-smd", type=int, nargs=3, default=[1, 1, 1],
+        help="Dilation of the sub-mask in x, y, and z directions."
     )
     parser.add_argument(
         "--smooth-surface", "-ss",  default=False, action="store_true",
