@@ -10,6 +10,7 @@ import SimpleITK as sitk
 from tqdm import tqdm, trange
 from skimage.morphology import binary_erosion, binary_dilation
 from matplotlib import pyplot as plt
+from scipy.special import erf
 from scipy.optimize import least_squares
 from scipy.ndimage import gaussian_filter1d
 from datetime import datetime
@@ -30,27 +31,8 @@ INPUT_EXTENSIONS = [".nii", ".nii.gz"]
 
 
 # FUNCTIONS
-def indefinite_integral(x: np.ndarray, dx: float) -> np.ndarray:
-    '''
-    Compute the indefinite integral of x with respect to dx.
-
-    Parameters
-    ----------
-    x : np.ndarray
-        The function to integrate.
-
-    dx : float
-        The spacing between values in x.
-
-    Returns
-    -------
-    np.ndarray
-        The indefinite integral of x with respect to dx.
-    '''
-    return np.cumsum(x) * dx
-
 def create_treece_model(
-    y1: float, r: float, dx: float, r_threshold: float = 1e-3
+    y1: float
 ) -> Callable[[np.ndarray, float, float, float, float, float], np.ndarray]:
     '''
     Create a model function for Treece' method.
@@ -60,24 +42,22 @@ def create_treece_model(
     y1 : float
         The density of the tissue between x0 and x1 (cortical bone).
 
-    r : float
-        Half of the value of the out-of-plane blur effect caused by the misalignment
-        of the cortical surface and the slice orientation.
-
-    dx : float
-        The spacing between values in x (spatial resolution of the discrete parameterized line).
-
-    r_threshold : float
-        The threshold for the value of r, below which the alternative version of the model is used.
-
     Returns
     -------
-    Callable[[np.ndarray, float, float, float, float, float], float]
-        A function for Treece' model with y1 and r fixed.
+    Callable[[np.ndarray, float, float, float, float, float], np.ndarray]
+        A function for Treece' model with y1 fixed.
     '''
-    sqrtpi = np.sqrt(np.pi)
 
-    def model(x: np.ndarray, x0: float, t: float, y0: float, y2: float, sigma: float) -> np.ndarray:
+    sqrt_of_two = np.sqrt(2)
+
+    def model(
+        x: np.ndarray,
+        x0: float,
+        t: float,
+        y0: float,
+        y2: float,
+        sigma: float
+    ) -> np.ndarray:
         '''
         A model that predicts the intensity at a given location on a parameterized line normal to
         the cortical surface based on a function with two step functions and some blurring.
@@ -108,57 +88,13 @@ def create_treece_model(
         np.ndarray
             The predicted intensities at the locations x.
         '''
-        integrand = (
-            (y1 - y0) / (2*r*sigma*sqrtpi) * (
-                np.exp(-(x+r-(x0-t/2))**2/(sigma**2)) - np.exp(-(x-r-(x0-t/2))**2/(sigma**2))
-            )
-            + (y2 - y1) / (2*r*sigma*sqrtpi) * (
-                np.exp(-(x+r-(x0+t/2))**2/(sigma**2)) - np.exp(-(x-r-(x0+t/2))**2/(sigma**2))
-            )
-        )
-        return y0 + indefinite_integral(indefinite_integral(integrand, dx), dx)
+        term1 = ((y1 - y0) / 2) * (1 + erf((x - x0 + t/2) / (sigma * sqrt_of_two)))
+        term2 = ((y2 - y1) / 2) * (1 + erf((x - x0 - t/2) / (sigma * sqrt_of_two)))
 
-    def model_r0(x: np.ndarray, x0: float, t: float, y0: float, y2: float, sigma: float) -> np.ndarray:
-        '''
-        A model that predicts the intensity at a given location on a parameterized line normal to
-        the cortical surface based on a function with two step functions and some blurring.
+        return y0 + term1 + term2
 
-        Parameters
-        ----------
-        x : np.ndarray
-            The locations along the parameterized line where the intensities are measured.
+    return model
 
-        x0 : float
-            The middle of the cortical bone.
-
-        t : float
-            The thickness of the cortical bone.
-
-        y0 : float
-            The density outside the cortical bone (soft tissue).
-
-        y2 : float
-            The density past the cortical bone (marrow and trabecular bone).
-
-        sigma : float
-            The standard deviation of the Gaussian blur approximating in-plane partial volume effects
-            and other blurring effects from the measurement system.
-
-        Returns
-        -------
-        np.ndarray
-            The predicted intensities at the locations x.
-        '''
-        integrand = (
-            (y1 - y0) / (sigma * sqrtpi) * np.exp(-(x-(x0-t/2))**2/(sigma**2))
-            + (y2 - y1) / (sigma * sqrtpi) * np.exp(-(x-(x0+t/2))**2/(sigma**2))
-        )
-        return y0 + indefinite_integral(integrand, dx)
-
-    if r > r_threshold:
-        return model
-    else:
-        return model_r0
 
 
 def create_treece_residual_function(
@@ -313,7 +249,7 @@ def treece_fit(
         y0_bounds[1], y2_bounds[1], sigma_bounds[1]
     ]
 
-    model = create_treece_model(y1, r, dx, r_threshold)
+    model = create_treece_model(y1) #create_treece_model(y1, r, dx, r_threshold)
     residual_function = create_treece_residual_function(model, intensities, x, residual_boost_factor)
 
     result = least_squares(
