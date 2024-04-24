@@ -153,11 +153,11 @@ def treece_fit(
     dx: float,
     y1: Optional[float],
     residual_boost_factor: float,
-    slice_thickness: float,
+    t_initial_guess: Optional[float],
     y0_initial_guess: float,
     y2_initial_guess: float,
     sigma_initial_guess: float,
-    r_threshold: float,
+    t_bounds: Optional[Tuple[float, float]],
     y0_bounds: Tuple[float, float],
     y2_bounds: Tuple[float, float],
     sigma_bounds: Tuple[float, float]
@@ -188,8 +188,8 @@ def treece_fit(
         to the first peak which will correspond to the cortical bone and less likely to be
         influenced by subsequent peaks, which will correspond to trabecular bone in high-res images.
 
-    slice_thickness : float
-        The thickness of the slice in the direction of the normal.
+    t_initial_guess : Optional[float]
+        The initial guess for the thickness of the cortical bone.
 
     y0_initial_guess : float
         The initial guess for the density outside the cortical bone (soft tissue).
@@ -201,8 +201,8 @@ def treece_fit(
         The initial guess for the standard deviation of the Gaussian blur approximating in-plane
         partial volume effects and other blurring effects from the measurement system.
 
-    r_threshold : float
-        The threshold to determine if r is small enough that the alternative model for r=0 should be used.
+    t_bounds : Optional[Tuple[float, float]]
+        The bounds for the thickness of the cortical bone.
 
     y0_bounds : Tuple[float, float]
         The bounds for the density outside the cortical bone (soft tissue).
@@ -224,29 +224,28 @@ def treece_fit(
     if y1 is None:
         y1 = intensities.max()
 
-    r = (
-        (slice_thickness / 2)
-        * np.abs(normal[2])
-        / np.sqrt(normal[0]**2 + normal[1]**2)
-    )
-
-    x0, t = 0, dx
-
-    initial_guess = [
-        x0, t,
-        y0_initial_guess,
-        y2_initial_guess,
-        sigma_initial_guess
-    ]
+    if t_bounds is None:
+        t_bounds = (dx, x.max() - x.min())
 
     lower_bounds = [
-        x.min(), dx,
+        x.min(), t_bounds[0],
         y0_bounds[0], y2_bounds[0], sigma_bounds[0]
     ]
 
     upper_bounds = [
-        x.max(), x.max() - x.min(),
+        x.max(), t_bounds[1],
         y0_bounds[1], y2_bounds[1], sigma_bounds[1]
+    ]
+
+    if t_initial_guess is None:
+        t_initial_guess = ( t_bounds[0] + t_bounds[1] ) / 2
+
+    initial_guess = [
+        0, # we always guess '0' for the x0 parameter because this is where the mask placed the surface
+        t_initial_guess,
+        y0_initial_guess,
+        y2_initial_guess,
+        sigma_initial_guess
     ]
 
     model = create_treece_model(y1)
@@ -554,6 +553,7 @@ def treece_thickness(args: Namespace) -> None:
         message("Computing the cortical thickness at each surface point...")
     use_indices = np.where(surface["use_point"] == 1)[0]
     surface.point_data["thickness"] = np.zeros((surface.n_points,))
+    surface.point_data["cort_center"] = np.zeros((surface.n_points,))
     if ~args.silent:
         message("Computing all of the intensity profiles in parallel...")
     intensity_profiles, x = sample_all_intensity_profiles(
@@ -584,16 +584,17 @@ def treece_thickness(args: Namespace) -> None:
             dx,
             args.cortical_density,
             args.residual_boost_factor,
-            image.spacing[2], # assuming that we want the z-spacing for slice thickness
+            args.thickness_initial_guess,
             args.soft_tissue_intensity_initial_guess,
             args.trabecular_bone_intensity_initial_guess,
             args.model_sigma_initial_guess,
-            args.r_threshold,
+            args.thickness_bounds,
             args.soft_tissue_intensity_bounds,
             args.trabecular_bone_intensity_bounds,
-            args.model_sigma_bounds
+            args.model_sigma_bounds,
         )
         surface["thickness"][i] = t
+        surface["cort_center"][i] = x0
 
         if args.debug_check_model_fit or args.plot_model_fit_for_point:
             point = surface.extract_points([i], include_cells=False)
@@ -745,8 +746,9 @@ def create_parser() -> ArgumentParser:
         help="distance inside the boundary to sample the intensities for the Treece' algorithm"
     )
     parser.add_argument(
-        "--r-threshold", "-rt", type=float, default=1e-3,
-        help="threshold for switching between standard and r=0 version of the model"
+        "--thickness-initial-guess", "-tig", type=float, default=None,
+        help="initial guess for the thickness of the cortical bone in the model. If not provided, "
+             "will be set to the middle of the thickness bounds"
     )
     parser.add_argument(
         "--soft-tissue-intensity-initial-guess", "-stig", type=float, default=0,
@@ -763,6 +765,11 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--trabecular-bone-intensity-bounds", "-tbb", type=float, nargs=2, default=[-200, 400],
         help="bounds for the intensity of trabecular bone in the model"
+    )
+    parser.add_argument(
+        "--thickness-bounds", "-tb", type=float, nargs=2, default=None,
+        help="bounds for the cortical thickness in the model, if not set then "
+             "then the bounds will be from the line resolution to the line length"
     )
     parser.add_argument(
         "--model-sigma-initial-guess", "-msig", type=float, default=1,
