@@ -14,7 +14,7 @@ pyvista
 
 # Numerics
 numpy
-scipy
+scipy==1.7
 matplotlib
 
 # Data
