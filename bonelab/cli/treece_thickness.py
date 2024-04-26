@@ -335,15 +335,6 @@ def dilate_mask(mask: pv.UniformGrid, dilate_amount: Tuple[int, int, int]) -> pv
     pv.UniformGrid
         The dilated mask.
     '''
-    '''
-    mask[mask.active_scalars_name] = binary_dilation(
-        binary_dilation(
-            binary_dilation(
-                mask[mask.active_scalars_name].reshape(mask.dimensions, order="F"), np.ones((dilate_amount[0],1,1))
-            ), np.ones((1,dilate_amount[1],1))
-        ), np.ones((1,1,dilate_amount[2]))
-    ).flatten(order="F")
-    '''
     mask_np = mask[mask.active_scalars_name].reshape(mask.dimensions, order="F")
     for i, d in enumerate(dilate_amount):
         dilation_shape = [1, 1, 1]
@@ -503,9 +494,9 @@ def median_smooth_polydata(
 
 
 def compute_control_point_indices(
+    points: np.ndarray,
     candidates: Optional[List[int]],
-    neighbours: List[List[int]],
-    n: int,
+    spacing: float,
     silent: bool
 ) -> List[int]:
     '''
@@ -513,14 +504,14 @@ def compute_control_point_indices(
 
     Parameters
     ----------
+    points : np.ndarray
+        The points of the PolyData object.
+
     candidates : Optional[List[int]]
         The candidate control points. If None, all points are candidates.
 
-    neighbours : List[List[int]]
-        The neighbours of each point in the PolyData object.
-
-    n : int
-        The minimum number of nodes between control points along mesh edges.
+    spacing : float
+        The minimum physical spacing between control points.
 
     silent : bool
         Set this flag to not show the progress bar.
@@ -535,15 +526,12 @@ def compute_control_point_indices(
     else:
         candidates = set(candidates)
     control_points = []
-    for i in trange(len(neighbours)):
+    for i in trange(len(candidates)):
         p = np.random.choice(list(candidates))
         control_points.append(p)
-        p_neighbours = [p]
-        for _ in range(n):
-            for pn in p_neighbours.copy():
-                p_neighbours.extend(neighbours[pn])
-        p_neighbours = set(p_neighbours)
-        candidates = candidates - p_neighbours
+        d = np.linalg.norm(points[p,:] - points, ord=2, axis=1)
+        candidates -= set(np.where(d < spacing)[0])
+        # candidates = candidates - p_neighbours
         if not candidates:
             break
     return control_points
@@ -741,10 +729,6 @@ def treece_fit_global(
         M: 5 (x0, t, y0, y2, sigma)
     '''
 
-    '''
-    return result.x[0], result.x[1], model(x, *result.x)
-    '''
-
     if y1 is None:
         raise ValueError("In global mode, you must specify the `--cortical-density` argument")
 
@@ -793,8 +777,13 @@ def treece_fit_global(
     result = least_squares(
         residual_function,
         x0=initial_guess,
-        bounds=(lower_bounds, upper_bounds),
-        method="trf",
+        #bounds=(lower_bounds, upper_bounds),
+        method="lm", #"trf",
+        #tr_solver="lsmr",
+        #loss="soft_l1",
+        ftol=1e-6,
+        xtol=1e-6,
+        gtol=1e-6,
         verbose=(0 if silent else 2)
     )
 
@@ -909,17 +898,10 @@ def treece_thickness(args: Namespace) -> None:
         )
         # get the control points
         if ~args.silent:
-            message("Computing mesh neighbours...")
-        neighbours = compute_neighbours(surface, args.silent)
-        if ~args.silent:
             message("Computing the control points...")
         control_points_idxs = compute_control_point_indices(
-            use_indices, neighbours, args.control_point_separation, args.silent
+            surface.points, use_indices, args.control_point_separation, args.silent
         )
-        pl = pv.Plotter()
-        pl.add_mesh(surface, scalars="use_point", opacity=0.1)
-        pl.add_mesh(pv.wrap(surface.points[control_points_idxs,:]), color="black", point_size=20)
-        pl.show()
         # fit the model
         if ~args.silent:
             message("Fitting the model...")
@@ -1197,7 +1179,7 @@ def create_parser() -> ArgumentParser:
         help="enable this flag to use thin plate splines to fit the model to the entire surface at once"
     )
     parser.add_argument(
-        "--control-point-separation", "-cps", type=int, default=5,
+        "--control-point-separation", "-cps", type=float, default=5,
         help="separation of control points for the thin plate spline model fit; "
              "higher values will result in less control points and a smoother thickness map"
     )
