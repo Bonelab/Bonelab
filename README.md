@@ -4,7 +4,7 @@
 
 Collection of scripts used in the [Bone Imaging Laboratory](https://bonelab.ucalgary.ca/).
 
-Main branch test status: ![Python CI](https://github.com/Bonelab/Bonelab/actions/workflows/pyci.yml/badge.svg)
+Main branch test status: [![Python CI](https://github.com/Bonelab/Bonelab/actions/workflows/pyci.yml/badge.svg)](https://github.com/Bonelab/Bonelab/actions)
 
 ---
 
