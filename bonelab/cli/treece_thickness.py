@@ -11,11 +11,14 @@ from tqdm import tqdm, trange
 from skimage.morphology import binary_erosion, binary_dilation
 from matplotlib import pyplot as plt
 from scipy.special import erf
-from scipy.optimize import least_squares
+from scipy.optimize import least_squares, minimize
 from scipy.ndimage import gaussian_filter1d
+from scipy.spatial import KDTree
+from scipy.sparse import csr_matrix
 from scipy.interpolate import RBFInterpolator
 from datetime import datetime
 import os
+import sys
 
 # internal
 from bonelab.util.registration_util import (
@@ -29,6 +32,559 @@ from bonelab.util.time_stamp import message
 # CONSTANTS
 # define file extensions that we consider available for input images
 INPUT_EXTENSIONS = [".nii", ".nii.gz"]
+
+
+# CLASSES
+class Treece:
+    '''
+    Class to compute the intensities and their derivatives along a
+    parameterized line normal to the cortical surface based on a
+    function with two step functions and some blurring.
+    '''
+
+    def __init__(self, c: Union[float, np.ndarray]) -> None:
+        '''
+        Initiailization function
+
+        Parameters
+        ----------
+        c : Union[float, np.ndarray]
+            The intensity of the cortical bone. Can be specified
+            globally, or at each point.
+        '''
+        self.c = c
+        self.sqrt2 = np.sqrt(2)
+        self.sqrt2pi = np.sqrt(2 * np.pi)
+
+    def compute_intensities_and_derivatives(
+        self,
+        x: np.ndarray,
+        m: float,
+        t: float,
+        s: float,
+        b: float,
+        sigma: float
+    ) -> Tuple[np.ndarray, Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
+        '''
+        Compute the intensities at a given location on a parameterized
+        line normal to the cortical surface based on a function with two
+        step functions and some blurring. Also compute the Jacobian of
+        the intensities along the line with respect to the free
+        parameters in the model.
+
+        Parameters
+        ----------
+        x : np.ndarray
+            The locations along the parameterized line where the intensities are measured.
+
+        m : float
+            The middle of the cortical bone.
+
+        t : float
+            The thickness of the cortical bone.
+
+        s : float
+            The intensity of the tissue outside the cortical bone.
+
+        b : float
+            The intensity of the tissue past the cortical bone.
+
+        sigma : float
+            The standard deviation of the Gaussian blur approximating
+
+        Returns
+        -------
+        np.ndarray
+            The predicted intensities at the locations x.
+        '''
+        cort_start = x - m + t/2
+        cort_end = x - m - t/2
+
+        term1 = ((self.c - s) / 2) * (1 + erf(cort_start / (sigma * self.sqrt2)))
+        term2 = ((b - self.c) / 2) * (1 + erf(cort_end / (sigma * self.sqrt2)))
+        f = s + term1 + term2
+
+        df_ds = 0.5 * ( 1 - erf(cort_start / (sigma * self.sqrt2)) )
+        df_db = 0.5 * ( 1 + erf(cort_end / (sigma * self.sqrt2)) )
+
+        df_dm = (
+            -(self.c - s) / (sigma * self.sqrt2pi) * np.exp(-(cort_start**2) / (2 * sigma**2))
+            - (b - self.c) / (sigma * self.sqrt2pi) * np.exp(-(cort_end**2) / (2 * sigma**2))
+        )
+
+        df_dt = (
+            (self.c - s) / (2 * sigma * self.sqrt2pi) * np.exp(
+                -(cort_start**2) / (2 * sigma**2)
+            )
+            - (b - self.c) / (2 * sigma * self.sqrt2pi) * np.exp(
+                -(cort_end**2) / (2 * sigma**2)
+            )
+        )
+
+        df_dsigma = (
+            -(self.c - s) * cort_start / (sigma**2 * self.sqrt2pi) * np.exp(
+                -(cort_start**2) / (2 * sigma**2)
+            )
+            - (b - self.c) * cort_end / (sigma**2 * self.sqrt2pi) * np.exp(
+                -(cort_end**2) / (2 * sigma**2)
+            )
+        )
+
+        return f, (df_dm, df_dt, df_ds, df_db, df_dsigma)
+
+
+class GlobalTreeceMinimizationFunctions:
+    '''
+    Class to compute the residuals and Jacobian of the residuals for
+    the global optimization of the Treece model.
+    '''
+
+    def __init__(
+        self,
+        treece: Treece,
+        control_points: np.ndarray,
+        points: np.ndarray,
+        f_ij: np.ndarray,
+        x_j: np.ndarray,
+        distance_power: int,
+        interpolation_neighbours: int,
+        residual_boost_factor: float = 2.0,
+    ) -> None:
+        '''
+        Initialization function
+
+        Parameters
+        ----------
+        treece : Treece
+            The Treece model to use for the optimization.
+
+        control_points : (Q, 3) np.ndarray
+            The control points for the optimization.
+
+        points : (N, 3) np.ndarray
+            The points on which intensities are measured. Model
+            parameters will be interpolated from control points
+            to the points.
+
+        f_ij : (N, M) np.ndarray
+            The intensities at the points.
+
+        x_j : (M, 1) np.ndarray
+            Sampling locations along the parameterized line normal
+            to the surface at each point.
+
+        distance_power : int
+            The power to which the distance between control points
+            and points is raised in the nearest neighbour IDW
+            interpolation.
+
+        interpolation_neighbours : int
+            The number of nearest neighbours to use in the IDW
+            interpolation.
+
+        residual_boost_factor : float
+            The factor by which to boost the residualsclose to
+            x_j = 0 along the line. This helps the model fit the
+            steps to the cortical bone rather than to trabeculae
+            that may lie along the path of the normal.
+        '''
+        self._q = control_points.shape[0]
+        self._n = points.shape[0]
+        self._m = x_j.shape[0]
+        self._treece = treece
+        self._control_points = control_points
+        self._points = points
+        self._f_ij = f_ij
+        self._x_j = x_j.reshape(1, -1)
+        self._distance_power = distance_power
+        self._interpolation_neighbours = interpolation_neighbours
+        self._residual_boost_factor = residual_boost_factor
+        self._update_interpolation_matrix()
+        self._update_residual_multiplier()
+
+
+    @property
+    def q(self) -> int:
+        '''
+        The number of control points.
+
+        Returns
+        -------
+        int
+        '''
+        return self._q
+
+
+    @property
+    def n(self) -> int:
+        '''
+        The number of points.
+
+        Returns
+        -------
+        int
+        '''
+        return self._n
+
+
+    @property
+    def m(self) -> int:
+        '''
+        The number of sampling locations.
+
+        Returns
+        -------
+        int
+        '''
+        return self._m
+
+
+    @property
+    def treece(self) -> Treece:
+        '''
+        The Treece model used for the optimization.
+
+        Returns
+        -------
+        Treece
+        '''
+        return self._treece
+
+
+    @treece.setter
+    def treece(self, treece: Treece) -> None:
+        '''
+        Set the Treece model used for the optimization.
+
+        Parameters
+        ----------
+        treece : Treece
+        '''
+        self._treece = treece
+
+
+    @property
+    def control_points(self) -> np.ndarray:
+        '''
+        The control points for the optimization.
+
+        Returns
+        -------
+        np.ndarray
+        '''
+        return self._control_points
+
+
+    @control_points.setter
+    def control_points(self, control_points: np.ndarray) -> None:
+        '''
+        Set the control points for the optimization.
+        Setting new control points automatically updates the
+        interpolation matrix and the number of control points.
+
+        Parameters
+        ----------
+        control_points : (Q, 3) np.ndarray
+        '''
+        self._control_points = control_points
+        self._q = control_points.shape[0]
+        self._update_interpolation_matrix()
+
+
+    @property
+    def points(self) -> np.ndarray:
+        '''
+        The points on which intensities are measured and
+        residuals are computed.
+
+        Returns
+        -------
+        np.ndarray
+        '''
+        return self._points
+
+
+    @points.setter
+    def points(self, points: np.ndarray) -> None:
+        '''
+        Set the points on which intensities are measured and
+        residuals are computed. Setting new points automatically
+        updates the interpolation matrix and the number of points.
+
+        Parameters
+        ----------
+        points : (N, 3) np.ndarray
+        '''
+        self._points = points
+        self._n = points.shape[0]
+        self._update_interpolation_matrix()
+
+
+    @property
+    def f_ij(self) -> np.ndarray:
+        '''
+        The intensities at the points.
+
+        Returns
+        -------
+        np.ndarray
+        '''
+        return self._f_ij
+
+
+    @f_ij.setter
+    def f_ij(self, f_ij: np.ndarray) -> None:
+        '''
+        Set the intensities at the points.
+
+        Parameters
+        ----------
+        f_ij : (N, M) np.ndarray
+        '''
+        self._f_ij = f_ij
+
+
+    @property
+    def x_j(self) -> np.ndarray:
+        '''
+        The sampling locations along the parameterized line normal
+        to the surface at each point.
+
+        Returns
+        -------
+        np.ndarray
+        '''
+        return self._x_j
+
+
+    @x_j.setter
+    def x_j(self, x_j: np.ndarray) -> None:
+        '''
+        Set the sampling locations along the parameterized line normal
+        to the surface at each point. Setting new sampling locations
+        automatically updates the number of sampling locations and the
+        residual multiplier.
+
+        Parameters
+        ----------
+        x_j : (M, 1) np.ndarray
+        '''
+        self._m = x_j.shape[0]
+        self._x_j = x_j.reshape(1, -1)
+        self._update_residual_multiplier()
+
+
+    @property
+    def distance_power(self) -> int:
+        '''
+        The power to which the distance between control points
+        and points is raised in the nearest neighbour IDW
+        interpolation.
+
+        Returns
+        -------
+        int
+        '''
+        return self._distance_power
+
+
+    @distance_power.setter
+    def distance_power(self, distance_power: int) -> None:
+        '''
+        Set the power to which the distance between control points
+        and points is raised in the nearest neighbour IDW
+        interpolation. Setting a new distance power automatically
+        updates the interpolation matrix.
+
+        Parameters
+        ----------
+        distance_power : int
+        '''
+        self._distance_power = distance_power
+        self._update_interpolation_matrix()
+
+
+    @property
+    def interpolation_neighbours(self) -> int:
+        '''
+        The number of nearest neighbours to use in the IDW
+        interpolation.
+
+        Returns
+        -------
+        int
+        '''
+        return self._interpolation_neighbours
+
+
+    @interpolation_neighbours.setter
+    def interpolation_neighbours(self, interpolation_neighbours: int) -> None:
+        '''
+        Set the number of nearest neighbours to use in the IDW
+        interpolation. Setting a new number of nearest neighbours
+        automatically updates the interpolation matrix.
+
+        Parameters
+        ----------
+        interpolation_neighbours : int
+        '''
+        self._interpolation_neighbours = interpolation_neighbours
+        self._update_interpolation_matrix()
+
+
+    @property
+    def residual_boost_factor(self) -> float:
+        '''
+        The factor by which to boost the residuals near x_j = 0.
+
+        Returns
+        -------
+        float
+        '''
+        return self._residual_boost_factor
+
+
+    @residual_boost_factor.setter
+    def residual_boost_factor(self, residual_boost_factor: float) -> None:
+        '''
+        Set the factor by which to boost the residuals near x_j = 0.
+        Setting a new residual boost factor automatically updates
+        the residual multiplier.
+
+        Parameters
+        ----------
+        residual_boost_factor : float
+        '''
+        self._residual_boost_factor = residual_boost_factor
+        self._update_residual_multiplier()
+
+
+    @property
+    def a(self) -> csr_matrix:
+        '''
+        The interpolation matrix.
+
+        Returns
+        -------
+        (N, Q) csr_matrix
+        '''
+        return self._a
+
+
+    @property
+    def a_t(self) -> csr_matrix:
+        '''
+        The transpose of the interpolation matrix.
+
+        Returns
+        -------
+        (Q, N) csr_matrix
+        '''
+        return self._a_t
+
+
+    def _update_interpolation_matrix(self) -> None:
+        '''
+        Update the interpolation matrix using the current
+        points, control points, distance power, and number
+        of nearest neighbours.
+        '''
+        self._a = (
+            compute_inverse_distance_weighting_transformation(
+                self._points, self._control_points,
+                self._distance_power, self._interpolation_neighbours,
+            )
+        )
+
+        self._a_t = self.a.T
+
+
+    def _update_residual_multiplier(self) -> None:
+        '''
+        Update the residual multiplier using the current
+        sampling locations and residual boost factor.
+        '''
+        distance_from_middle = np.abs(self._x_j) - np.abs(self._x_j).min()
+        distance_from_middle = 1 - (distance_from_middle / distance_from_middle.max())
+        self._gamma_j = self._residual_boost_factor * distance_from_middle
+
+
+    def compute_loss_and_jacobian_initial(
+        self, control_params: np.ndarray
+    ) -> Tuple[float, np.ndarray]:
+        '''
+        Compute the loss and Jacobian of the loss with respect to
+        the control parameters for the initial optimization step,
+        where there is only one set of model parameters applied
+        simultaneously to all points.
+
+        Parameters
+        ----------
+        control_params : (5, 1) np.ndarray
+            The control parameters: [m, t, s, b, sigma]
+
+        Returns
+        -------
+        Tuple[float, (5,) np.ndarray]
+            The loss and Jacobian of the loss with respect to the
+            control parameters.
+        '''
+        m = control_params[0].reshape(1,1)
+        t = control_params[1].reshape(1,1)
+        s = control_params[2].reshape(1,1)
+        b = control_params[3].reshape(1,1)
+        sigma = control_params[4].reshape(1,1)
+        fhat_ij, dfhat_ij_gradient = self.treece.compute_intensities_and_derivatives(
+            self.x_j, m, t, s, b, sigma
+        )
+        r_ij = fhat_ij - self.f_ij
+        loss = 0.5 * (self._gamma_j * np.power(r_ij, 2)).mean(axis=1).mean(axis=0)
+        jacobian = np.array([
+            (self._gamma_j * r_ij * dfhat_ij_dp).mean() / self.n
+            for dfhat_ij_dp in dfhat_ij_gradient
+        ])
+        return loss, jacobian
+
+
+    def compute_loss_and_jacobian(
+        self,control_params: np.ndarray
+    ) -> Tuple[float, np.ndarray]:
+        '''
+        Compute the loss and Jacobian of the loss with respect to
+        the control parameters for the optimization step, where
+        there are separate sets of model parameters applied to
+        each point.
+
+        Parameters
+        ----------
+        control_params : ((2 * Q) + 3, 1) np.ndarray
+            The control parameters: [m_1, ..., m_Q, t_1, ..., t_Q, s, b, sigma]
+
+        Returns
+        -------
+        Tuple[float, ((2 * Q) + 3,) np.ndarray]
+            The loss and Jacobian of the loss with respect to the
+            control parameters.
+        '''
+        m = self.a @ control_params[:self.q].reshape(self.q, 1)
+        t = self.a @ control_params[self.q:(2 * self.q)].reshape(self.q, 1)
+        s = control_params[-3].reshape(1,1)
+        b = control_params[-2].reshape(1,1)
+        sigma = control_params[-1].reshape(1,1)
+        fhat_ij, dfhat_ij_gradient = self.treece.compute_intensities_and_derivatives(
+            self.x_j, m, t, s, b, sigma
+        )
+        r_ij = fhat_ij - self.f_ij
+        loss = 0.5 * (self._gamma_j * np.power(r_ij, 2)).mean(axis=1).mean(axis=0)
+        jacobian = np.concatenate([
+            self.a_t @ (self._gamma_j * r_ij * dfhat_ij_gradient[0]).mean(axis=1) / self.n,
+            self.a_t @ (self._gamma_j * r_ij * dfhat_ij_gradient[1]).mean(axis=1) / self.n,
+            np.asarray([
+                (self._gamma_j * r_ij * dfhat_ij_dp).mean() / self.n
+                for dfhat_ij_dp in dfhat_ij_gradient[2:]
+            ])
+        ])
+        return loss, jacobian
 
 
 # FUNCTIONS
@@ -522,7 +1078,7 @@ def compute_control_point_indices(
         The control point indices for each point.
     '''
     if candidates is None:
-        candidates = set(range(len(neighbours)))
+        candidates = set(range(len(points)))
     else:
         candidates = set(candidates)
     control_points = []
@@ -537,99 +1093,67 @@ def compute_control_point_indices(
     return control_points
 
 
-def create_global_treece_residual_function(
-    model: Callable[[np.ndarray, float, float, float, float, float], np.ndarray],
-    control_points: np.ndarray,
+def compute_inverse_distance_weighting_transformation(
     points: np.ndarray,
-    intensities: np.ndarray,
-    x: np.ndarray,
-    thin_plate_spline_smoothing: float,
-    thin_plate_spline_neighbors: int,
-    thin_plate_spline_degree: int,
-    residual_boost_factor: float = 2.0,
-) -> Callable[[Tuple[float, float, float, float, float]], np.ndarray]:
+    control_points: np.ndarray,
+    power: int,
+    neighbours: int,
+    eps: float = 1e-8
+) -> csr_matrix:
     '''
-    Create a residual function for Treece' method to fit the model using least squares.
+    Compute the nearest-neighbour inverse distance weighting
+    transformation matrix.
 
     Parameters
     ----------
-    model : Callable[[np.ndarray, float, float, float, float, float], float]
-        The model function to fit.
+    points : np.ndarray
+        The points of the PolyData object.
 
     control_points : np.ndarray
-        An Nx3 array containing the positions of control points for the thin plate splines of model parameters.
+        The control points.
 
-    points: np.ndarray
-        An Nx3 array containing the positions of the points where the intensities were measured.
+    power : int
+        The power of the inverse distance weighting.
 
-    intensities: np.ndarray
-        The measured intensities at the locations x.
+    neighbours : int
+        The number of neighbours to consider.
 
-    x : np.ndarray
-        The locations along the parameterized line where the intensities were measured.
-
-    thin_plate_spline_smoothing : float
-        The smoothing parameter for the thin plate spline interpolation.
-
-    thin_plate_spline_neighbors : int
-        The number of neighbours to use for the thin plate spline interpolation.
-
-    residual_boost_factor : float
-        A factor to boost the residuals at the edges of the line.
+    eps : float
+        A small value to avoid division by zero.
 
     Returns
     -------
-    Callable[[Tuple[float, float, float, float, float]], np.ndarray]
-        A function that computes the residuals between the model and the measured intensities.
+    csr_matrix
+        The inverse distance weighting transformation matrix.
+        Usage: y = A @ c
+        y : (P,) np.ndarray
+            Data values on the points
+        A : (P,Q) csr_matrix
+            The inverse distance weighting transformation matrix
+        c : (Q,) np.ndarray
+            The control point values
     '''
-    num_control_points = control_points.shape[0]
-    num_points = points.shape[0]
+    n_points = points.shape[0]
+    n_control_points = control_points.shape[0]
 
-    x = x.reshape(1, len(x))
+    neighbours = min(neighbours, n_control_points)
 
-    distance_from_middle = np.abs(x) - np.abs(x).min()
-    distance_from_middle = 1 - (distance_from_middle / distance_from_middle.max())
-    mult = residual_boost_factor * distance_from_middle
-
-    tps = RBFInterpolator(
-        control_points,
-        np.zeros((num_control_points, 5), dtype=float),
-        smoothing = thin_plate_spline_smoothing,
-        neighbors = thin_plate_spline_neighbors,
-        kernel = "thin_plate_spline",
-        degree = thin_plate_spline_degree
+    kdtree = KDTree(control_points)
+    distances, cols = kdtree.query(points, neighbours)
+    rows = (
+        np.ones((1, neighbours), dtype=int)
+        * np.arange(n_points).reshape(n_points, 1)
     )
-
-    def global_residual_function(params: Tuple[float, ...]) -> np.ndarray:
-        '''
-        Compute the residuals between the model and the measured intensities.
-
-        Parameters
-        ----------
-        args : Tuple[float, ...]
-            The parameters to fit the model: x0, x1, y0, y2, sigma.
-
-        Returns
-        -------
-        np.ndarray
-            The residuals between the modelled and the sampled intensities.
-        '''
-        tps.d = np.array(params).reshape(num_control_points, 5)
-        model_parameters = tps(points)
-        x0 = model_parameters[:, 0].reshape(num_points, 1)
-        t = model_parameters[:, 1].reshape(num_points, 1)
-        y0 = model_parameters[:, 2].reshape(num_points, 1)
-        y2 = model_parameters[:, 3].reshape(num_points, 1)
-        sigma = model_parameters[:, 4].reshape(num_points, 1)
-        modelled_intensities = model(x, x0, t, y0, y2, sigma)
-        return (mult * (modelled_intensities - intensities)).flatten()
-
-    return global_residual_function
-
+    distances = np.power(distances + eps, power).reshape(n_points, -1)
+    distances = distances / distances.sum(axis=1)[:,None]
+    return csr_matrix(
+        (distances.flatten(), (rows.flatten(), cols.flatten())),
+        shape=(n_points, n_control_points)
+    )
 
 
 def treece_fit_global(
-    control_points: np.ndarray,
+    control_point_separations: List[float],
     points: np.ndarray,
     intensities: np.ndarray,
     x: np.ndarray,
@@ -644,19 +1168,19 @@ def treece_fit_global(
     y0_bounds: Tuple[float, float],
     y2_bounds: Tuple[float, float],
     sigma_bounds: Tuple[float, float],
-    thin_plate_spline_smoothing: float,
-    thin_plate_spline_neighbors: int,
-    thin_plate_spline_degree: int,
+    distance_power: int,
+    interpolation_neighbours: int,
     silent: bool
-) -> np.ndarray:
+) -> Tuple[np.ndarray, np.ndarray, float, float, float]:
     '''
     Fit the Treece' model to the measured intensities and normal and return the location
     where the cortical bone starts and ends.
 
     Parameters
     ----------
-    control_points : np.ndarray
-        An Nx3 array containing the positions of control points for the thin plate splines of model parameters.
+    control_point_separations : List[float]
+        The physical separation between control points at each stage of the
+        hierarchical global model fitting.
 
     points: np.ndarray
         An Nx3 array containing the positions of the points where the intensities were measured.
@@ -709,94 +1233,134 @@ def treece_fit_global(
         The bounds for the standard deviation of the Gaussian blur approximating in-plane
         partial volume effects and other blurring effects from the measurement system.
 
-    thin_plate_spline_smoothing : float
-        The smoothing factor for the thin plate spline interpolation of the model parameters.
+    distance_power : int
+        The power to raise the distance to the control points to for the inverse
+        distance weighted interpolation.
 
-    thin_plate_spline_neighbors : int
-        The number of neighbors to consider for the thin plate spline interpolation of the model parameters.
+    interpolation_neighbours : int
+        The number of neighbours to use for the interpolation.
 
-    thin_plate_spline_degree : int
-        The degree of the thin plate spline interpolation of the model parameters.
-
-    bool : bool
+    silent : bool
         Whether to suppress output.
 
     Returns
     -------
-    np.ndarray
-        An NxM array containing the model parameters at all control points.
-        N: # of control points
-        M: 5 (x0, t, y0, y2, sigma)
+    Tuple[np.ndarray, np.ndarray, float, float, float]
+        Arrays of fitted distances to middle of cortical bone and thicknesses of cortical bone,
+        and the fitted global background and trabecular intensities and smoothing sigma.
     '''
 
     if y1 is None:
-        raise ValueError("In global mode, you must specify the `--cortical-density` argument")
+        y1 = intensities.max(axis=1).reshape(-1, 1)
 
     if t_bounds is None:
         t_bounds = (dx, x.max() - x.min())
 
-    # create the upper and lower bounds and initial guess as normal
-
-    lower_bounds = [
-        x.min(), t_bounds[0],
-        y0_bounds[0], y2_bounds[0], sigma_bounds[0]
-    ]
-
-    upper_bounds = [
-        x.max(), t_bounds[1],
-        y0_bounds[1], y2_bounds[1], sigma_bounds[1]
-    ]
-
-    if t_initial_guess is None:
-        t_initial_guess = ( t_bounds[0] + t_bounds[1] ) / 2
+    bounds = list(zip(
+        [x.min(), t_bounds[0], y0_bounds[0], y2_bounds[0], sigma_bounds[0]],
+        [x.max(), t_bounds[1], y0_bounds[1], y2_bounds[1], sigma_bounds[1]]
+    ))
 
     initial_guess = [
-        0, # we always guess '0' for the x0 parameter because this is where the mask placed the surface
-        t_initial_guess,
+        0,
+        (
+            ( t_bounds[0] + t_bounds[1] ) / 2
+            if t_initial_guess is None
+            else t_initial_guess
+        ),
         y0_initial_guess,
         y2_initial_guess,
         sigma_initial_guess
     ]
 
-    # but then we need to tile the bounds and guesses for each control point
-    lower_bounds = tuple(np.tile(lower_bounds, control_points.shape[0]))
-    upper_bounds = tuple(np.tile(upper_bounds, control_points.shape[0]))
-    initial_guess = tuple(np.tile(initial_guess, control_points.shape[0]))
+    treece = Treece(y1)
 
-    model = create_treece_model(y1)
-    residual_function = create_global_treece_residual_function(
-        model,
+    control_point_idxs = compute_control_point_indices(
+        points, None, control_point_separations[0], silent
+    )
+    control_points = points[control_point_idxs,:]
+
+    global_treece_minimization_functions = GlobalTreeceMinimizationFunctions(
+        treece,
         control_points, points,
         intensities, x,
-        thin_plate_spline_smoothing,
-        thin_plate_spline_neighbors,
-        thin_plate_spline_degree,
+        distance_power, interpolation_neighbours,
         residual_boost_factor
     )
 
-    result = least_squares(
-        residual_function,
+    if ~silent:
+        message("Initial global model fit:")
+
+    result = minimize(
+        global_treece_minimization_functions.compute_loss_and_jacobian_initial,
         x0=initial_guess,
-        #bounds=(lower_bounds, upper_bounds),
-        method="lm", #"trf",
-        #tr_solver="lsmr",
-        #loss="soft_l1",
-        ftol=1e-6,
-        xtol=1e-6,
-        gtol=1e-6,
-        verbose=(0 if silent else 2)
+        bounds=bounds,
+        method="L-BFGS-B",
+        options={"disp": (0 if silent else 2),},
+        jac=True
     )
 
-    tps = RBFInterpolator(
-        control_points,
-        np.array(result.x).reshape((-1, 5)),
-        smoothing = thin_plate_spline_smoothing,
-        neighbors = thin_plate_spline_neighbors,
-        kernel = "thin_plate_spline",
-        degree = thin_plate_spline_degree
-    )
+    x0 = result.x[0] * np.ones((points.shape[0],))
+    t = result.x[1] * np.ones((points.shape[0],))
+    y0 = result.x[-3]
+    y2 = result.x[-2]
+    sigma = result.x[-1]
 
-    return tps(points)
+    for si, separation in enumerate(control_point_separations):
+        if ~silent:
+            message(
+                f"Multiscale global model fit "
+                f"{si + 1} / {len(control_point_separations)}: "
+                f"separation = {separation:0.3e}"
+            )
+
+        control_point_idxs = compute_control_point_indices(
+            points, None, separation, silent
+        )
+        control_points = points[control_point_idxs,:]
+
+        global_treece_minimization_functions.control_points = control_points
+
+        bounds = list(zip(
+            (
+                [x.min()] * control_points.shape[0]
+                + [t_bounds[0]] * control_points.shape[0]
+                + [y0_bounds[0], y2_bounds[0], sigma_bounds[0]]
+            ),
+            (
+                [x.max()] * control_points.shape[0]
+                + [t_bounds[1]] * control_points.shape[0]
+                + [y0_bounds[1], y2_bounds[1], sigma_bounds[1]]
+            )
+        ))
+
+        initial_guess = np.concatenate([
+            x0[control_point_idxs],
+            t[control_point_idxs],
+            result.x[-3:]
+        ])
+
+        result = minimize(
+            global_treece_minimization_functions.compute_loss_and_jacobian,
+            x0=initial_guess,
+            bounds=bounds,
+            method="L-BFGS-B",
+            options={"disp": (0 if silent else 2),},
+            jac=True
+        )
+        x0 = (
+            global_treece_minimization_functions.a
+            @ result.x[:control_points.shape[0]]
+        )
+        t = (
+            global_treece_minimization_functions.a
+            @ result.x[control_points.shape[0]:2*control_points.shape[0]]
+        )
+        y0 = result.x[-3]
+        y2 = result.x[-2]
+        sigma = result.x[-1]
+
+    return (x0, t, y0, y2, sigma)
 
 
 def treece_thickness(args: Namespace) -> None:
@@ -896,17 +1460,11 @@ def treece_thickness(args: Namespace) -> None:
         intensity_profiles = gaussian_filter1d(
             intensity_profiles, args.intensity_smoothing_sigma, axis=1
         )
-        # get the control points
-        if ~args.silent:
-            message("Computing the control points...")
-        control_points_idxs = compute_control_point_indices(
-            surface.points, use_indices, args.control_point_separation, args.silent
-        )
         # fit the model
         if ~args.silent:
             message("Fitting the model...")
         params = treece_fit_global(
-            surface.points[control_points_idxs, :],
+            args.control_point_separations,
             surface.points[use_indices, :],
             intensity_profiles,
             x,
@@ -921,13 +1479,12 @@ def treece_thickness(args: Namespace) -> None:
             args.soft_tissue_intensity_bounds,
             args.trabecular_bone_intensity_bounds,
             args.model_sigma_bounds,
-            args.thin_plate_spline_smoothing,
-            args.thin_plate_spline_neighbours,
-            args.thin_plate_spline_degree,
+            args.idw_distance_power,
+            args.idw_neighbours,
             args.silent
         )
-        surface["thickness"][use_indices] = params[:, 1]
-        surface["cort_center"][use_indices] = params[:, 0]
+        surface["thickness"][use_indices] = params[1]
+        surface["cort_center"][use_indices] = params[0]
     else:
         if ~args.silent:
             message("Fitting the Treece model to each surface point individually...")
@@ -1176,25 +1733,20 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "--global-model-fit", "-gmf", default=False, action="store_true",
-        help="enable this flag to use thin plate splines to fit the model to the entire surface at once"
+        help="enable this flag to use interpolation to fit the model to the entire surface at once"
     )
     parser.add_argument(
-        "--control-point-separation", "-cps", type=float, default=5,
-        help="separation of control points for the thin plate spline model fit; "
-             "higher values will result in less control points and a smoother thickness map"
+        "--control-point-separations", "-cps", type=float, default=[5], nargs="+",
+        help="separation of control points at each stage of the global "
+             "hierarchical global model fitting"
     )
     parser.add_argument(
-        "--thin-plate-spline-neighbours", "-tpsn", type=int, default=25,
-        help="number of neighbours to use when performing thin plate spline interpolation; "
-             "higher values will result in longer run time for model fitting"
+        "--idw-distance-power", "-idp", type=int, default=-2,
+        help="power of the distance for the inverse distance weighting interpolation"
     )
     parser.add_argument(
-        "--thin-plate-spline-smoothing", "-tpss", type=float, default=1.0,
-        help="smoothing parameter for the thin plate spline interpolation (larger values will result in smoother thickness maps)"
-    )
-    parser.add_argument(
-        "--thin-plate-spline-degree", "-tpsd", type=int, default=1,
-        help="degree of the added polynomial in the thin plate spline interpolation (recommend leaving as default)"
+        "--idw-neighbours", "-idn", type=int, default=10,
+        help="number of neighbours to use for the inverse distance weighting interpolation"
     )
 
     return parser
