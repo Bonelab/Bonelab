@@ -8,6 +8,10 @@ from bonelab.util.cortical_thickness.TreeceModel import TreeceModel
 
 
 class BaseTreeceMinimization(metaclass=ABCMeta):
+    '''
+    Abstract base class for Treece minimization.
+    '''
+
     def __init__(
         self,
         rho_c: Optional[float],
@@ -193,4 +197,12 @@ class BaseTreeceMinimization(metaclass=ABCMeta):
 
     @abstractmethod
     def fit(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        '''
+        Fit the Treece model to the intensity profiles.
+
+        Returns
+        -------
+        Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+            The fitted parameters: m, t, rho_s, rho_b, sigma.
+        '''
         pass

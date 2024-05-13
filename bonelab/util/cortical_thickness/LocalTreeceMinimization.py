@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Tuple, Callable, Optional
 import numpy as np
-from tqdm import tqdm
+from tqdm import trange
 from scipy.optimize import least_squares
 
 from bonelab.util.cortical_thickness.BaseTreeceMinimization import BaseTreeceMinimization
@@ -12,12 +12,23 @@ from bonelab.util.cortical_thickness.TreeceModel import TreeceModel
 class LocalTreeceMinimization(BaseTreeceMinimization):
 
     def __init__(self, *args, **kwargs) -> None:
+        '''
+        Initialization function.
+        '''
         super().__init__(*args, **kwargs)
         self._idx = None
 
 
     @property
     def idx(self) -> Optional[int]:
+        '''
+        Get the index of the current profile being fit.
+
+        Returns
+        -------
+        Optional[int]
+            The index of the current profile being fit.
+        '''
         return self._idx
 
 
@@ -74,16 +85,14 @@ class LocalTreeceMinimization(BaseTreeceMinimization):
         rho_b = np.zeros((self.f_ij.shape[0],))
         sigma = np.zeros((self.f_ij.shape[0],))
 
-        for i in tqdm(range(self.f_ij.shape[0]), disable=self.silent):
+        for i in trange(self.f_ij.shape[0], disable=self.silent):
             self._idx = i
-
             result = least_squares(
                 fun=self._compute_residuals,
                 x0=initial_guess,
                 bounds=(lower_bounds, upper_bounds),
                 method="trf"
             )
-
             m[i], t[i], rho_s[i], rho_b[i], sigma[i] = result.x
 
         return m, t, rho_s, rho_b, sigma

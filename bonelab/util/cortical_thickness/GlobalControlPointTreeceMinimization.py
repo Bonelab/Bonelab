@@ -13,9 +13,8 @@ from bonelab.util.cortical_thickness.ctth_util import compute_gaussian_distance_
 
 class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
     '''
-    Class to compute the residuals and Jacobian of the residuals for
-    the global optimization of the Treece model using a random control
-    point and a Gaussian distance weighting transformation.
+    Class to perform the global Treece minimization using a
+    hierarchical multiscale control point interpolation approach.
     '''
 
     def __init__(
@@ -237,6 +236,11 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
         Update the interpolation matrix using the current
         points, control points, distance power, and number
         of nearest neighbours.
+
+        Parameters
+        ----------
+        sigma : float
+            The standard deviation of the Gaussian weighting
         '''
         self._a = compute_gaussian_distance_weighting_transformation(
             self._points, self._control_points,
