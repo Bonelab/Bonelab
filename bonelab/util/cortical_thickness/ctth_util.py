@@ -5,8 +5,6 @@ import numpy as np
 import pyvista as pv
 from skimage.morphology import binary_erosion, binary_dilation
 from tqdm import tqdm, trange
-from scipy.spatial import KDTree
-from scipy.sparse import csr_matrix
 
 
 def dilate_mask(mask: pv.UniformGrid, dilate_amount: Tuple[int, int, int]) -> pv.UniformGrid:
@@ -170,7 +168,6 @@ def compute_gaussian_distance_weighting_transformation(
     control_points: np.ndarray,
     sigma: float,
     neighbours: int,
-    force_zero_diagonal: bool = False,
     eps: float = 1e-8
 ) -> csr_matrix:
     '''
@@ -191,9 +188,9 @@ def compute_gaussian_distance_weighting_transformation(
     neighbours : int
         The number of neighbours to consider.
 
-    force_zero_diagonal : bool
-        Flag to set to force the diagonal elements of the
-        matrix to be zero.
+    diagonal_value : Optional[int]
+        The value to set the diagonal elements to. If None, the diagonal
+        elements are left as is.
 
     eps : float
         A small value to avoid division by zero.
@@ -226,15 +223,22 @@ def compute_gaussian_distance_weighting_transformation(
         * np.exp( -0.5 * (distances / sigma)**2 )
     )
 
-    if force_zero_diagonal:
+    if diagonal_value is not None:
         npts, nnbrs = distances.shape
         use_distance = (cols != rows)
         distances = distances[use_distance].reshape(npts, nnbrs - 1)
         cols = cols[use_distance].reshape(npts, nnbrs - 1)
         rows = rows[use_distance].reshape(npts, nnbrs - 1)
 
-    distances = distances / distances.sum(axis=1)[:,None]
+
+    vals = distances / distances.sum(axis=1)[:,None]
+
+    if diagonal_value is not None:
+        vals = np.hstack([vals, np.ones((n_points, 1)) * diagonal_value])
+        cols = np.hstack([cols, np.arange(n_control_points)])
+        rows = np.hstack([rows, np.arange(n_points)])
+
     return csr_matrix(
-        (distances.flatten(), (rows.flatten(), cols.flatten())),
+        (vals.flatten(), (rows.flatten(), cols.flatten())),
         shape=(n_points, n_control_points)
     )

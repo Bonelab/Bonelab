@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import List, Optional, Tuple
 import numpy as np
+from scipy.spatial import KDTree
 from scipy.sparse import csr_matrix
 from scipy.optimize import minimize
 from tqdm import trange
 
 from bonelab.util.time_stamp import message
 from bonelab.util.cortical_thickness.BaseTreeceMinimization import BaseTreeceMinimization
-from bonelab.util.cortical_thickness.ctth_util import compute_gaussian_distance_weighting_transformation
 
 
 class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
@@ -22,9 +22,6 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
         points: np.ndarray,
         control_point_separations: List[float],
         interpolation_neighbours: int,
-        max_iterations: int,
-        f_tol: float,
-        g_tol: float,
         *args,
         **kwargs
     ) -> None:
@@ -44,15 +41,6 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
         interpolation_neighbours : int
             The number of nearest neighbours to use.
 
-        max_iterations : int
-            The maximum number of iterations to perform.
-
-        f_tol : float
-            The tolerance for convergence of the function value.
-
-        g_tol : float
-            The tolerance for convergence of the gradient.
-
         *args, **kwargs
             Additional arguments to pass to the Base
         '''
@@ -67,9 +55,6 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
         self._control_points = None
         self._control_point_idxs = []
         self._interpolation_neighbours = interpolation_neighbours
-        self._max_iterations = max_iterations
-        self._f_tol = f_tol
-        self._g_tol = g_tol
 
 
     @property
@@ -172,42 +157,6 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
 
 
     @property
-    def max_iterations(self) -> int:
-        '''
-        The maximum number of iterations for the optimization.
-
-        Returns
-        -------
-        int
-        '''
-        return self._max_iterations
-
-
-    @property
-    def f_tol(self) -> float:
-        '''
-        The tolerance for the function value.
-
-        Returns
-        -------
-        float
-        '''
-        return self._f_tol
-
-
-    @property
-    def g_tol(self) -> float:
-        '''
-        The tolerance for the gradient.
-
-        Returns
-        -------
-        float
-        '''
-        return self._g_tol
-
-
-    @property
     def a(self) -> Optional[csr_matrix]:
         '''
         The interpolation matrix.
@@ -242,50 +191,28 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
         sigma : float
             The standard deviation of the Gaussian weighting
         '''
-        self._a = compute_gaussian_distance_weighting_transformation(
-            self._points, self._control_points,
-            sigma, self._interpolation_neighbours,
+        neighbours = min(self.interpolation_neighbours, self.q)
+
+        kdtree = KDTree(self.control_points)
+        distances, cols = kdtree.query(self.points, neighbours)
+        rows = (
+            np.ones((1, neighbours), dtype=int)
+            * np.arange(self.n).reshape(self.n, 1)
+        )
+        vals = (
+            ( 1 / (sigma * np.sqrt(2 * np.pi)) )
+            * np.exp( -0.5 * (distances / sigma)**2 )
+        )
+
+        self._a = csr_matrix(
+            (
+                (vals / vals.sum(axis=1)[:,None]).flatten(),
+                (rows.flatten(), cols.flatten())
+            ),
+            shape=(self.n, self.q)
         )
 
         self._a_t = self._a.T
-
-
-
-    def _compute_loss_and_jacobian_initial(
-        self, control_params: np.ndarray
-    ) -> Tuple[float, np.ndarray]:
-        '''
-        Compute the loss and Jacobian of the loss with respect to
-        the control parameters for the initial optimization step,
-        where there is only one set of model parameters applied
-        simultaneously to all points.
-
-        Parameters
-        ----------
-        control_params : (5, 1) np.ndarray
-            The control parameters: [m, t, s, b, sigma]
-
-        Returns
-        -------
-        Tuple[float, (5,) np.ndarray]
-            The loss and Jacobian of the loss with respect to the
-            control parameters.
-        '''
-        m = control_params[0].reshape(1,1)
-        t = control_params[1].reshape(1,1)
-        rho_s = control_params[2].reshape(1,1)
-        rho_b = control_params[3].reshape(1,1)
-        sigma = control_params[4].reshape(1,1)
-        fhat_ij, dfhat_ij_gradient = self.treece_model.compute_intensities_and_derivatives(
-            self.x_j, m, t, rho_s, rho_b, sigma
-        )
-        r_ij = fhat_ij - self.f_ij
-        loss = 0.5 * (self.gamma_j * np.power(r_ij, 2)).mean()
-        jacobian = np.array([
-            (self.gamma_j * r_ij * dfhat_ij_dp).mean()
-            for dfhat_ij_dp in dfhat_ij_gradient
-        ])
-        return loss, jacobian
 
 
     def _compute_loss_and_jacobian(
@@ -318,12 +245,12 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
             self.x_j, m, t, rho_s, rho_b, sigma
         )
         r_ij = fhat_ij - self.f_ij
-        loss = 0.5 * (self._gamma_j * np.power(r_ij, 2)).mean(axis=1).mean(axis=0)
+        loss = 0.5 * (self.gamma_j * np.power(r_ij, 2)).mean(axis=1).mean(axis=0)
         jacobian = np.concatenate([
-            self.a_t @ (self._gamma_j * r_ij * dfhat_ij_gradient[0]).mean(axis=1) / self.n,
-            self.a_t @ (self._gamma_j * r_ij * dfhat_ij_gradient[1]).mean(axis=1) / self.n,
+            self.a_t @ (self.gamma_j * r_ij * dfhat_ij_gradient[0]).mean(axis=1) / self.n,
+            self.a_t @ (self.gamma_j * r_ij * dfhat_ij_gradient[1]).mean(axis=1) / self.n,
             np.asarray([
-                (self._gamma_j * r_ij * dfhat_ij_dp).mean() / self.n
+                (self.gamma_j * r_ij * dfhat_ij_dp).mean() / self.n
                 for dfhat_ij_dp in dfhat_ij_gradient[2:]
             ])
         ])
@@ -354,60 +281,16 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
         self._update_interpolation_matrix(separation)
 
 
-    def fit(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def fit(self) -> Tuple[np.ndarray, np.ndarray, float, float, float]:
         '''
         Fit the model to the data.
 
         Returns
         -------
-        Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+        Tuple[np.ndarray, np.ndarray, float, float, float]
             The fitted parameters: m, t, rho_s, rho_b, sigma.
         '''
-
-        bounds = list(zip(
-            [
-                self.x_j.min(), self.t_bounds[0],
-                self.rho_s_bounds[0], self.rho_b_bounds[0], self.sigma_bounds[0]
-            ],
-            [
-                self.x_j.max(), self.t_bounds[1],
-                self.rho_s_bounds[1], self.rho_b_bounds[1], self.sigma_bounds[1]
-            ]
-        ))
-
-        initial_guess = [
-            0, # we always guess '0' for the m parameter
-            self.t_initial_guess,
-            self.rho_s_initial_guess,
-            self.rho_b_initial_guess,
-            self.sigma_initial_guess
-        ]
-
-        minimize_options = {
-            "disp": (0 if self.silent else 2),
-            "maxiter": self.max_iterations,
-            "ftol": self.f_tol,
-            "gtol": self.g_tol
-        }
-
-        if ~self.silent:
-            message("Initial global model fit:")
-
-        result = minimize(
-            self._compute_loss_and_jacobian_initial,
-            x0=initial_guess,
-            bounds=bounds,
-            method="L-BFGS-B",
-            options=minimize_options,
-            jac=True
-        )
-
-        m = result.x[0] * np.ones((self.n,))
-        t = result.x[1] * np.ones((self.n,))
-        rho_s = result.x[-3]
-        rho_b = result.x[-2]
-        sigma = result.x[-1]
-
+        m, t, rho_s, rho_b, sigma = self._initial_fit()
         for si, separation in enumerate(self.control_point_separations):
             if ~self.silent:
                 message(
@@ -415,9 +298,7 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
                     f"{si + 1} / {len(self.control_point_separations)}: "
                     f"separation = {separation:0.3e}"
                 )
-
             self._update_control_points(separation)
-
             bounds = list(zip(
                 (
                     [self.x_j.min()] * self.q
@@ -430,23 +311,21 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
                     + [self.rho_s_bounds[1], self.rho_b_bounds[1], self.sigma_bounds[1]]
                 )
             ))
-
             initial_guess = np.concatenate([
                 m[self.control_point_idxs],
                 t[self.control_point_idxs],
-                result.x[-3:]
+                np.array([rho_s, rho_b, sigma])
             ])
-
             result = minimize(
                 self._compute_loss_and_jacobian,
                 x0=initial_guess,
                 bounds=bounds,
                 method="L-BFGS-B",
-                options=minimize_options,
+                options=self.minimize_options,
                 jac=True
             )
             m = self.a @ result.x[:self.q]
-            t = self.a @result.x[self.q:(2 * self.q)]
+            t = self.a @ result.x[self.q:(2 * self.q)]
             rho_s = result.x[-3]
             rho_b = result.x[-2]
             sigma = result.x[-1]

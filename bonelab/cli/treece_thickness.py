@@ -93,7 +93,7 @@ def treece_thickness(args: Namespace) -> None:
         sub_mask = dilate_mask(sub_mask, args.sub_mask_dilation)
         bone_mask["use_point"] = sub_mask["NIFTI"]
     else:
-        surface["use_point"] = np.ones(surface.n_points)
+        bone_mask["use_point"] = np.ones_like(bone_mask["NIFTI"])
     if ~args.silent:
         message("Computing the surface of the bone mask...")
     surface = bone_mask.contour([1], progress_bar=~args.silent)
@@ -146,16 +146,16 @@ def treece_thickness(args: Namespace) -> None:
            args.soft_tissue_intensity_bounds,
            args.trabecular_bone_intensity_bounds,
            args.model_sigma_bounds,
-           args.silent
+           args.silent,
+           args.max_iterations,
+           args.function_tolerance,
+           args.gradient_tolerance
         )
     elif args.mode == "global-interpolation":
         minimization = GlobalControlPointTreeceMinimization(
             surface.points[use_indices,:],
             args.control_point_separations,
             args.neighbours,
-            400,
-            1e-6,
-            1e-6,
             args.cortical_density,
             intensity_profiles,
             x,
@@ -168,10 +168,34 @@ def treece_thickness(args: Namespace) -> None:
             args.soft_tissue_intensity_bounds,
             args.trabecular_bone_intensity_bounds,
             args.model_sigma_bounds,
-            args.silent
+            args.silent,
+            args.max_iterations,
+            args.function_tolerance,
+            args.gradient_tolerance
         )
     elif args.mode == "global-regularization":
-        raise NotImplementedError("Global regularization is not yet implemented.")
+        minimization = GlobalRegularizationTreeceMinimization(
+            surface.points[use_indices,:],
+            args.neighbours,
+            args.sigma_regularization,
+            args.lambda_regularization,
+            args.cortical_density,
+            intensity_profiles,
+            x,
+            args.residual_boost_factor,
+            args.thickness_initial_guess,
+            args.soft_tissue_intensity_initial_guess,
+            args.trabecular_bone_intensity_initial_guess,
+            args.model_sigma_initial_guess,
+            args.thickness_bounds,
+            args.soft_tissue_intensity_bounds,
+            args.trabecular_bone_intensity_bounds,
+            args.model_sigma_bounds,
+            args.silent,
+            args.max_iterations,
+            args.function_tolerance,
+            args.gradient_tolerance
+        )
     else:
         raise ValueError(
             f"Unrecognized mode: {args.mode}. "
@@ -362,8 +386,24 @@ def create_parser() -> ArgumentParser:
         help="number of neighbours to use for the inverse distance weighting interpolation"
     )
     parser.add_argument(
-        "--lambda", "-l", type=float, default=0.1,
+        "--lambda-regularization", "-l", type=float, default=0.1,
         help="lambda parameter for the regularization term in the global-regularization mode"
+    )
+    parser.add_argument(
+        "--sigma-regularization", "-sr", type=float, default=3.0,
+        help="sigma parameter for the regularization term in the global-regularization mode"
+    )
+    parser.add_argument(
+        "--max-iterations", "-mi", type=int, default=400,
+        help="maximum number of iterations for the optimization algorithm"
+    )
+    parser.add_argument(
+        "--function-tolerance", "-ft", type=float, default=1e-6,
+        help="function tolerance for the optimization algorithm"
+    )
+    parser.add_argument(
+        "--gradient-tolerance", "-gt", type=float, default=1e-6,
+        help="gradient tolerance for the optimization algorithm"
     )
 
     return parser
