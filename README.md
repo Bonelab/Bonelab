@@ -27,9 +27,6 @@ git clone git@github.com:Bonelab/Bonelab.git
 git clone https://github.com/Bonelab/Bonelab.git
 
 # setup the environment
-conda create -n bl -c numerics88 -c conda-forge python=3 pyqt n88tools simpleitk pbr nose six pydicom gdcm
-
-# ... or start fresh
 conda create -n bl -c numerics88 -c conda-forge python=3 n88tools pbr nose
 
 # Activate the environemnt
@@ -51,9 +48,6 @@ git clone git@github.com:Bonelab/Bonelab.git
 git clone https://github.com/Bonelab/Bonelab.git
 
 # setup the environment
-CONDA_SUBDIR=osx-64 conda create -n bl -c numerics88 -c conda-forge python=3 pyqt n88tools simpleitk pbr nose six pydicom gdcm
-
-# ... or start fresh
 CONDA_SUBDIR=osx-64 conda create -n bl -c numerics88 -c conda-forge python=3 n88tools pbr nose
 
 # Activate the environemnt
