@@ -194,7 +194,7 @@ def adaptive_local_thresholding(args: Namespace):
         writer.SetFileName(args.output)
         writer.Update()
     else:
-        segmentation_sitk = sitk.GetImageFromArray(segmentation)
+        segmentation_sitk = sitk.GetImageFromArray(segmentation.astype(int))
         segmentation_sitk.CopyInformation(image_sitk)
         sitk.WriteImage(segmentation_sitk, args.output)
 
