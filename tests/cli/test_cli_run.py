@@ -119,7 +119,7 @@ class TestCommandLineInterfaceRun(unittest.TestCase):
         out = os.path.join(self.test_dir, 'test25a_seg.aim')
         command = ['blAdaptiveLocalThresholding', aim, out, "--aims"]
         self.runner(command)
-        self.assertTrue(out, 'Cannot find file ' + out)
+        self.assertTrue(os.path.isfile(out), 'Cannot find file ' + out)
 
     def test_blFFTLaplaceHamming(self):
         """Can run `blFFTLaplaceHamming`"""
@@ -127,7 +127,13 @@ class TestCommandLineInterfaceRun(unittest.TestCase):
         out = os.path.join(self.test_dir, 'test25a_seg.aim')
         command = ['blFFTLaplaceHamming', aim, out, "--aims"]
         self.runner(command)
-        self.assertTrue(out, 'Cannot find file ' + out)
+        self.assertTrue(os.path.isfile(out), 'Cannot find file ' + out)
+
+    @unittest.skip("Not implemented")
+    def test_blTreeceThickness(self):
+        """Can run `blTreeceThickness`"""
+        pass
+
 
 
 if __name__ == '__main__':
