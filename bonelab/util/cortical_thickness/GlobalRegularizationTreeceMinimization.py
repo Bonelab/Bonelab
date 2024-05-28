@@ -122,6 +122,7 @@ class GlobalRegularizationTreeceMinimization(BaseTreeceMinimization):
         self._construct_regularization_matrix()
         self._lambda_regularization = lambda_regularization
         self._t0 = None
+        self._rho_c_0 = None
 
 
     @property
@@ -235,6 +236,17 @@ class GlobalRegularizationTreeceMinimization(BaseTreeceMinimization):
         '''
         return self._t0
 
+    @property
+    def rho_c_0(self) -> Optional[float]:
+        '''
+        The cortical density value to use for regularization scaling.
+
+        Returns
+        -------
+        Optional[float]
+        '''
+        return self._rho_c_0
+
 
     def _construct_regularization_matrix(self) -> None:
         '''
@@ -288,9 +300,10 @@ class GlobalRegularizationTreeceMinimization(BaseTreeceMinimization):
             self.x_j, m, t, rho_s, rho_b, sigma
         )
         r_ij = fhat_ij - self.f_ij
+
         loss = 0.5 * (
             (self._gamma_j * np.power(r_ij, 2)).mean()
-            + self.lambda_regularization * (self.rho_c ** 2) / (self._t0) * (
+            + self.lambda_regularization * (self._rho_c_0 ** 2) / (self._t0) * (
                 np.power(self.a @ m.reshape(self.n), 2).mean()
                 + np.power(self.a @ t.reshape(self.n), 2).mean()
             )
@@ -299,14 +312,14 @@ class GlobalRegularizationTreeceMinimization(BaseTreeceMinimization):
             (1 / self.n) * (
                 (self.gamma_j * r_ij * dfhat_ij_gradient[0]).mean(axis=1)
                 + (
-                    self.lambda_regularization * (self.rho_c ** 2) / (self._t0)
+                    self.lambda_regularization * (self._rho_c_0 ** 2) / (self._t0)
                     * self.a_t @ (self.a @ m.reshape(self.n))
                 )
             ),
             (1 / self.n) * (
                 (self.gamma_j * r_ij * dfhat_ij_gradient[1]).mean(axis=1)
                 + (
-                    self.lambda_regularization * (self.rho_c ** 2) / (self._t0)
+                    self.lambda_regularization * (self._rho_c_0 ** 2) / (self._t0)
                     * self.a_t @ (self.a @ t.reshape(self.n))
                 )
             ),
@@ -329,6 +342,7 @@ class GlobalRegularizationTreeceMinimization(BaseTreeceMinimization):
         '''
         m, t, rho_s, rho_b, sigma = self._initial_fit()
         self._t0 = t.mean()
+        self._rho_c_0 = np.max(self.rho_c)
         initial_guess = np.concatenate([
             m, t, np.array([rho_s, rho_b, sigma])
         ])
