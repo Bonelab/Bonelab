@@ -3,20 +3,6 @@ from __future__ import annotations
 # IMPORTS
 # external
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace, ArgumentTypeError
-'''
-from typing import Callable, Tuple, Optional, List, Union
-
-
-import SimpleITK as sitk
-from tqdm import tqdm, trange
-from skimage.morphology import binary_erosion, binary_dilation
-from matplotlib import pyplot as plt
-from scipy.special import erf
-from scipy.optimize import least_squares, minimize
-from scipy.ndimage import gaussian_filter1d
-
-from scipy.interpolate import RBFInterpolator
-'''
 import numpy as np
 import pyvista as pv
 from datetime import datetime
