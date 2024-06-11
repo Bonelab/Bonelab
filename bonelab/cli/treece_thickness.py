@@ -128,8 +128,6 @@ def treece_thickness(args: Namespace) -> None:
         args.sample_outside_distance,
         args.sample_inside_distance,
         dx,
-        args.constrain_normal_to_plane,
-        args.constraint_normal_to_axis,
         args.silent
     )
     surface.point_data["thickness"] = np.zeros((surface.n_points,))
