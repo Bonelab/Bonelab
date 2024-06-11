@@ -90,7 +90,7 @@ class BaseTreeceMinimization(metaclass=ABCMeta):
         self._rho_c = (
             rho_c
             if rho_c is not None
-            else f_ij.max(axis=0)
+            else f_ij.max(axis=1).reshape(f_ij.shape[0], 1)
         )
         self._create_treece_model()
         self._residual_boost_factor = residual_boost_factor
