@@ -48,6 +48,8 @@ def treece_thickness(args: Namespace) -> None:
     output_surface = f"{args.output_base}.vtk"
     output_log = f"{args.output_base}.log"
     check_for_output_overwrite([output_surface, output_log], args.overwrite, args.silent)
+    if args.constrain_normal_to_plane and args.constraint_normal_to_axis:
+        raise ValueError("Cannot constrain the normal to both a plane and an axis.")
     if ~args.silent:
         message("Reading in the image...")
     image = pv.read(args.image)
@@ -101,6 +103,21 @@ def treece_thickness(args: Namespace) -> None:
         flip_normals=True,
         progress_bar=~args.silent
     )
+    if args.constrain_normal_to_plane:
+        surface.point_data["Normals"][:,constrain_normal_to_plane] = 0
+    elif args.constrain_normal_to_axis:
+        surface.point_data["Normals"][:,:] = 0
+        surface.point_data["Normals"][:,constrain_normal_to_axis] = np.sign(constrain_normal_to_axis)
+    surface.point_data["Normals"] = (
+        surface.point_data["Normals"]
+        / (
+            np.sqrt(
+                (surface.point_data["Normals"]**2).sum(axis=-1)
+            )[:,np.newaxis]
+            + 1e-6
+        )
+    )
+
     if ~args.silent:
         message("Computing all of the intensity profiles in parallel...")
     use_indices = np.where(surface["use_point"] == 1)[0]
@@ -112,6 +129,7 @@ def treece_thickness(args: Namespace) -> None:
         args.sample_inside_distance,
         dx,
         args.constrain_normal_to_plane,
+        args.constraint_normal_to_axis,
         args.silent
     )
     surface.point_data["thickness"] = np.zeros((surface.n_points,))
@@ -335,9 +353,16 @@ def create_parser() -> ArgumentParser:
     )
 
     parser.add_argument(
-        "--constrain-normal-to-plane", "-cnxy", type=int, default=None,
+        "--constrain-normal-to-plane", "-cnp", type=int, default=None,
         help="Set this to 0, 1, or 2 to zero out the normal in the given direction. For radius and "
              "tibia images you probably should zero out the normal in axis 2 (axial direction)."
+    )
+    parser.add_argument(
+        "--constrain-normal-to-axis", "-cna", type=int, default=None,
+        help=(
+            "Set this to +/- 0, 1, or 2 to constrain the normal to the given axis. "
+            "Positive numbers will use a positive normal, negative numbers will use a negative normal. "
+        )
     )
     parser.add_argument(
         "--median-smooth-thicknesses", "-mst", default=False, action="store_true",
@@ -390,6 +415,13 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--gradient-tolerance", "-gt", type=float, default=1e-6,
         help="gradient tolerance for the optimization algorithm"
+    )
+    parser.add_argument(
+        "--control-point-rbf-splines", "-cprbf", default=False, action="store_true",
+        help=(
+            "enable this flag to use RBF splines as the final interpolation step "
+            "between stages and at the end in the global-regularization mode."
+        )
     )
 
     return parser

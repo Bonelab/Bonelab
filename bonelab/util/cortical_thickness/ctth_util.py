@@ -41,7 +41,6 @@ def sample_all_intensity_profiles(
     outside_dist: float,
     inside_dist: float,
     dx: float,
-    constrain_normal_to_plane: Optional[int],
     silent: bool
 ):
     '''
@@ -67,9 +66,6 @@ def sample_all_intensity_profiles(
     dx : float
         The spacing between sample points.
 
-    constrain_normal_to_plane : Optional[int]
-        The index of the axis to constrain the normal vectors to. If None, no constraint is applied.
-
     silent : bool
         Set this flag to not show the progress bar.
 
@@ -78,9 +74,6 @@ def sample_all_intensity_profiles(
     Tuple[np.ndarray, np.ndarray]
         The sampled intensities and the x values of the sample points.
     '''
-    if constrain_normal_to_plane:
-        normals[:,constrain_normal_to_plane] = 0
-    normals = normals / (np.sqrt((normals**2).sum(axis=-1))[:,np.newaxis] + 1e-6)
     x = np.arange(-outside_dist, inside_dist, dx)
     nx = x.shape[0]
     x = np.tile(x, points.shape[0])
