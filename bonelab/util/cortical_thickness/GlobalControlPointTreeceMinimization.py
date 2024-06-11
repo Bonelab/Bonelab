@@ -5,6 +5,7 @@ import numpy as np
 from scipy.spatial import KDTree
 from scipy.sparse import csr_matrix
 from scipy.optimize import minimize
+from scipy.interpolate import RBFInterpolator
 from tqdm import trange
 
 from bonelab.util.time_stamp import message
@@ -22,6 +23,9 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
         points: np.ndarray,
         control_point_separations: List[float],
         interpolation_neighbours: int,
+        use_rbf_spline: bool,
+        rbf_smooth: float,
+        rbf_degree: int,
         *args,
         **kwargs
     ) -> None:
@@ -41,6 +45,10 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
         interpolation_neighbours : int
             The number of nearest neighbours to use.
 
+        use_rbf_spline : bool
+            Whether to use a radial basis function spline for
+            interpolation between / after optimizations.
+
         *args, **kwargs
             Additional arguments to pass to the Base
         '''
@@ -55,6 +63,9 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
         self._control_points = None
         self._control_point_idxs = []
         self._interpolation_neighbours = interpolation_neighbours
+        self._use_rbf_spline = use_rbf_spline
+        self._rbf_smooth = rbf_smooth
+        self._rbf_degree = rbf_degree
 
 
     @property
@@ -154,6 +165,43 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
         int
         '''
         return self._interpolation_neighbours
+
+
+    @property
+    def use_rbf_spline(self) -> bool:
+        '''
+        Whether to use a radial basis function spline for
+        interpolation between / after optimizations.
+
+        Returns
+        -------
+        bool
+        '''
+        return self._use_rbf_spline
+
+
+    @property
+    def rbf_smooth(self) -> float:
+        '''
+        The smoothing parameter for the RBF spline.
+
+        Returns
+        -------
+        float
+        '''
+        return self._rbf_smooth
+
+
+    @property
+    def rbf_degree(self) -> int:
+        '''
+        The degree of the RBF spline.
+
+        Returns
+        -------
+        int
+        '''
+        return self._rbf_degree
 
 
     @property
@@ -324,8 +372,19 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
                 options=self.minimize_options,
                 jac=True
             )
-            m = self.a @ result.x[:self.q]
-            t = self.a @ result.x[self.q:(2 * self.q)]
+            if self.use_rbf_spline:
+                m = RBFInterpolator(
+                    self.control_points,
+                    result.x[:self.q],
+                    neighbors=self.interpolation_neighbours,
+                    kernel="thin_plate_spline",
+                    smoothing=self.rbf_smooth,
+                    degree=self.rbf_degree
+                )(self.points)
+                # then t
+            else:
+                m = self.a @ result.x[:self.q]
+                t = self.a @ result.x[self.q:(2 * self.q)]
             rho_s = result.x[-3]
             rho_b = result.x[-2]
             sigma = result.x[-1]
