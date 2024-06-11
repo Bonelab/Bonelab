@@ -159,6 +159,8 @@ def treece_thickness(args: Namespace) -> None:
             args.control_point_separations,
             args.neighbours,
             args.control_point_rbf_splines,
+            args.control_point_rbf_smoothness,
+            args.control_point_rbf_degree,
             args.cortical_density,
             intensity_profiles,
             x,
@@ -421,6 +423,14 @@ def create_parser() -> ArgumentParser:
             "enable this flag to use RBF splines as the final interpolation step "
             "between stages and at the end in the global-regularization mode."
         )
+    )
+    parser.add_argument(
+        "--control-point-rbf-smoothness", "-cprbfs", type=float, default=1.0,
+        help="smoothness parameter for the RBF spline interpolation"
+    )
+    parser.add_argument(
+        "--control-point-rbf-degree", "-cprbfd", type=int, default=1,
+        help="degree of the add polynomial in the RBF spline interpolation"
     )
 
     return parser
