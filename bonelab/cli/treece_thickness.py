@@ -48,7 +48,7 @@ def treece_thickness(args: Namespace) -> None:
     output_surface = f"{args.output_base}.vtk"
     output_log = f"{args.output_base}.log"
     check_for_output_overwrite([output_surface, output_log], args.overwrite, args.silent)
-    if args.constrain_normal_to_plane and args.constraint_normal_to_axis:
+    if args.constrain_normal_to_plane and args.constrain_normal_to_axis:
         raise ValueError("Cannot constrain the normal to both a plane and an axis.")
     if ~args.silent:
         message("Reading in the image...")
@@ -104,10 +104,10 @@ def treece_thickness(args: Namespace) -> None:
         progress_bar=~args.silent
     )
     if args.constrain_normal_to_plane:
-        surface.point_data["Normals"][:,constrain_normal_to_plane] = 0
+        surface.point_data["Normals"][:,args.constrain_normal_to_plane] = 0
     elif args.constrain_normal_to_axis:
         surface.point_data["Normals"][:,:] = 0
-        surface.point_data["Normals"][:,constrain_normal_to_axis] = np.sign(constrain_normal_to_axis)
+        surface.point_data["Normals"][:,args.constrain_normal_to_axis] = np.sign(args.constrain_normal_to_axis)
     surface.point_data["Normals"] = (
         surface.point_data["Normals"]
         / (
