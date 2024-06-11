@@ -22,6 +22,7 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
         points: np.ndarray,
         control_point_separations: List[float],
         interpolation_neighbours: int,
+        use_rbf_spline: bool,
         *args,
         **kwargs
     ) -> None:

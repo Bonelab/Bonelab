@@ -158,6 +158,7 @@ def treece_thickness(args: Namespace) -> None:
             surface.points[use_indices,:],
             args.control_point_separations,
             args.neighbours,
+            args.control_point_rbf_splines,
             args.cortical_density,
             intensity_profiles,
             x,
