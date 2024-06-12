@@ -286,9 +286,9 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
         '''
         m = self.a @ control_params[:self.q].reshape(self.q, 1)
         t = self.a @ control_params[self.q:(2 * self.q)].reshape(self.q, 1)
-        rho_s = control_params[-3].reshape(1,1)
-        rho_b = control_params[-2].reshape(1,1)
-        sigma = control_params[-1].reshape(1,1)
+        rho_s = control_params[2 * self.q].reshape(1,1)
+        rho_b = control_params[2 * self.q + 1].reshape(1,1)
+        sigma = control_params[(-self.q):].reshape(self.q,1)
         fhat_ij, dfhat_ij_gradient = self.treece_model.compute_intensities_and_derivatives(
             self.x_j, m, t, rho_s, rho_b, sigma
         )
@@ -299,8 +299,9 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
             self.a_t @ (self.gamma_j * r_ij * dfhat_ij_gradient[1]).mean(axis=1) / self.n,
             np.asarray([
                 (self.gamma_j * r_ij * dfhat_ij_dp).mean() / self.n
-                for dfhat_ij_dp in dfhat_ij_gradient[2:]
-            ])
+                for dfhat_ij_dp in dfhat_ij_gradient[2:4]
+            ]),
+            self.a_t @ (self.gamma_j * r_ij * dfhat_ij_gradient[4]).mean(axis=1) / self.n,
         ])
         return loss, jacobian
 
