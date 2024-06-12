@@ -226,7 +226,7 @@ class GlobalRegularizationTreeceMinimization(BaseTreeceMinimization):
         t = params[self.n:(2 * self.n)].reshape(self.n, 1)
         rho_s = params[2 * self.n].reshape(1,1)
         rho_b = params[2 * self.n + 1].reshape(1,1)
-        sigma = params[(-self.n):].reshape(1,1)
+        sigma = params[(-self.n):].reshape(self.n, 1)
         fhat_ij, dfhat_ij_gradient = self.treece_model.compute_intensities_and_derivatives(
             self.x_j, m, t, rho_s, rho_b, sigma
         )

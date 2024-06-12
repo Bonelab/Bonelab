@@ -190,13 +190,12 @@ def treece_thickness(args: Namespace) -> None:
             f"Unrecognized mode: {args.mode}. "
             f"Must be one of: 'local', 'global-interpolation', 'global-regularization'"
         )
-    (
-        surface.point_data["cort_center"][use_indices],
-        surface.point_data["thickness"][use_indices],
-        surface.field_data["rho_s"],
-        surface.field_data["rho_b"],
-        surface.point_data["sigma"][use_indices]
-    ) = minimization.fit()
+    parameters = minimization.fit()
+    surface.point_data["cort_center"][use_indices] = parameters[0]
+    surface.point_data["thickness"][use_indices] = parameters[1]
+    #surface.field_data["rho_s"] = parameters[2]
+    #surface.field_data["rho_b"] = parameters[3]
+    surface.point_data["sigma"][use_indices] = parameters[4]
 
     if args.median_smooth_thicknesses:
         if ~args.silent:
