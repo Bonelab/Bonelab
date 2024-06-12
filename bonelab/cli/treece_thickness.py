@@ -8,6 +8,7 @@ import pyvista as pv
 from datetime import datetime
 import os
 import sys
+import pickle
 
 # internal
 from bonelab.util.registration_util import (
@@ -47,7 +48,11 @@ def treece_thickness(args: Namespace) -> None:
     check_inputs_exist(input_fns, args.silent)
     output_surface = f"{args.output_base}.vtk"
     output_log = f"{args.output_base}.log"
-    check_for_output_overwrite([output_surface, output_log], args.overwrite, args.silent)
+    output_fns = [output_surface, output_log]
+    if args.pickle_intensiites:
+        output_pickle = f"{args.output_base}.pkl"
+        output_fns.append(output_pickle)
+    check_for_output_overwrite(output_fns, args.overwrite, args.silent)
     if args.constrain_normal_to_plane and args.constrain_normal_to_axis:
         raise ValueError("Cannot constrain the normal to both a plane and an axis.")
     if ~args.silent:
@@ -130,6 +135,11 @@ def treece_thickness(args: Namespace) -> None:
         dx,
         args.silent
     )
+    if args.pickle_intensities:
+        if ~args.silent:
+            message("Pickling the intensity profiles...")
+        with open(args.pickle_intensities, "wb") as f:
+            pickle.dump((intensity_profiles, x), f)
     surface.point_data["thickness"] = np.zeros((surface.n_points,))
     surface.point_data["cort_center"] = np.zeros((surface.n_points,))
 
@@ -410,6 +420,10 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--control-point-rbf-degree", "-cprbfd", type=int, default=1,
         help="degree of the add polynomial in the RBF spline interpolation"
+    )
+    parser.add_argument(
+        "--pickle-intensities", "-pi", default=False, action="store_true",
+        help="enable this flag to pickle the sampled intensities for debugging / viz purposes"
     )
 
     return parser
