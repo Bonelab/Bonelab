@@ -47,6 +47,8 @@ class LocalTreeceMinimization(BaseTreeceMinimization):
             The residuals between the modelled and the sampled intensities.
         '''
         modelled_intensities = self.treece_model.compute_intensities(self.x_j, *args)
+        if len(modelled_intensities) > 1:
+            modelled_intensities = modelled_intensities[self.idx, :]
         return self.gamma_j * (modelled_intensities - self.f_ij[self.idx, :])
 
 
