@@ -49,7 +49,7 @@ def treece_thickness(args: Namespace) -> None:
     output_surface = f"{args.output_base}.vtk"
     output_log = f"{args.output_base}.log"
     output_fns = [output_surface, output_log]
-    if args.pickle_intensiites:
+    if args.pickle_intensities:
         output_pickle = f"{args.output_base}.pkl"
         output_fns.append(output_pickle)
     check_for_output_overwrite(output_fns, args.overwrite, args.silent)
@@ -138,7 +138,7 @@ def treece_thickness(args: Namespace) -> None:
     if args.pickle_intensities:
         if ~args.silent:
             message("Pickling the intensity profiles...")
-        with open(args.pickle_intensities, "wb") as f:
+        with open(output_pickle, "wb") as f:
             pickle.dump((intensity_profiles, x), f)
     surface.point_data["thickness"] = np.zeros((surface.n_points,))
     surface.point_data["cort_center"] = np.zeros((surface.n_points,))
