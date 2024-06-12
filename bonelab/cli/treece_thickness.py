@@ -40,6 +40,7 @@ def treece_thickness(args: Namespace) -> None:
     args : Namespace
         The parsed command line arguments.
     '''
+    start_time = datetime.now()
     echoed_args = echo_arguments("Treece Thickness", vars(args))
     print(echoed_args)
     input_fns = args.bone_masks + [args.image]
@@ -142,6 +143,7 @@ def treece_thickness(args: Namespace) -> None:
             pickle.dump((intensity_profiles, x), f)
     surface.point_data["thickness"] = np.zeros((surface.n_points,))
     surface.point_data["cort_center"] = np.zeros((surface.n_points,))
+    surface.point_data["sigma"] = np.zeros((surface.n_points,))
 
     # here is where we check the mode and then create a minimization object and fit the model
     common_args = [
@@ -188,9 +190,13 @@ def treece_thickness(args: Namespace) -> None:
             f"Unrecognized mode: {args.mode}. "
             f"Must be one of: 'local', 'global-interpolation', 'global-regularization'"
         )
-    parameters = minimization.fit()
-    surface.point_data["thickness"][use_indices] = parameters[1]
-    surface.point_data["cort_center"][use_indices] = parameters[0]
+    (
+        surface.point_data["cort_center"][use_indices],
+        surface.point_data["thickness"][use_indices],
+        surface.field_data["rho_s"],
+        surface.field_data["rho_b"],
+        surface.point_data["sigma"][use_indices]
+    ) = minimization.fit()
 
     if args.median_smooth_thicknesses:
         if ~args.silent:
@@ -204,15 +210,17 @@ def treece_thickness(args: Namespace) -> None:
     if ~args.silent:
         message("Calculate mean and standard deviation of thickness...")
     thickness = surface["thickness"][surface["use_point"] == 1]
-    mean_thickness = np.mean(thickness[thickness>0])
-    std_thickness = np.std(thickness[thickness>0])
+    mean_thickness = thickness.mean()
+    std_thickness = thickness.std()
 
     if ~args.silent:
         message("Writing log file...")
 
     with open(output_log, "w") as f:
         f.write(echoed_args)
-        f.write(f"Date and time: {datetime.now()}\n")
+        f.write("-"*30 + "\n")
+        f.write(f"Start time: {start_time}\n")
+        f.write(f"Finish time: {datetime.now()}\n")
         f.write("-"*30 + "\n")
         f.write(f"Mean Thickness: {mean_thickness}\n")
         f.write(f"Standard Deviation of Thickness: {std_thickness}\n")
