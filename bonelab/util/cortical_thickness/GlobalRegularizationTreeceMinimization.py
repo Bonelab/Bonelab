@@ -40,6 +40,7 @@ class GlobalRegularizationTreeceMinimization(BaseTreeceMinimization):
         self._lambda_regularization = lambda_regularization
         self._t0 = None
         self._rho_c_0 = None
+        self._sigma0 = None
 
 
     @property
@@ -165,6 +166,19 @@ class GlobalRegularizationTreeceMinimization(BaseTreeceMinimization):
         return self._rho_c_0
 
 
+    @property
+    def sigma0(self) -> Optional[float]:
+        '''
+        The initial value of the standard deviation of the Gaussian
+        blurring fitted in the model.
+
+        Returns
+        -------
+        Optional[float]
+        '''
+        return self._sigma0
+
+
     def _construct_regularization_matrix(self) -> None:
         '''
         Update the regularization matrix.
@@ -210,9 +224,9 @@ class GlobalRegularizationTreeceMinimization(BaseTreeceMinimization):
 
         m = params[:self.n].reshape(self.n, 1)
         t = params[self.n:(2 * self.n)].reshape(self.n, 1)
-        rho_s = params[-3].reshape(1,1)
-        rho_b = params[-2].reshape(1,1)
-        sigma = params[-1].reshape(1,1)
+        rho_s = params[2 * self.n].reshape(1,1)
+        rho_b = params[2 * self.n + 1].reshape(1,1)
+        sigma = params[(-self.n):].reshape(1,1)
         fhat_ij, dfhat_ij_gradient = self.treece_model.compute_intensities_and_derivatives(
             self.x_j, m, t, rho_s, rho_b, sigma
         )
@@ -229,50 +243,60 @@ class GlobalRegularizationTreeceMinimization(BaseTreeceMinimization):
             (1 / self.n) * (
                 (self.gamma_j * r_ij * dfhat_ij_gradient[0]).mean(axis=1)
                 + (
-                    self.lambda_regularization * (self._rho_c_0 ** 2) / (self._t0)
+                    self.lambda_regularization * (self._rho_c_0 ** 2) / (self._t0 ** 2)
                     * self.a_t @ (self.a @ m.reshape(self.n))
                 )
             ),
             (1 / self.n) * (
                 (self.gamma_j * r_ij * dfhat_ij_gradient[1]).mean(axis=1)
                 + (
-                    self.lambda_regularization * (self._rho_c_0 ** 2) / (self._t0)
+                    self.lambda_regularization * (self._rho_c_0 ** 2) / (self._t0 ** 2)
                     * self.a_t @ (self.a @ t.reshape(self.n))
                 )
             ),
             np.asarray([
                 (self._gamma_j * r_ij * dfhat_ij_dp).mean() / self.n
-                for dfhat_ij_dp in dfhat_ij_gradient[2:]
-            ])
+                for dfhat_ij_dp in dfhat_ij_gradient[2:4]
+            ]),
+            (1 / self.n) * (
+                (self.gamma_j * r_ij * dfhat_ij_gradient[4]).mean(axis=1)
+                + (
+                    self.lambda_regularization * (self._rho_c_0 ** 2) / (self._sigma0 ** 2)
+                    * self.a_t @ (self.a @ t.reshape(self.n))
+                )
+            ),
         ])
         return loss, jacobian
 
 
-    def fit(self) -> Tuple[np.ndarray, np.ndarray, float, float, float]:
+    def fit(self) -> Tuple[np.ndarray, np.ndarray, float, float, np.ndarray]:
         '''
         Fit the Treece model to the intensity profiles.
 
         Returns
         -------
-        Tuple[np.ndarray, np.ndarray, float float, float]
+        Tuple[np.ndarray, np.ndarray, float float, np.ndarray]
             The fitted parameters: m, t, rho_s, rho_b, sigma.
         '''
         m, t, rho_s, rho_b, sigma = self._initial_fit()
         self._t0 = t.mean()
+        self._sigma0 = sigma.max()
         self._rho_c_0 = np.max(self.rho_c)
         initial_guess = np.concatenate([
-            m, t, np.array([rho_s, rho_b, sigma])
+            m, t, np.array([rho_s, rho_b]), sigma
         ])
         bounds = list(zip(
             (
                 [self.x_bounds[0]] * self.n
                 + [self.t_bounds[0]] * self.n
-                + [self.rho_s_bounds[0], self.rho_b_bounds[0], self.sigma_bounds[0]]
+                + [self.rho_s_bounds[0], self.rho_b_bounds[0]]
+                + [self.sigma_bounds[0]] * self.n
             ),
             (
                 [self.x_bounds[1]] * self.n
                 + [self.t_bounds[1]] * self.n
-                + [self.rho_s_bounds[1], self.rho_b_bounds[1], self.sigma_bounds[1]]
+                + [self.rho_s_bounds[1], self.rho_b_bounds[1]]
+                + [self.sigma_bounds[1]] * self.n
             )
         ))
         result = minimize(
@@ -285,7 +309,7 @@ class GlobalRegularizationTreeceMinimization(BaseTreeceMinimization):
         )
         m = result.x[:self.n]
         t = result.x[self.n:(2 * self.n)]
-        rho_s = result.x[-3]
-        rho_b = result.x[-2]
-        sigma = result.x[-1]
+        rho_s = result.x[2 * self.n]
+        rho_b = result.x[2 * self.n + 1]
+        sigma = result.x[(-self.n):]
         return (m, t, rho_s, rho_b, sigma)
