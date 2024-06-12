@@ -288,7 +288,7 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
         t = self.a @ control_params[self.q:(2 * self.q)].reshape(self.q, 1)
         rho_s = control_params[2 * self.q].reshape(1,1)
         rho_b = control_params[2 * self.q + 1].reshape(1,1)
-        sigma = control_params[(-self.q):].reshape(self.q,1)
+        sigma = self.a @ control_params[(-self.q):].reshape(self.q, 1)
         fhat_ij, dfhat_ij_gradient = self.treece_model.compute_intensities_and_derivatives(
             self.x_j, m, t, rho_s, rho_b, sigma
         )
