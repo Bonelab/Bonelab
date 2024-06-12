@@ -25,6 +25,7 @@ class BaseTreeceMinimization(metaclass=ABCMeta):
         rho_s_initial_guess: float,
         rho_b_initial_guess: float,
         sigma_initial_guess: float,
+        x_bounds: Tuple[float, float],
         t_bounds: Optional[Tuple[float, float]],
         rho_s_bounds: Tuple[float, float],
         rho_b_bounds: Tuple[float, float],
@@ -61,6 +62,9 @@ class BaseTreeceMinimization(metaclass=ABCMeta):
         sigma_initial_guess : float
             The initial guess for the parameter sigma.
 
+        x_bounds : Tuple[float, float]
+            The bounds for the parameter x.
+
         t_bounds : Optional[Tuple[float, float]]
             The bounds for the parameter t.
 
@@ -95,6 +99,7 @@ class BaseTreeceMinimization(metaclass=ABCMeta):
         self._create_treece_model()
         self._residual_boost_factor = residual_boost_factor
         self._compute_residual_multiplier()
+        self._x_bounds = x_bounds
         self._t_bounds = (
             t_bounds
             if t_bounds is not None
@@ -188,6 +193,18 @@ class BaseTreeceMinimization(metaclass=ABCMeta):
         np.ndarray
         '''
         return self._gamma_j
+
+
+    @property
+    def x_bounds(self) -> Tuple[float, float]:
+        '''
+        The bounds for the parameter x.
+
+        Returns
+        -------
+        Tuple[float, float]
+        '''
+        return self._x_bounds
 
 
     @property
