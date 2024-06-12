@@ -265,12 +265,12 @@ class GlobalRegularizationTreeceMinimization(BaseTreeceMinimization):
         ])
         bounds = list(zip(
             (
-                [self.x_j.min()] * self.n
+                [self.x_bounds[0]] * self.n
                 + [self.t_bounds[0]] * self.n
                 + [self.rho_s_bounds[0], self.rho_b_bounds[0], self.sigma_bounds[0]]
             ),
             (
-                [self.x_j.max()] * self.n
+                [self.x_bounds[1]] * self.n
                 + [self.t_bounds[1]] * self.n
                 + [self.rho_s_bounds[1], self.rho_b_bounds[1], self.sigma_bounds[1]]
             )
