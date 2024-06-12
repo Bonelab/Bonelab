@@ -134,25 +134,27 @@ def treece_thickness(args: Namespace) -> None:
     surface.point_data["cort_center"] = np.zeros((surface.n_points,))
 
     # here is where we check the mode and then create a minimization object and fit the model
+    common_args = [
+        args.cortical_density,
+        intensity_profiles,
+        x,
+        args.residual_boost_factor,
+        args.thickness_initial_guess,
+        args.soft_tissue_intensity_initial_guess,
+        args.trabecular_bone_intensity_initial_guess,
+        args.model_sigma_initial_guess,
+        args.cort_center_bounds,
+        args.thickness_bounds,
+        args.soft_tissue_intensity_bounds,
+        args.trabecular_bone_intensity_bounds,
+        args.model_sigma_bounds,
+        args.silent,
+        args.max_iterations,
+        args.function_tolerance,
+        args.gradient_tolerance
+    ]
     if args.mode == "local":
-        minimization = LocalTreeceMinimization(
-           args.cortical_density,
-           intensity_profiles,
-           x,
-           args.residual_boost_factor,
-           args.thickness_initial_guess,
-           args.soft_tissue_intensity_initial_guess,
-           args.trabecular_bone_intensity_initial_guess,
-           args.model_sigma_initial_guess,
-           args.thickness_bounds,
-           args.soft_tissue_intensity_bounds,
-           args.trabecular_bone_intensity_bounds,
-           args.model_sigma_bounds,
-           args.silent,
-           args.max_iterations,
-           args.function_tolerance,
-           args.gradient_tolerance
-        )
+        minimization = LocalTreeceMinimization(*common_args)
     elif args.mode == "global-interpolation":
         minimization = GlobalControlPointTreeceMinimization(
             surface.points[use_indices,:],
@@ -161,22 +163,7 @@ def treece_thickness(args: Namespace) -> None:
             args.control_point_rbf_splines,
             args.control_point_rbf_smoothness,
             args.control_point_rbf_degree,
-            args.cortical_density,
-            intensity_profiles,
-            x,
-            args.residual_boost_factor,
-            args.thickness_initial_guess,
-            args.soft_tissue_intensity_initial_guess,
-            args.trabecular_bone_intensity_initial_guess,
-            args.model_sigma_initial_guess,
-            args.thickness_bounds,
-            args.soft_tissue_intensity_bounds,
-            args.trabecular_bone_intensity_bounds,
-            args.model_sigma_bounds,
-            args.silent,
-            args.max_iterations,
-            args.function_tolerance,
-            args.gradient_tolerance
+            *common_args
         )
     elif args.mode == "global-regularization":
         minimization = GlobalRegularizationTreeceMinimization(
@@ -184,22 +171,7 @@ def treece_thickness(args: Namespace) -> None:
             args.neighbours,
             args.sigma_regularization,
             args.lambda_regularization,
-            args.cortical_density,
-            intensity_profiles,
-            x,
-            args.residual_boost_factor,
-            args.thickness_initial_guess,
-            args.soft_tissue_intensity_initial_guess,
-            args.trabecular_bone_intensity_initial_guess,
-            args.model_sigma_initial_guess,
-            args.thickness_bounds,
-            args.soft_tissue_intensity_bounds,
-            args.trabecular_bone_intensity_bounds,
-            args.model_sigma_bounds,
-            args.silent,
-            args.max_iterations,
-            args.function_tolerance,
-            args.gradient_tolerance
+            *common_args
         )
     else:
         raise ValueError(
@@ -338,6 +310,13 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--trabecular-bone-intensity-bounds", "-tbb", type=float, nargs=2, default=[-200, 400],
         help="bounds for the intensity of trabecular bone in the model"
+    )
+    parser.add_argument(
+        "--cort-center-bounds", "-ccb", type=float, nargs=2, default=[-3, 3],
+        help=(
+            "bounds for the cortical center in the model. highly recommended to "
+            "set this to be +/- a few voxel widths."
+        )
     )
     parser.add_argument(
         "--thickness-bounds", "-tb", type=float, nargs=2, default=None,
