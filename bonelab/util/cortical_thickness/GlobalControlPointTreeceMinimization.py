@@ -349,12 +349,12 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
             self._update_control_points(separation)
             bounds = list(zip(
                 (
-                    [self.x_j.min()] * self.q
+                    [self.x_bounds[0]] * self.q
                     + [self.t_bounds[0]] * self.q
                     + [self.rho_s_bounds[0], self.rho_b_bounds[0], self.sigma_bounds[0]]
                 ),
                 (
-                    [self.x_j.max()] * self.q
+                    [self.x_bounds[1]] * self.q
                     + [self.t_bounds[1]] * self.q
                     + [self.rho_s_bounds[1], self.rho_b_bounds[1], self.sigma_bounds[1]]
                 )
