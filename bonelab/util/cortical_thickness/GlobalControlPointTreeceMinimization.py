@@ -329,13 +329,13 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
         self._update_interpolation_matrix(separation)
 
 
-    def fit(self) -> Tuple[np.ndarray, np.ndarray, float, float, float]:
+    def fit(self) -> Tuple[np.ndarray, np.ndarray, float, float, np.ndarray]:
         '''
         Fit the model to the data.
 
         Returns
         -------
-        Tuple[np.ndarray, np.ndarray, float, float, float]
+        Tuple[np.ndarray, np.ndarray, float, float, np.ndarray]
             The fitted parameters: m, t, rho_s, rho_b, sigma.
         '''
         m, t, rho_s, rho_b, sigma = self._initial_fit()
@@ -351,18 +351,21 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
                 (
                     [self.x_bounds[0]] * self.q
                     + [self.t_bounds[0]] * self.q
-                    + [self.rho_s_bounds[0], self.rho_b_bounds[0], self.sigma_bounds[0]]
+                    + [self.rho_s_bounds[0], self.rho_b_bounds[0]]
+                    + [self.sigma_bounds[0]] * self.q
                 ),
                 (
                     [self.x_bounds[1]] * self.q
                     + [self.t_bounds[1]] * self.q
-                    + [self.rho_s_bounds[1], self.rho_b_bounds[1], self.sigma_bounds[1]]
+                    + [self.rho_s_bounds[1], self.rho_b_bounds[1]]
+                    + [self.sigma_bounds[1]] * self.q
                 )
             ))
             initial_guess = np.concatenate([
                 m[self.control_point_idxs],
                 t[self.control_point_idxs],
-                np.array([rho_s, rho_b, sigma])
+                np.array([rho_s, rho_b]),
+                sigma[self.control_point_idxs]
             ])
             result = minimize(
                 self._compute_loss_and_jacobian,
@@ -381,12 +384,27 @@ class GlobalControlPointTreeceMinimization(BaseTreeceMinimization):
                     smoothing=self.rbf_smooth,
                     degree=self.rbf_degree
                 )(self.points)
-                # then t
+                t = RBFInterpolator(
+                    self.control_points,
+                    result.x[self.q:(2 * self.q)],
+                    neighbors=self.interpolation_neighbours,
+                    kernel="thin_plate_spline",
+                    smoothing=self.rbf_smooth,
+                    degree=self.rbf_degree
+                )(self.points)
+                sigma = RBFInterpolator(
+                    self.control_points,
+                    result.x[(-self.q):],
+                    neighbors=self.interpolation_neighbours,
+                    kernel="thin_plate_spline",
+                    smoothing=self.rbf_smooth,
+                    degree=self.rbf_degree
+                )(self.points)
             else:
                 m = self.a @ result.x[:self.q]
                 t = self.a @ result.x[self.q:(2 * self.q)]
-            rho_s = result.x[-3]
-            rho_b = result.x[-2]
-            sigma = result.x[-1]
+                sigma = self.a @ result.x[(-self.q):]
+            rho_s = result.x[2 * self.q]
+            rho_b = result.x[2 * self.q + 1]
 
         return (m, t, rho_s, rho_b, sigma)
