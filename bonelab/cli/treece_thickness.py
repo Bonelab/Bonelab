@@ -110,10 +110,10 @@ def treece_thickness(args: Namespace) -> None:
         progress_bar=~args.silent
     )
     if args.constrain_normal_to_plane:
-        surface.point_data["Normals"][:,args.constrain_normal_to_plane] = 0
+        surface.point_data["Normals"][:, args.constrain_normal_to_plane] = 0
     elif args.constrain_normal_to_axis:
         surface.point_data["Normals"][:,:] = 0
-        surface.point_data["Normals"][:,args.constrain_normal_to_axis] = np.sign(args.constrain_normal_to_axis)
+        surface.point_data["Normals"][:, abs(args.constrain_normal_to_axis)] = np.sign(args.constrain_normal_to_axis)
     surface.point_data["Normals"] = (
         surface.point_data["Normals"]
         / (
