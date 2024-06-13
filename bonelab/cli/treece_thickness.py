@@ -9,6 +9,7 @@ from datetime import datetime
 import os
 import sys
 import pickle
+from scipy.ndimage import gaussian_filter
 
 # internal
 from bonelab.util.registration_util import (
