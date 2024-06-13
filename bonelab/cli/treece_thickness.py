@@ -137,6 +137,11 @@ def treece_thickness(args: Namespace) -> None:
         dx,
         args.silent
     )
+    intensity_profiles = gaussian_filter(
+        intensity_profiles,
+        sigma=args.intensity_smoothing_sigma,
+        axes=(0)
+    )
     if args.pickle_intensities:
         if ~args.silent:
             message("Pickling the intensity profiles...")
