@@ -9,7 +9,7 @@ from datetime import datetime
 import os
 import sys
 import pickle
-from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter1d
 
 # internal
 from bonelab.util.registration_util import (
@@ -137,10 +137,10 @@ def treece_thickness(args: Namespace) -> None:
         dx,
         args.silent
     )
-    intensity_profiles = gaussian_filter(
+    intensity_profiles = gaussian_filter1d(
         intensity_profiles,
         sigma=args.intensity_smoothing_sigma,
-        axes=(0)
+        axis=1
     )
     if args.pickle_intensities:
         if ~args.silent:
