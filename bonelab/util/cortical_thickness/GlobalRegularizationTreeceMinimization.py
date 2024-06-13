@@ -262,7 +262,7 @@ class GlobalRegularizationTreeceMinimization(BaseTreeceMinimization):
                 (self.gamma_j * r_ij * dfhat_ij_gradient[4]).mean(axis=1)
                 + (
                     self.lambda_regularization * (self._rho_c_0 ** 2) / (self._sigma0 ** 2)
-                    * self.a_t @ (self.a @ t.reshape(self.n))
+                    * self.a_t @ (self.a @ sigma.reshape(self.n))
                 )
             ),
         ])
