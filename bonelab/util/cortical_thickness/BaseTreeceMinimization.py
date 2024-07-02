@@ -25,6 +25,7 @@ class BaseTreeceMinimization(metaclass=ABCMeta):
         rho_s_initial_guess: float,
         rho_b_initial_guess: float,
         sigma_initial_guess: float,
+        x_bounds: Tuple[float, float],
         t_bounds: Optional[Tuple[float, float]],
         rho_s_bounds: Tuple[float, float],
         rho_b_bounds: Tuple[float, float],
@@ -61,6 +62,9 @@ class BaseTreeceMinimization(metaclass=ABCMeta):
         sigma_initial_guess : float
             The initial guess for the parameter sigma.
 
+        x_bounds : Tuple[float, float]
+            The bounds for the parameter x.
+
         t_bounds : Optional[Tuple[float, float]]
             The bounds for the parameter t.
 
@@ -95,6 +99,7 @@ class BaseTreeceMinimization(metaclass=ABCMeta):
         self._create_treece_model()
         self._residual_boost_factor = residual_boost_factor
         self._compute_residual_multiplier()
+        self._x_bounds = x_bounds
         self._t_bounds = (
             t_bounds
             if t_bounds is not None
@@ -188,6 +193,18 @@ class BaseTreeceMinimization(metaclass=ABCMeta):
         np.ndarray
         '''
         return self._gamma_j
+
+
+    @property
+    def x_bounds(self) -> Tuple[float, float]:
+        '''
+        The bounds for the parameter x.
+
+        Returns
+        -------
+        Tuple[float, float]
+        '''
+        return self._x_bounds
 
 
     @property
@@ -416,23 +433,23 @@ class BaseTreeceMinimization(metaclass=ABCMeta):
         return loss, jacobian
 
 
-    def _initial_fit(self) -> Tuple[np.ndarray, np.ndarray, float, float, float]:
+    def _initial_fit(self) -> Tuple[np.ndarray, np.ndarray, float, float, np.ndarray]:
         '''
         Perform an initial fit to the data to determine the
         best initial guess for the next phase.
 
         Returns
         -------
-        Tuple[np.ndarray, np.ndarray, float, float, float]
+        Tuple[np.ndarray, np.ndarray, float, float, np.ndarray]
             The fitted parameters: m, t, rho_s, rho_b, sigma.
         '''
         bounds = list(zip(
             [
-                self.x_j.min(), self.t_bounds[0],
+                self.x_bounds[0], self.t_bounds[0],
                 self.rho_s_bounds[0], self.rho_b_bounds[0], self.sigma_bounds[0]
             ],
             [
-                self.x_j.max(), self.t_bounds[1],
+                self.x_bounds[1], self.t_bounds[1],
                 self.rho_s_bounds[1], self.rho_b_bounds[1], self.sigma_bounds[1]
             ]
         ))
@@ -468,19 +485,19 @@ class BaseTreeceMinimization(metaclass=ABCMeta):
         t = result.x[1] * np.ones((self.f_ij.shape[0],))
         rho_s = result.x[-3]
         rho_b = result.x[-2]
-        sigma = result.x[-1]
+        sigma = result.x[-1] * np.ones((self.f_ij.shape[0],))
 
         return m, t, rho_s, rho_b, sigma
 
 
     @abstractmethod
-    def fit(self) -> Tuple[np.ndarray, np.ndarray, float, float, float]:
+    def fit(self) -> Tuple[np.ndarray, np.ndarray, float, float, np.ndarray]:
         '''
         Fit the Treece model to the intensity profiles.
 
         Returns
         -------
-        Tuple[np.ndarray, np.ndarray, float, float, float]
+        Tuple[np.ndarray, np.ndarray, float, float, np.ndarray]
             The fitted parameters: m, t, rho_s, rho_b, sigma.
         '''
         pass

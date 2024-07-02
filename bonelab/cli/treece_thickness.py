@@ -8,6 +8,8 @@ import pyvista as pv
 from datetime import datetime
 import os
 import sys
+import pickle
+from scipy.ndimage import gaussian_filter1d
 
 # internal
 from bonelab.util.registration_util import (
@@ -39,6 +41,7 @@ def treece_thickness(args: Namespace) -> None:
     args : Namespace
         The parsed command line arguments.
     '''
+    start_time = datetime.now()
     echoed_args = echo_arguments("Treece Thickness", vars(args))
     print(echoed_args)
     input_fns = args.bone_masks + [args.image]
@@ -47,7 +50,11 @@ def treece_thickness(args: Namespace) -> None:
     check_inputs_exist(input_fns, args.silent)
     output_surface = f"{args.output_base}.vtk"
     output_log = f"{args.output_base}.log"
-    check_for_output_overwrite([output_surface, output_log], args.overwrite, args.silent)
+    output_fns = [output_surface, output_log]
+    if args.pickle_intensities:
+        output_pickle = f"{args.output_base}.pkl"
+        output_fns.append(output_pickle)
+    check_for_output_overwrite(output_fns, args.overwrite, args.silent)
     if args.constrain_normal_to_plane and args.constrain_normal_to_axis:
         raise ValueError("Cannot constrain the normal to both a plane and an axis.")
     if ~args.silent:
@@ -104,10 +111,10 @@ def treece_thickness(args: Namespace) -> None:
         progress_bar=~args.silent
     )
     if args.constrain_normal_to_plane:
-        surface.point_data["Normals"][:,args.constrain_normal_to_plane] = 0
+        surface.point_data["Normals"][:, args.constrain_normal_to_plane] = 0
     elif args.constrain_normal_to_axis:
         surface.point_data["Normals"][:,:] = 0
-        surface.point_data["Normals"][:,args.constrain_normal_to_axis] = np.sign(args.constrain_normal_to_axis)
+        surface.point_data["Normals"][:, abs(args.constrain_normal_to_axis)] = np.sign(args.constrain_normal_to_axis)
     surface.point_data["Normals"] = (
         surface.point_data["Normals"]
         / (
@@ -130,29 +137,42 @@ def treece_thickness(args: Namespace) -> None:
         dx,
         args.silent
     )
+    intensity_profiles = gaussian_filter1d(
+        intensity_profiles,
+        sigma=args.intensity_smoothing_sigma,
+        axis=1
+    )
+    if args.pickle_intensities:
+        if ~args.silent:
+            message("Pickling the intensity profiles...")
+        with open(output_pickle, "wb") as f:
+            pickle.dump((intensity_profiles, x), f)
     surface.point_data["thickness"] = np.zeros((surface.n_points,))
     surface.point_data["cort_center"] = np.zeros((surface.n_points,))
+    surface.point_data["sigma"] = np.zeros((surface.n_points,))
 
     # here is where we check the mode and then create a minimization object and fit the model
+    common_args = [
+        args.cortical_density,
+        intensity_profiles,
+        x,
+        args.residual_boost_factor,
+        args.thickness_initial_guess,
+        args.soft_tissue_intensity_initial_guess,
+        args.trabecular_bone_intensity_initial_guess,
+        args.model_sigma_initial_guess,
+        args.cort_center_bounds,
+        args.thickness_bounds,
+        args.soft_tissue_intensity_bounds,
+        args.trabecular_bone_intensity_bounds,
+        args.model_sigma_bounds,
+        args.silent,
+        args.max_iterations,
+        args.function_tolerance,
+        args.gradient_tolerance
+    ]
     if args.mode == "local":
-        minimization = LocalTreeceMinimization(
-           args.cortical_density,
-           intensity_profiles,
-           x,
-           args.residual_boost_factor,
-           args.thickness_initial_guess,
-           args.soft_tissue_intensity_initial_guess,
-           args.trabecular_bone_intensity_initial_guess,
-           args.model_sigma_initial_guess,
-           args.thickness_bounds,
-           args.soft_tissue_intensity_bounds,
-           args.trabecular_bone_intensity_bounds,
-           args.model_sigma_bounds,
-           args.silent,
-           args.max_iterations,
-           args.function_tolerance,
-           args.gradient_tolerance
-        )
+        minimization = LocalTreeceMinimization(*common_args)
     elif args.mode == "global-interpolation":
         minimization = GlobalControlPointTreeceMinimization(
             surface.points[use_indices,:],
@@ -161,22 +181,7 @@ def treece_thickness(args: Namespace) -> None:
             args.control_point_rbf_splines,
             args.control_point_rbf_smoothness,
             args.control_point_rbf_degree,
-            args.cortical_density,
-            intensity_profiles,
-            x,
-            args.residual_boost_factor,
-            args.thickness_initial_guess,
-            args.soft_tissue_intensity_initial_guess,
-            args.trabecular_bone_intensity_initial_guess,
-            args.model_sigma_initial_guess,
-            args.thickness_bounds,
-            args.soft_tissue_intensity_bounds,
-            args.trabecular_bone_intensity_bounds,
-            args.model_sigma_bounds,
-            args.silent,
-            args.max_iterations,
-            args.function_tolerance,
-            args.gradient_tolerance
+            *common_args
         )
     elif args.mode == "global-regularization":
         minimization = GlobalRegularizationTreeceMinimization(
@@ -184,22 +189,7 @@ def treece_thickness(args: Namespace) -> None:
             args.neighbours,
             args.sigma_regularization,
             args.lambda_regularization,
-            args.cortical_density,
-            intensity_profiles,
-            x,
-            args.residual_boost_factor,
-            args.thickness_initial_guess,
-            args.soft_tissue_intensity_initial_guess,
-            args.trabecular_bone_intensity_initial_guess,
-            args.model_sigma_initial_guess,
-            args.thickness_bounds,
-            args.soft_tissue_intensity_bounds,
-            args.trabecular_bone_intensity_bounds,
-            args.model_sigma_bounds,
-            args.silent,
-            args.max_iterations,
-            args.function_tolerance,
-            args.gradient_tolerance
+            *common_args
         )
     else:
         raise ValueError(
@@ -207,8 +197,11 @@ def treece_thickness(args: Namespace) -> None:
             f"Must be one of: 'local', 'global-interpolation', 'global-regularization'"
         )
     parameters = minimization.fit()
-    surface.point_data["thickness"][use_indices] = parameters[1]
     surface.point_data["cort_center"][use_indices] = parameters[0]
+    surface.point_data["thickness"][use_indices] = parameters[1]
+    #surface.field_data["rho_s"] = parameters[2]
+    #surface.field_data["rho_b"] = parameters[3]
+    surface.point_data["sigma"][use_indices] = parameters[4]
 
     if args.median_smooth_thicknesses:
         if ~args.silent:
@@ -222,15 +215,17 @@ def treece_thickness(args: Namespace) -> None:
     if ~args.silent:
         message("Calculate mean and standard deviation of thickness...")
     thickness = surface["thickness"][surface["use_point"] == 1]
-    mean_thickness = np.mean(thickness[thickness>0])
-    std_thickness = np.std(thickness[thickness>0])
+    mean_thickness = thickness.mean()
+    std_thickness = thickness.std()
 
     if ~args.silent:
         message("Writing log file...")
 
     with open(output_log, "w") as f:
         f.write(echoed_args)
-        f.write(f"Date and time: {datetime.now()}\n")
+        f.write("-"*30 + "\n")
+        f.write(f"Start time: {start_time}\n")
+        f.write(f"Finish time: {datetime.now()}\n")
         f.write("-"*30 + "\n")
         f.write(f"Mean Thickness: {mean_thickness}\n")
         f.write(f"Standard Deviation of Thickness: {std_thickness}\n")
@@ -340,6 +335,13 @@ def create_parser() -> ArgumentParser:
         help="bounds for the intensity of trabecular bone in the model"
     )
     parser.add_argument(
+        "--cort-center-bounds", "-ccb", type=float, nargs=2, default=[-3, 3],
+        help=(
+            "bounds for the cortical center in the model. highly recommended to "
+            "set this to be +/- a few voxel widths."
+        )
+    )
+    parser.add_argument(
         "--thickness-bounds", "-tb", type=float, nargs=2, default=None,
         help="bounds for the cortical thickness in the model, if not set then "
              "then the bounds will be from the line resolution to the line length"
@@ -431,6 +433,10 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "--control-point-rbf-degree", "-cprbfd", type=int, default=1,
         help="degree of the add polynomial in the RBF spline interpolation"
+    )
+    parser.add_argument(
+        "--pickle-intensities", "-pi", default=False, action="store_true",
+        help="enable this flag to pickle the sampled intensities for debugging / viz purposes"
     )
 
     return parser
