@@ -49,7 +49,7 @@ git clone git@github.com:Bonelab/Bonelab.git
 git clone https://github.com/Bonelab/Bonelab.git
 
 # setup the environment
-CONDA_SUBDIR=osx-64 conda create -n bl -c numerics88 -c conda-forge python=3 n88tools pbr nose
+CONDA_SUBDIR=osx-64 conda create -n bl -c numerics88 -c conda-forge python=3 n88tools pbr nose PyQt
 
 # Activate the environemnt
 conda activate bl
