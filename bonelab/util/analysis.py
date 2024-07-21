@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 # This utility module has some stuff for doing precision analysis and also for
-# formatting data and p values in a way that is standardized and nice-looking
+# formatting data and p values in a way that is standardized and nice-looking.
+# Nothing in here is ground-breaking but it's annoying to have to figure out how to
+# do it and it would be nicer if everyone in the lab did this stuff the same
+# way so we know that precision is always being calculated consistently and that
+# data is being reported in a standard way (avoids manual formatting)
+
 
 from typing import Tuple
 import numpy as np
@@ -79,9 +84,10 @@ def format_estimate(estimate: float, stderr: float, err_label="SEE") -> str:
 
 def format_pval(pval: float, alpha: float, sigmarker: str = "*", decimal_places: int = 3) -> str:
     """
-    Format a p value into a nice string. If the p value is less than 0.001, it
+    Format a p value into a nice string. By default, if the p value is less than 0.001, it
     will be reported as "< 0.001 *". Otherwise, it will be reported as a number
-    with 3 decimal places and a star if it is less than the alpha level.
+    with 3 decimal places and a star if it is less than the alpha level. You can change the
+    number of decimal places and the significance marker if you want.
 
     Parameters
     ----------
