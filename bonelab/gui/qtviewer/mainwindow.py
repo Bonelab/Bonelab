@@ -57,6 +57,9 @@ class MainWindow(qtw.QMainWindow):
     # Initialize the window
     self.initUI()
     
+    # Default filepath 
+    self.default_path = qtc.QDir.homePath()
+    
     # Take inputs from command line. Only use these if there is an input file specified
     if (input_file != None):
       if (not os.path.exists(input_file)):
@@ -953,16 +956,18 @@ class MainWindow(qtw.QMainWindow):
     if (pipeline_name == "in2" and self.in1_pipe == None):
       qtw.QMessageBox.warning(self, "Warning", "Image 2 cannot be loaded before image 1.")
       return
+
     self.statusBar().showMessage("Load image types (.aim, .nii, .dcm)",4000)
     filename, _ = qtw.QFileDialog.getOpenFileName(
       self,
       "Select a 3D image file to open…",
-      qtc.QDir.homePath(),
+      self.default_path,
       "Aim Files (*.aim) ;;Nifti Files (*.nii) ;;DICOM Files (*.dcm) ;;STL Files (*.stl) ;;All Files (*)",
       "All Files (*)",
       qtw.QFileDialog.DontUseNativeDialog |
       qtw.QFileDialog.DontResolveSymlinks
     )
+    self.default_path = qtc.QFileInfo(filename).path()
     
     if filename:
       _,ext = os.path.splitext(filename)
