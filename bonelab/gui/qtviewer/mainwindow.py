@@ -479,7 +479,7 @@ class MainWindow(qtw.QMainWindow):
     self.vtkWidget = QVTKRenderWindowInteractor()
     self.vtkWidget.AddObserver("ExitEvent", lambda o, e, a=self: a.quit())
     #self.vtkWidget.AddObserver("KeyReleaseEvent", self.keyEventDetected)
-    self.vtkWidget.AddObserver("LeftButtonReleaseEvent", self.mouseEventDetected)
+    #self.vtkWidget.AddObserver("LeftButtonReleaseEvent", self.mouseEventDetected)
     
     # Create main layout and add VTK window and control panel
     self.mainLayout = qtw.QHBoxLayout()
@@ -596,6 +596,9 @@ class MainWindow(qtw.QMainWindow):
     qr.moveCenter(cp)
     self.move(qr.topLeft())
   
+  def doit(self):
+      print('hi')
+      
   def initRenderWindow(self):
     # Create renderer
     self.renderer = vtk.vtkRenderer()
@@ -606,10 +609,13 @@ class MainWindow(qtw.QMainWindow):
     self.renWin.AddRenderer(self.renderer)
     self.iren = self.renWin.GetInteractor()
     
+    #self.iren.AddObserver("KeyPressEvent",self.doit())
+    
     self.pickerstyle = MyInteractorStyle()
     self.pickerstyle.AddObserver("UpdateEvent", self.keyEventDetected)
     #self.pickerstyle.SetCurrentStyleToTrackballCamera()
     self.iren.SetInteractorStyle(self.pickerstyle)
+    #self.iren.SetInteractorStyle(vtk.vtkInteractorStyleSwitch())
     #print(self.iren.GetInteractorStyle().GetClassName())
     
     # Initialize
@@ -853,10 +859,10 @@ class MainWindow(qtw.QMainWindow):
     if (self.in2_pipe != None):
       if (qtc.Qt.Checked == _state):
         self.in2_pipe.useTransform(True)
-        self.statusBar().showMessage("Toggling transform visibility ON",4000)
+        self.statusBar().showMessage("Toggling transform ON",4000)
       else:
         self.in2_pipe.useTransform(False)
-        self.statusBar().showMessage("Toggling transform visibility OFF",4000)
+        self.statusBar().showMessage("Toggling transform OFF",4000)
       self.refreshRenderWindow()
   
   def updateMatrixGUI(self, _mat):
