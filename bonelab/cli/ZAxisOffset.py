@@ -113,8 +113,7 @@ def main():
                              Default is a tab ('\\t').""")
 
     parser.add_argument("--output_file", "-o",
-                        help="Output file. If not specified, output will go to
-                        STDOUT.")
+                        help="Output file. If not specified, output will go to STDOUT.")
 
     parser.add_argument("input_files", nargs='*',
                         help="Files to process. Any number may be specified.")
