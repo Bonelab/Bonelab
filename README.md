@@ -121,6 +121,10 @@ This removes the need to run `pip install` with each change. However, changing e
 
 - utility function for writing data stored in a dictionary to a csv file
 
+`bonelab.util.analysis`
+
+- utility code for calculating short term precision and for standardized reporting (means, errors, p values)
+
 ---
 
 ## Command Line Apps
