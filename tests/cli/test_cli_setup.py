@@ -125,6 +125,22 @@ class TestCommandLineInterfeceSetup(unittest.TestCase):
         ''' Can run `blFFTLaplaceHamming` '''
         self.runner('blFFTLaplaceHamming')
 
+    def test_blTreeceThickness(self):
+        ''' Can run `blTreeceThickness` '''
+        self.runner('blTreeceThickness')
+
+    def test_blAIMs2NIIs(self):
+        ''' Can run `blAIMs2NIIs` '''
+        self.runner('blAIMs2NIIs')
+
+    def test_blMask2AIM(self):
+        ''' Can run `blMask2AIM` '''
+        self.runner('blMask2AIM')
+
+    def test_blMasks2AIMs(self):
+        ''' Can run `blMasks2AIMs` '''
+        self.runner('blMasks2AIMs')
+
 
 if __name__ == '__main__':
     unittest.main()
