@@ -784,7 +784,7 @@ def create_sphere(output_file, transform_file, radius, phi, theta, phi_start, ph
 
   write_stl( triangleFilter.GetOutputPort(), output_file, mat4x4 )
   
-def create_cylinder(output_file, transform_file, radius, height, resolution, capping, center, rotate, visualize, overwrite, func):
+def create_cylinder(output_file, transform_file, radius, height, resolution, capping, center, rotate, endpoints, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -792,14 +792,27 @@ def create_cylinder(output_file, transform_file, radius, height, resolution, cap
       print('Not overwriting. Exiting...')
       os.sys.exit()
 
-  cylinder = vtk.vtkCylinderSource()
-  cylinder.SetHeight( height )
-  cylinder.SetRadius( radius )
-  cylinder.SetResolution( resolution )
-  cylinder.SetCapping( capping )
-  cylinder.SetCenter( center )
-  cylinder.Update()
+  # If there are end points defined we create the cylinder differently
+  if np.count_nonzero(endpoints): # endpoints are defined
+      line = vtk.vtkLineSource()
+      line.SetPoint1(endpoints[0],endpoints[1],endpoints[2])
+      line.SetPoint2(endpoints[3],endpoints[4],endpoints[5])
+      line.Update()
   
+      cylinder = vtk.vtkTubeFilter()
+      cylinder.SetInputConnection( line.GetOutputPort() )
+      cylinder.SetRadius( radius )
+      cylinder.SetNumberOfSides( resolution )
+      cylinder.SetCapping( capping )
+  else:
+      cylinder = vtk.vtkCylinderSource()
+      cylinder.SetHeight( height )
+      cylinder.SetRadius( radius )
+      cylinder.SetResolution( resolution )
+      cylinder.SetCapping( capping )
+      cylinder.SetCenter( center )
+      cylinder.Update()
+
   triangleFilter = vtk.vtkTriangleFilter()
   triangleFilter.SetInputConnection( cylinder.GetOutputPort() )
   triangleFilter.Update()
@@ -1103,6 +1116,7 @@ $ blRapidPrototype create_cube --help
     parser_create_cylinder.add_argument('--capping', action='store_false', help='Cylinder capping (default: %(default)s)')
     parser_create_cylinder.add_argument('--center', type=float, nargs=3, default=[0,0,0], metavar='0', help='Cylinder center (default: %(default)s)')
     parser_create_cylinder.add_argument('--rotate', type=float, nargs=3, default=[0,0,0], metavar='0', help='Rotation angle about X, Y and Z axes (default: %(default)s)')
+    parser_create_cylinder.add_argument('--endpoints', type=float, nargs=6, default=[0,0,0,0,0,0], metavar='0', help='Ends X,Y,Z and X,Y,Z (default: %(default)s)')
     parser_create_cylinder.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
     parser_create_cylinder.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
     parser_create_cylinder.set_defaults(func=create_cylinder)
