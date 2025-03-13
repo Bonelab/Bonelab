@@ -577,7 +577,8 @@ def setup_optimizer(
             learningRate=gradient_descent_learning_rate,
             numberOfIterations=max_iterations,
             convergenceMinimumValue=gradient_descent_convergence_min_value,
-            convergenceWindowSize=gradient_descent_convergence_window_size
+            convergenceWindowSize=gradient_descent_convergence_window_size,
+            estimateLearningRate=sitk.ImageRegistrationMethod.EachIteration
         )
     elif optimizer == "Powell":
         if not silent:

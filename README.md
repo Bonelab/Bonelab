@@ -169,7 +169,7 @@ with the `bl` environment activated.
 | `blAIMs2NIIs`                  | Convert an AIM, and optionally it's associated masks, to nifti image(s). The image and it's masks will be padded so they align.                                                                                    |
 | `blMask2AIM `                  | Convert a binary mask in nifti format back to AIM format, using a reference AIM as a base so the AIM you create will line up properly with the associated image when you go back to the VMS.                       |
 | `blMasks2AIMs`                 | Same as `blMask2AIM`, except instead of a binary mask nifti you give a multiclass mask nifti and you provide a set of class values and associated mask labels to append to the filename when creating binary AIMs. |
-
+| `blMaskFilter `                  | Read a mask and apply erosion, dilation, opening, or closing.                       |
 ---
 
 ## Running Tests
