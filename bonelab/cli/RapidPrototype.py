@@ -62,7 +62,14 @@ def printMatrix4x4(m):
     for i in range(4):
       row_data = delimiter.join([formatter.format(float(m.GetElement(i,j))) for j in range(4)])
       print('[ '+row_data+' ]')
-        
+
+# Parameter mu is between 0 and 1
+def point_along_line(mu,pt1,pt2):
+  if mu<0 or mu>1:
+    os.sys.exit('[ERROR] Parameter mu must be between 0 and 1: {}'.format(mu))
+
+  return [a*(1-mu)+b*mu for a,b in zip(pt1,pt2)]
+  
 def diagonal(x, y, z):
     return math.sqrt(math.pow(x,2)+math.pow(y,2)+math.pow(z,2))
 
@@ -806,7 +813,7 @@ def create_sphere(output_file, transform_file, radius, phi, theta, phi_start, ph
 
   write_stl( triangleFilter.GetOutputPort(), output_file, mat4x4 )
   
-def create_cylinder(output_file, transform_file, radius, height, resolution, capping, center, rotate, endpoints, visualize, overwrite, func):
+def create_cylinder(output_file, transform_file, radius, height, resolution, capping, center, rotate, endpoints, scale, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -816,9 +823,16 @@ def create_cylinder(output_file, transform_file, radius, height, resolution, cap
 
   # If there are end points defined we create the cylinder differently
   if np.count_nonzero(endpoints): # endpoints are defined
+      
+      pt1 = endpoints[0:3:1]
+      pt2 = endpoints[3:6:1]
+
+      point1 = point_along_line((1-scale)/2.0,pt1,pt2)
+      point2 = point_along_line((1+scale)/2.0,pt1,pt2)
+      
       line = vtk.vtkLineSource()
-      line.SetPoint1(endpoints[0],endpoints[1],endpoints[2])
-      line.SetPoint2(endpoints[3],endpoints[4],endpoints[5])
+      line.SetPoint1(point1[0],point1[1],point1[2])
+      line.SetPoint2(point2[0],point2[1],point2[2])
       line.Update()
   
       cylinder = vtk.vtkTubeFilter()
@@ -1138,6 +1152,7 @@ $ blRapidPrototype create_cube --help
     parser_create_cylinder.add_argument('--center', type=float, nargs=3, default=[0,0,0], metavar='0', help='Cylinder center (default: %(default)s)')
     parser_create_cylinder.add_argument('--rotate', type=float, nargs=3, default=[0,0,0], metavar='0', help='Rotation angle about X, Y and Z axes (default: %(default)s)')
     parser_create_cylinder.add_argument('--endpoints', type=float, nargs=6, default=[0,0,0,0,0,0], metavar='0', help='Ends X,Y,Z and X,Y,Z (default: %(default)s)')
+    parser_create_cylinder.add_argument('--scale', type=float, default=1, metavar='1', help='Scale between 0 and 1 of length (default: %(default)s)')
     parser_create_cylinder.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
     parser_create_cylinder.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
     parser_create_cylinder.set_defaults(func=create_cylinder)
