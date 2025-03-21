@@ -29,12 +29,14 @@ def get_centroid(image,label):
   
   return centroid
   
-def ImageCentroids(input_filename,links):
+def ImageCentroids(input_filename,rapidprototyping,scantype):
 
     # Read input
-    for filename in [input_filename]:
-        if not os.path.isfile(filename):
-            os.sys.exit('[ERROR] Cannot find file \"{}\"'.format(filename))
+    if not os.path.isfile(input_filename):
+        os.sys.exit('[ERROR] Cannot find file \"{}\"'.format(input_filename))
+    
+    workingdir = os.path.dirname(input_filename)
+    filename_base = os.path.splitext(os.path.splitext(os.path.basename(input_filename))[0])[0]
     
     image_reader = get_vtk_reader(input_filename)
     if image_reader is None:
@@ -99,7 +101,7 @@ def ImageCentroids(input_filename,links):
     print(guard)
     
     labels = np.unique(array)
-    print(formatter_int.format('!> Labels    =',len(labels),'[1]'))
+    print(formatter_int.format('!> N Labels  =',len(labels),'[1]'))
     for label in labels:
       print(formatter_int.format('!> Label  ',label,''))
     print(guard)
@@ -108,35 +110,69 @@ def ImageCentroids(input_filename,links):
     
     print('!> Centroids')
     for label in labels:
+      #if label != 0 and (label ==10 or label==9):
       if label != 0:
         centroid = get_centroid(img,label)
         print('!> Label {:3d}: {:8.4f} {:8.4f} {:8.4f}'.format(label,centroid[0],centroid[1],centroid[2]))
         centroid_dict[label] = centroid
     print(guard)
     
-    formatter_two_tuples ='{:>20s} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f} {:.3f}'
-    
-    if links:
-      # Make any links we can
-      if centroid_dict.get(10) and centroid_dict.get(9):
-        print('{:>20s}: '.format('l1_to_l2')+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(10))+' '+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(9)))
-      if centroid_dict.get(9) and centroid_dict.get(8):
-        print('{:>20s}: '.format('l2_to_l3')+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(9))+' '+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(8)))
-      if centroid_dict.get(8) and centroid_dict.get(7):
-        print('{:>20s}: '.format('l3_to_l4')+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(8))+' '+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(7)))
-      if centroid_dict.get(7) and centroid_dict.get(6):
-        print('{:>20s}: '.format('l4_to_l5')+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(7))+' '+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(6)))
-      if centroid_dict.get(6) and centroid_dict.get(5):
-        print('{:>20s}: '.format('l5_to_sacrum')+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(6))+' '+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(5)))
-      if centroid_dict.get(5) and centroid_dict.get(4):
-        print('{:>20s}: '.format('sacrum_left_pelvis')+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(5))+' '+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(4)))
-      if centroid_dict.get(5) and centroid_dict.get(3):
-        print('{:>20s}: '.format('sacrum_right_pelvis')+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(5))+' '+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(3)))
-      if centroid_dict.get(3) and centroid_dict.get(1):
-        print('{:>20s}: '.format('right_pelvis_femur')+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(3))+' '+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(1)))
-      if centroid_dict.get(4) and centroid_dict.get(2):
-        print('{:>20s}: '.format('left_pelvis_femur')+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(4))+' '+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(2)))
+    if rapidprototyping:
+      print('!> Helpful commands for rapid prototyping:')
+      print('!> Type = {}'.format(scantype))
+      print('!>')
       
+      if scantype is "KUB":
+        print('\n# Create the skeleton STL')
+        print('{:s} '.format('blRapidPrototype img2stl --marching_cubes 0.5 --gaussian 1.2 --radius 2.0 ') + '{:s} {:s}/{:s}.stl'.format(input_filename,workingdir,filename_base))
+        
+        print('\n# Create cylinders to link bones')
+        if centroid_dict.get(10) and centroid_dict.get(9):
+          print('{:s} '.format('blRapidPrototype create_cylinder --scale 0.9 --endpoints')+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(10))+' '+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(9)) + '{:s} {:s}{:s}'.format(' --resolution 20 --radius 5.0',workingdir,'/rod_l1_to_l2.stl'))
+        if centroid_dict.get(9) and centroid_dict.get(8):
+          print('{:s} '.format('blRapidPrototype create_cylinder --scale 0.9 --endpoints')+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(9))+' '+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(8)) +  '{:s} {:s}{:s}'.format(' --resolution 20 --radius 5.0',workingdir,'/rod_l2_to_l3.stl'))
+        if centroid_dict.get(8) and centroid_dict.get(7):
+          print('{:s} '.format('blRapidPrototype create_cylinder --scale 0.9 --endpoints')+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(8))+' '+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(7)) +  '{:s} {:s}{:s}'.format(' --resolution 20 --radius 5.0',workingdir,'/rod_l3_to_l4.stl'))
+        if centroid_dict.get(7) and centroid_dict.get(6):
+          print('{:s} '.format('blRapidPrototype create_cylinder --scale 0.9 --endpoints')+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(7))+' '+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(6)) +  '{:s} {:s}{:s}'.format(' --resolution 20 --radius 5.0',workingdir,'/rod_l4_to_l5.stl'))
+        if centroid_dict.get(6) and centroid_dict.get(5):
+          print('{:s} '.format('blRapidPrototype create_cylinder --scale 0.9 --endpoints')+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(6))+' '+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(5)) +  '{:s} {:s}{:s}'.format(' --resolution 20 --radius 5.0',workingdir,'/rod_l5_to_sacrum.stl'))
+        if centroid_dict.get(5) and centroid_dict.get(4):
+          print('{:s} '.format('blRapidPrototype create_cylinder --scale 0.9 --endpoints')+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(5))+' '+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(4)) +  '{:s} {:s}{:s}'.format(' --resolution 20 --radius 5.0',workingdir,'/rod_sacrum_left_pelvis.stl'))
+        if centroid_dict.get(5) and centroid_dict.get(3):
+          print('{:s} '.format('blRapidPrototype create_cylinder --scale 0.9 --endpoints')+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(5))+' '+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(3)) +  '{:s} {:s}{:s}'.format(' --resolution 20 --radius 5.0',workingdir,'/rod_sacrum_right_pelvis.stl'))
+        if centroid_dict.get(3) and centroid_dict.get(1):
+          print('{:s} '.format('blRapidPrototype create_cylinder --scale 0.9 --endpoints')+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(3))+' '+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(1)) +  '{:s} {:s}{:s}'.format(' --resolution 20 --radius 5.0',workingdir,'/rod_right_pelvis_femur.stl'))
+        if centroid_dict.get(4) and centroid_dict.get(2):
+          print('{:s} '.format('blRapidPrototype create_cylinder --scale 0.9 --endpoints')+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(4))+' '+' '.join('{:8.2f}'.format(x) for x in centroid_dict.get(2)) +  '{:s} {:s}{:s}'.format(' --resolution 20 --radius 5.0',workingdir,'/rod_left_pelvis_femur.stl'))
+        
+        # find center from L1 (label 10) and extent of the image
+        if centroid_dict.get(10):
+          print('\n# Create base plate')
+          center_base = [centroid_dict.get(10)[0],centroid_dict.get(10)[1],phys_dim[2]]
+          plate_thickness = 10 # thickness in mm
+          center_base_top = [center_base[0],center_base[1],phys_dim[2]-plate_thickness]
+          print('{:s} '.format('blRapidPrototype create_cylinder --endpoints')+' '.join('{:8.2f}'.format(x) for x in center_base)+' '+' '.join('{:8.2f}'.format(x) for x in center_base_top) + '{:s}'.format(' --resolution 200 --radius 150.0 /Users/skboyd/Desktop/test/baseplate.stl'))
+          
+        print('\n# Connect the parts')
+        print('{:s}'.format('blRapidPrototype add_stl \\'))
+        print('  {:s}/{:s}.stl \\'.format(workingdir,filename_base))
+        print('  {:s}{:s}'.format(workingdir,'/rod_l1_to_l2.stl \\'))
+        print('  {:s}{:s}'.format(workingdir,'/rod_l2_to_l3.stl \\'))
+        print('  {:s}{:s}'.format(workingdir,'/rod_l3_to_l4.stl \\'))
+        print('  {:s}{:s}'.format(workingdir,'/rod_l4_to_l5.stl \\'))
+        print('  {:s}{:s}'.format(workingdir,'/rod_l5_to_sacrum.stl \\'))
+        print('  {:s}{:s}'.format(workingdir,'/rod_left_pelvis_femur.stl \\'))
+        print('  {:s}{:s}'.format(workingdir,'/rod_right_pelvis_femur.stl \\'))
+        #print('  {:s}{:s}'.format(workingdir,'/rod_sacrum_left_pelvis.stl \\'))
+        #print('  {:s}{:s}'.format(workingdir,'/rod_sacrum_right_pelvis.stl \\'))
+        print('  {:s}{:s}'.format(workingdir,'/baseplate.stl \\'))
+        print('  {:s}/{:s}_model.stl'.format(workingdir,filename_base))
+        
+        print('\n# View the results')
+        print('{:s}'.format('blRapidPrototype view_stl {}/{}_model.stl'.format(workingdir,filename_base)))
+        
+        
 def main():
     # Setup description
     description='''Calculate centroids of segmented components
@@ -152,7 +188,8 @@ in the image.
         description=description
     )
     parser.add_argument('input_filename', help='Input image')
-    parser.add_argument('--links', action='store_true', help='Output links for rapid prototyping (default: %(default)s)')
+    parser.add_argument('--rapidprototyping', action='store_true', help='Print convenient commands (default: %(default)s)')
+    parser.add_argument('--scantype', default='KUB', choices=['KUB', 'Chest'],help='Specify scan type (default: %(default)s)')
 
     # Parse and display
     args = parser.parse_args()

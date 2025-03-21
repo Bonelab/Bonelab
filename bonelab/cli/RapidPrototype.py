@@ -16,12 +16,24 @@ from bonelab.io.vtk_helpers import get_vtk_reader, get_vtk_writer, handle_filety
 def CheckExt(choices):
     class Act(argparse.Action):
         def __call__(self,parser,namespace,fname,option_string=None):
-            ext = os.path.splitext(fname)[1][1:]
-            if ext not in choices:
-                option_string = '({})'.format(option_string) if option_string else ''
-                parser.error("File extension must be {}{}".format(choices,option_string))
+            if isinstance(fname,str): # case of a string argument
+              ext = os.path.splitext(fname)[1][1:]
+              if ext not in choices:
+                  option_string = '({})'.format(option_string) if option_string else ''
+                  parser.error("File extension must be {}{}".format(choices,option_string))
+              else:
+                  setattr(namespace,self.dest,fname)
+            elif isinstance(fname,list): # case of a list argument containing strings (e.g., nargs='*')
+              for f in fname:
+                ext = os.path.splitext(f)[1][1:]
+                if ext not in choices:
+                    option_string = '({})'.format(option_string) if option_string else ''
+                    parser.error("File extension must be {}{}".format(choices,option_string))
+                else:
+                    setattr(namespace,self.dest,fname)
+              
             else:
-                setattr(namespace,self.dest,fname)
+              parser.error("Data type cannot be processed: {}".format(type(fname)))
 
     return Act
 
@@ -50,7 +62,14 @@ def printMatrix4x4(m):
     for i in range(4):
       row_data = delimiter.join([formatter.format(float(m.GetElement(i,j))) for j in range(4)])
       print('[ '+row_data+' ]')
-        
+
+# Parameter mu is between 0 and 1
+def point_along_line(mu,pt1,pt2):
+  if mu<0 or mu>1:
+    os.sys.exit('[ERROR] Parameter mu must be between 0 and 1: {:.4f}'.format(mu))
+
+  return [a*(1-mu)+b*mu for a,b in zip(pt1,pt2)]
+  
 def diagonal(x, y, z):
     return math.sqrt(math.pow(x,2)+math.pow(y,2)+math.pow(z,2))
 
@@ -559,7 +578,7 @@ def view_stl(input_file, transform_file, func):
   
   mat4x4 = visualize_actors( model.GetOutputPort(), None )
   
-def add_stl(input_file1, input_file2, output_file, transform_file, visualize, overwrite, func):
+def add_stl(input_files, output_file, transform_file, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -567,31 +586,41 @@ def add_stl(input_file1, input_file2, output_file, transform_file, visualize, ov
       print('Not overwriting. Exiting...')
       os.sys.exit()
   
+  n_files = len(input_files)
+  
   im1 = vtk.vtkSTLReader()
-  im1.SetFileName(input_file1)
+  im1.SetFileName(input_files[0])
   im1.Update()
   
-  im2 = vtk.vtkSTLReader()
-  im2.SetFileName(input_file2)
-  im2.Update()
-
-  im2 = applyTransform(transform_file, im2)
-  
-  if (visualize):
-    mat4x4 = visualize_actors( im2.GetOutputPort(), im1.GetOutputPort() )
-  else:
-    mat4x4 = vtk.vtkMatrix4x4()
-
+  im = vtk.vtkSTLReader()
   transform = vtk.vtkTransform()
-  transform.SetMatrix(mat4x4)
-  
   transformFilter = vtk.vtkTransformFilter()
-  transformFilter.SetInputConnection( im2.GetOutputPort() )
-  transformFilter.SetTransform( transform )
-  transformFilter.Update()
   
-  final_image = joinPolyData( transformFilter.GetOutput(), im1.GetOutput() )
-  
+  for idx,file in enumerate(input_files):
+    if idx>0:
+      im.SetFileName(file)
+      im.Update()
+      
+      im = applyTransform(transform_file, im)
+      
+      if (visualize):
+        mat4x4 = visualize_actors( im.GetOutputPort(), im1.GetOutputPort() )
+      else:
+        mat4x4 = vtk.vtkMatrix4x4()
+      
+      transform.SetMatrix(mat4x4)
+      
+      transformFilter.SetInputConnection( im.GetOutputPort() )
+      transformFilter.SetTransform( transform )
+      transformFilter.Update()
+      
+      if idx==1:
+        final_image = joinPolyData( transformFilter.GetOutput(), im1.GetOutput() )
+        final_image.Update()
+      else:
+        final_image = joinPolyData( transformFilter.GetOutput(), final_image.GetOutput() )
+        final_image.Update()
+        
   write_stl( final_image.GetOutputPort(), output_file, vtk.vtkMatrix4x4() )
   
 def boolean_stl(input_file1, input_file2, output_file, transform_file, operation, visualize, overwrite, func):
@@ -784,7 +813,7 @@ def create_sphere(output_file, transform_file, radius, phi, theta, phi_start, ph
 
   write_stl( triangleFilter.GetOutputPort(), output_file, mat4x4 )
   
-def create_cylinder(output_file, transform_file, radius, height, resolution, capping, center, rotate, endpoints, visualize, overwrite, func):
+def create_cylinder(output_file, transform_file, radius, height, resolution, capping, center, rotate, endpoints, scale, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -794,9 +823,16 @@ def create_cylinder(output_file, transform_file, radius, height, resolution, cap
 
   # If there are end points defined we create the cylinder differently
   if np.count_nonzero(endpoints): # endpoints are defined
+      
+      pt1 = endpoints[0:3:1]
+      pt2 = endpoints[3:6:1]
+
+      point1 = point_along_line((1-scale)/2.0,pt1,pt2)
+      point2 = point_along_line((1+scale)/2.0,pt1,pt2)
+      
       line = vtk.vtkLineSource()
-      line.SetPoint1(endpoints[0],endpoints[1],endpoints[2])
-      line.SetPoint2(endpoints[3],endpoints[4],endpoints[5])
+      line.SetPoint1(point1[0],point1[1],point1[2])
+      line.SetPoint2(point2[0],point2[1],point2[2])
       line.Update()
   
       cylinder = vtk.vtkTubeFilter()
@@ -984,7 +1020,7 @@ stl2img         : takes an STL model and converts to a thresholded AIM or NIFTI
 
 view_stl        : view an STL model
 boolean_stl     : union, intersect or difference of two STL models
-add_stl         : add two STL models (an alternative to 'union' boolean_stl)
+add_stl         : add two or more STL models (see also boolean_stel 'union')
 
 create_sign     : make a sign with text
 create_sphere   : make a sphere
@@ -1058,10 +1094,9 @@ $ blRapidPrototype create_cube --help
 
     # parser for add_stl
     parser_add_stl = subparsers.add_parser('add_stl')
-    parser_add_stl.add_argument('input_file1', action=CheckExt({'stl','STL'}), help='Input STL image file name')
-    parser_add_stl.add_argument('input_file2', action=CheckExt({'stl','STL'}), help='Input STL image file name (allows transform)')
+    parser_add_stl.add_argument('input_files', action=CheckExt({'stl','STL'}), nargs='+', help='Input two or more STL image file names')
     parser_add_stl.add_argument('output_file', action=CheckExt({'stl','STL'}), help='Output STL image file name')
-    parser_add_stl.add_argument('--transform_file', default="None", action=CheckExt({'txt','TXT'}), metavar='FILE', help='Apply a 4x4 transform from a file to input_file1 (default: %(default)s)')
+    parser_add_stl.add_argument('--transform_file', default="None", action=CheckExt({'txt','TXT'}), metavar='FILE', help='Apply a 4x4 transform to input_file2 to N (default: %(default)s)')
     parser_add_stl.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
     parser_add_stl.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
     parser_add_stl.set_defaults(func=add_stl)
@@ -1117,6 +1152,7 @@ $ blRapidPrototype create_cube --help
     parser_create_cylinder.add_argument('--center', type=float, nargs=3, default=[0,0,0], metavar='0', help='Cylinder center (default: %(default)s)')
     parser_create_cylinder.add_argument('--rotate', type=float, nargs=3, default=[0,0,0], metavar='0', help='Rotation angle about X, Y and Z axes (default: %(default)s)')
     parser_create_cylinder.add_argument('--endpoints', type=float, nargs=6, default=[0,0,0,0,0,0], metavar='0', help='Ends X,Y,Z and X,Y,Z (default: %(default)s)')
+    parser_create_cylinder.add_argument('--scale', type=float, default=1, metavar='1', help='Scale between 0 and 1 of length (default: %(default)s)')
     parser_create_cylinder.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
     parser_create_cylinder.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
     parser_create_cylinder.set_defaults(func=create_cylinder)
