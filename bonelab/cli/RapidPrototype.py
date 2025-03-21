@@ -66,7 +66,7 @@ def printMatrix4x4(m):
 # Parameter mu is between 0 and 1
 def point_along_line(mu,pt1,pt2):
   if mu<0 or mu>1:
-    os.sys.exit('[ERROR] Parameter mu must be between 0 and 1: {}'.format(mu))
+    os.sys.exit('[ERROR] Parameter mu must be between 0 and 1: {:.4f}'.format(mu))
 
   return [a*(1-mu)+b*mu for a,b in zip(pt1,pt2)]
   
