@@ -21,6 +21,7 @@ from bonelab.gui.qtviewer.colourpalette import ColourPalette
 from bonelab.gui.qtviewer.pickercollection import PickerCollection
 
 class MyInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
+#class MyInteractorStyle(vtk.vtkInteractorStyleSwitch):
 #class MyInteractorStyle(vtk.vtkInteractorStyleTrackballActor):
 #class MyInteractorStyle(vtk.vtkInteractorStyleTrackball):
 #class MyInteractorStyle(vtk.vtkInteractorStyleSwitch):
@@ -38,6 +39,8 @@ class MyInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
       self.in2_collection.setPointActorColour(ColourPalette().getColour("red"))
             
       self.activityString = "Point picker action!"
+      
+      #self.SetCurrentStyleToTrackballActor()
     
     def setMainActor(self, _actor, _pipeline_name):
       if (_pipeline_name == "in1_pipeline"):
@@ -102,6 +105,12 @@ class MyInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
     def getPointActionString(self):
       return self.activityString
         
+    def printMatrix(self,ind,m):
+      print('--> print matrix {}'.format(ind))
+      for i in range(4):
+        print('{:8.2f} {:8.2f} {:8.2f} {:8.2f}'.format(m.GetElement(i,0),m.GetElement(i,1),m.GetElement(i,2),m.GetElement(i,3)))
+      #print('      [' + ', '.join('{:8.2f}'.format(i) for i in c) + ']')      
+      
     def KeyPressEvent(self, obj, event):
       self.iren = self.GetInteractor()
       self.renderer = self.iren.GetRenderWindow().GetRenderers().GetFirstRenderer()
@@ -111,7 +120,7 @@ class MyInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
       key = self.iren.GetKeySym()
 
       if key in 'h':
-        #print("Press the \'u\' key to output actor transform matrix")
+        print("Press the \'u\' key to output actor transform matrix")
         print("Press the \'p\' key to pick a point")
         print("Press the \'d\' key to delete a point")
         #print("Press the \'a\' key for actor control mode")
@@ -127,23 +136,26 @@ class MyInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
       #if key in 'a':
       #  self.iren.GetInteractorStyle().SetCurrentStyleToTrackballActor()
       #
-      #if key in 'u':
-      #  for index in range(self.actorCollection.GetNumberOfItems()):
-      #    nextActor = self.actorCollection.GetNextActor()
-      #    if (nextActor.GetPickable()==1):
-      #      printMatrix4x4(self,nextActor.GetMatrix())
+      if key in 'u':
+        for index in range(self.actorCollection.GetNumberOfItems()):
+          nextActor = self.actorCollection.GetNextActor()
+          if (nextActor.GetPickable()==1):
+            self.printMatrix(index,nextActor.GetMatrix())
                  
       if key in 'p':
         x, y = self.iren.GetEventPosition()
+        print('x = {}, y = {}'.format(x,y))
       
         cellPicker = vtk.vtkCellPicker() # Try vtkPropPicker() ? 
         cellPicker.SetTolerance(0.0001)
         cellPicker.Pick(x, y, 0, self.renderer)
         
         if (cellPicker.GetPickedPositions().GetNumberOfPoints() == 0):
+          print('returned zero picked points')
           return
         else:
           point = cellPicker.GetPickedPositions().GetPoint(0)
+          print(point)
         
         if (self.in1_collection.getMainActor() == cellPicker.GetActor()):
           idx = self.in1_collection.addPoint(point)

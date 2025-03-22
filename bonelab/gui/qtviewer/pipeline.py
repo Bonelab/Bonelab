@@ -58,7 +58,7 @@ class Pipeline():
     # store a copy in self.matrix for retrieval later.
     self.rigidBodyTransform = vtk.vtkTransform()
     self.rigidBodyTransform.Identity()
-    self.rigidBodyTransform.PostMultiply() # Important so that transform concatenations is correct!
+    self.rigidBodyTransform.PostMultiply() # Important so that transform concatenation is correct!
 
     self.matrix = vtk.vtkMatrix4x4()
     self.dim = [1,1,1]

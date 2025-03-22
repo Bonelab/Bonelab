@@ -57,6 +57,9 @@ class MainWindow(qtw.QMainWindow):
     # Initialize the window
     self.initUI()
     
+    # Default filepath 
+    self.default_path = qtc.QDir.homePath()
+    
     # Take inputs from command line. Only use these if there is an input file specified
     if (input_file != None):
       if (not os.path.exists(input_file)):
@@ -335,7 +338,7 @@ class MainWindow(qtw.QMainWindow):
     ########################################
     
     # Fixed Image (in1) --------------------------------------------------------------------------
-    self.in1_mainGroupBox = qtw.QGroupBox("Fixed Image (in1)")
+    self.in1_mainGroupBox = qtw.QGroupBox("Fixed Image (in1) [white]")
     self.in1_mainGroupBox.setLayout(qtw.QHBoxLayout())
     
     self.in1_pointWidget = qtw.QFrame()
@@ -362,7 +365,7 @@ class MainWindow(qtw.QMainWindow):
     self.in1_mainGroupBox.layout().addWidget(self.in1_isosurfaceGroupBox)
         
     # Moving Image (in2) -------------------------------------------------------------------------
-    self.in2_mainGroupBox = qtw.QGroupBox("Moving Image (in2)")
+    self.in2_mainGroupBox = qtw.QGroupBox("Moving Image (in2) [yellow]")
     self.in2_mainGroupBox.setLayout(qtw.QHBoxLayout())
     
     self.in2_pointWidget = qtw.QFrame()
@@ -476,7 +479,7 @@ class MainWindow(qtw.QMainWindow):
     self.vtkWidget = QVTKRenderWindowInteractor()
     self.vtkWidget.AddObserver("ExitEvent", lambda o, e, a=self: a.quit())
     #self.vtkWidget.AddObserver("KeyReleaseEvent", self.keyEventDetected)
-    self.vtkWidget.AddObserver("LeftButtonReleaseEvent", self.mouseEventDetected)
+    #self.vtkWidget.AddObserver("LeftButtonReleaseEvent", self.mouseEventDetected)
     
     # Create main layout and add VTK window and control panel
     self.mainLayout = qtw.QHBoxLayout()
@@ -593,6 +596,9 @@ class MainWindow(qtw.QMainWindow):
     qr.moveCenter(cp)
     self.move(qr.topLeft())
   
+  def doit(self):
+      print('hi')
+      
   def initRenderWindow(self):
     # Create renderer
     self.renderer = vtk.vtkRenderer()
@@ -603,10 +609,13 @@ class MainWindow(qtw.QMainWindow):
     self.renWin.AddRenderer(self.renderer)
     self.iren = self.renWin.GetInteractor()
     
+    #self.iren.AddObserver("KeyPressEvent",self.doit())
+    
     self.pickerstyle = MyInteractorStyle()
     self.pickerstyle.AddObserver("UpdateEvent", self.keyEventDetected)
     #self.pickerstyle.SetCurrentStyleToTrackballCamera()
     self.iren.SetInteractorStyle(self.pickerstyle)
+    #self.iren.SetInteractorStyle(vtk.vtkInteractorStyleSwitch())
     #print(self.iren.GetInteractorStyle().GetClassName())
     
     # Initialize
@@ -850,10 +859,10 @@ class MainWindow(qtw.QMainWindow):
     if (self.in2_pipe != None):
       if (qtc.Qt.Checked == _state):
         self.in2_pipe.useTransform(True)
-        self.statusBar().showMessage("Toggling transform visibility ON",4000)
+        self.statusBar().showMessage("Toggling transform ON",4000)
       else:
         self.in2_pipe.useTransform(False)
-        self.statusBar().showMessage("Toggling transform visibility OFF",4000)
+        self.statusBar().showMessage("Toggling transform OFF",4000)
       self.refreshRenderWindow()
   
   def updateMatrixGUI(self, _mat):
@@ -943,6 +952,7 @@ class MainWindow(qtw.QMainWindow):
   def validExtension(self, extension):
     if (extension == ".aim" or \
         extension == ".nii" or \
+        extension == ".nii.gz" or \
         extension == ".dcm" or \
         extension == ".stl"):
       return True
@@ -953,19 +963,24 @@ class MainWindow(qtw.QMainWindow):
     if (pipeline_name == "in2" and self.in1_pipe == None):
       qtw.QMessageBox.warning(self, "Warning", "Image 2 cannot be loaded before image 1.")
       return
+
     self.statusBar().showMessage("Load image types (.aim, .nii, .dcm)",4000)
     filename, _ = qtw.QFileDialog.getOpenFileName(
       self,
       "Select a 3D image file to open…",
-      qtc.QDir.homePath(),
+      self.default_path,
       "Aim Files (*.aim) ;;Nifti Files (*.nii) ;;DICOM Files (*.dcm) ;;STL Files (*.stl) ;;All Files (*)",
       "All Files (*)",
       qtw.QFileDialog.DontUseNativeDialog |
       qtw.QFileDialog.DontResolveSymlinks
     )
+    self.default_path = qtc.QFileInfo(filename).path()
     
     if filename:
       _,ext = os.path.splitext(filename)
+      if 'gz' in ext:
+        ext = '.nii' + ext
+      
       if not (self.validExtension(ext.lower())):
         qtw.QMessageBox.warning(self, "Error", "Invalid file type.")
         return
