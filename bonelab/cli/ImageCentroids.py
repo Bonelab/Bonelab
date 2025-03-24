@@ -150,7 +150,7 @@ def ImageCentroids(input_filename,rapidprototyping,scantype):
         if centroid_dict.get(10):
           print('\n# Create base plate')
           center_base = [centroid_dict.get(10)[0],centroid_dict.get(10)[1],phys_dim[2]]
-          plate_thickness = 10 # thickness in mm
+          plate_thickness = 20 # thickness in mm
           center_base_top = [center_base[0],center_base[1],phys_dim[2]-plate_thickness]
           print('{:s} '.format('blRapidPrototype create_cylinder --endpoints')+' '.join('{:8.2f}'.format(x) for x in center_base)+' '+' '.join('{:8.2f}'.format(x) for x in center_base_top) + '{:s}'.format(' --resolution 200 --radius 150.0 /Users/skboyd/Desktop/test/baseplate.stl'))
           
