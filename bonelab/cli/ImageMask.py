@@ -115,29 +115,25 @@ def ImageMask(input_image, input_mask, output_image, kernel, overwrite):
       
   print('Saving image ' + output_image)
   writer.Update()
-  exit()
-  # print('\n!> Output image')
-  # aix(output_filename,extract.GetOutput())
   
 def main():
     # Setup description
     description='''
-Masks an image with a provided mask. 
+Masks an image. Data in mask is maintained and data outside is set to zero. 
 
-Dilation of mask is optional. The size of the kernel
-determines the amount of dilation.
+Dilation of mask is optional. The size of the kernel determines the amount 
+of dilation.
 
 Extents of the image and mask must be the same.
 
-Valid input and output formats include: 
-.nii, .nii.gz
+Valid input and output formats include: .nii, .nii.gz
 
 Currently only accepts NIFTI file formats as input and output.
 
 '''
     epilog='''
 To see the options for each of the utilities, type something like this:
-$ blImageMask input_image.nii.gz input_mask.nii.gz output_image.nii.gz --dilation 2
+$ blImageMask image.nii.gz mask.nii.gz output.nii.gz --kernel 15 15 15
 
 '''
 
