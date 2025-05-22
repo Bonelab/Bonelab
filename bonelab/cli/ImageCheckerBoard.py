@@ -131,7 +131,9 @@ def main():
 Shows two images in checkerboard style. Typically used to qualitatively check 
 3D image registration results.
 
-Extents of the two input images do not need to be the same.
+Extents of the two input images do not need to be the same. The divisions in
+all three dimensions sometimes results in strange effects. Better to set the 
+Z dimension to 1 usually.
 
 Valid input and output formats include: .nii, .nii.gz
 
@@ -154,7 +156,7 @@ $ blImageCheckerBoard image1.nii.gz image2.nii.gz --divisions 5 5 5
     
     parser.add_argument('input_image1', help='Input image 1')
     parser.add_argument('input_image2', help='Input image 2')
-    parser.add_argument('-d', '--divisions', type=int, nargs=3, metavar='N', default=[10,10,10], help='Checker board divisions (default: %(default)s)')
+    parser.add_argument('-d', '--divisions', type=int, nargs=3, metavar='N', default=[10,10,1], help='Checker board divisions (default: %(default)s)')
 
     # Parse and display
     args = parser.parse_args()
