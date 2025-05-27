@@ -10,7 +10,7 @@ import math
 from bonelab.util.echo_arguments import echo_arguments
 from vtk.util.numpy_support import vtk_to_numpy
 
-def ImageCheckerBoard(input_image1, input_image2, divisions):
+def ImageCheckerBoard(input_image1, input_image2, divisions, outfile):
 
   if not os.path.isfile(input_image1):
       os.sys.exit('[ERROR] Cannot find file \"{}\"'.format(input_image1))
@@ -123,6 +123,23 @@ def ImageCheckerBoard(input_image1, input_image2, divisions):
   # Draw stuff to the screen!
   viewer.Render()
   iren.Start()
+  
+  if outfile is not None:
+    if outfile.lower().endswith('.nii'):
+        writer = vtk.vtkNIFTIImageWriter()
+    elif outfile.lower().endswith('.nii.gz'):
+        writer = vtk.vtkNIFTIImageWriter()
+    elif outfile.lower().endswith('.aim'):
+        writer = vtkbone.vtkboneAIMWriter()
+    else:
+        os.sys.exit('[ERROR] Cannot find reader for file \"{}\"'.format(input_image1))
+    
+    # writer = vtk.vtkNIFTIImageWriter()
+    writer.SetFileName(outfile)
+    writer.SetInputConnection(checker.GetOutputPort())
+    writer.Write()
+    print('Writing {}'.format(outfile))
+
 
   
 def main():
@@ -157,6 +174,7 @@ $ blImageCheckerBoard image1.nii.gz image2.nii.gz --divisions 5 5 5
     parser.add_argument('input_image1', help='Input image 1')
     parser.add_argument('input_image2', help='Input image 2')
     parser.add_argument('-d', '--divisions', type=int, nargs=3, metavar='N', default=[10,10,1], help='Checker board divisions (default: %(default)s)')
+    parser.add_argument('-o','--outfile', default=None, metavar='FN', help='Output image file (*.tif) (default: %(default)s)')
 
     # Parse and display
     args = parser.parse_args()
