@@ -27,7 +27,7 @@ import sys
 import math
 import vtk
 
-from PyQt5 import QtWidgets as qtw
+from PyQt6 import QtWidgets as qtw
 
 #-------------------------------------------------------------------------------
 def argManager():

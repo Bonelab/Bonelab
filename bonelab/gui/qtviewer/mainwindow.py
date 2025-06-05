@@ -30,9 +30,9 @@ from bonelab.gui.qtviewer.colourpalette import ColourPalette
 from bonelab.gui.qtviewer.scancomatrixconverter import ScancoMatrixConverter
 from bonelab.gui.qtviewer.resources import *
 
-from PyQt5 import QtWidgets as qtw
-from PyQt5 import QtCore as qtc
-from PyQt5 import QtGui as qtg
+from PyQt6 import QtWidgets as qtw
+from PyQt6 import QtCore as qtc
+from PyQt6 import QtGui as qtg
 
 class MainWindow(qtw.QMainWindow):
   
@@ -264,12 +264,12 @@ class MainWindow(qtw.QMainWindow):
     self.in1_points_count = qtw.QLCDNumber(
       self,
       intValue=0,
-      segmentStyle=qtw.QLCDNumber.Flat
+      segmentStyle=qtw.QLCDNumber.SegmentStyle.Flat
     )
     self.in2_points_count = qtw.QLCDNumber(
       self,
       intValue=0,
-      segmentStyle=qtw.QLCDNumber.Flat
+      segmentStyle=qtw.QLCDNumber.SegmentStyle.Flat
     )
     
     # Vectors
@@ -307,7 +307,7 @@ class MainWindow(qtw.QMainWindow):
       self,
       objectName = "log_window",
       acceptRichText=False,
-      lineWrapMode=qtw.QTextEdit.NoWrap,
+      lineWrapMode=qtw.QTextEdit.LineWrapMode.NoWrap,
       lineWrapColumnOrWidth=80,
       placeholderText="Ready..."
     )
@@ -454,7 +454,7 @@ class MainWindow(qtw.QMainWindow):
     
     # Set up the log window ----------------------------------------------------------------------
     font = qtg.QFont("Courier")
-    font.setStyleHint(qtg.QFont.TypeWriter)
+    font.setStyleHint(qtg.QFont.StyleHint.TypeWriter)
     font.setWeight(25)
     self.log_window.setTextColor(qtg.QColor("blue"))
     self.log_window.setCurrentFont(font)
@@ -471,7 +471,7 @@ class MainWindow(qtw.QMainWindow):
     self.panel.addWidget(self.cameraControlsGroupBox)
     self.panel.addWidget(self.transformPanelGroupBox)
     self.panel.addWidget(self.log_window)
-    self.panel.addWidget(self.logoLabel, alignment=qtc.Qt.AlignRight)
+    self.panel.addWidget(self.logoLabel, alignment=qtc.Qt.AlignmentFlag.AlignRight)
     self.panelWidget = qtw.QFrame()
     self.panelWidget.setLayout(self.panel)    
     
@@ -514,31 +514,31 @@ class MainWindow(qtw.QMainWindow):
     self.transLabel.setMaximumSize(15,20)
     
     self.vtkWidget.setSizePolicy(
-      qtw.QSizePolicy.MinimumExpanding,
-      qtw.QSizePolicy.MinimumExpanding
+      qtw.QSizePolicy.Policy.MinimumExpanding,
+      qtw.QSizePolicy.Policy.MinimumExpanding
     )
     
     self.in1_points_count.setMaximumSize(50,30)
     self.in2_points_count.setMaximumSize(50,30)
     
     self.in1_mainGroupBox.setSizePolicy(
-      qtw.QSizePolicy.Maximum,
-      qtw.QSizePolicy.Maximum
+      qtw.QSizePolicy.Policy.Maximum,
+      qtw.QSizePolicy.Policy.Maximum
     )
     
     self.in2_mainGroupBox.setSizePolicy(
-      qtw.QSizePolicy.Maximum,
-      qtw.QSizePolicy.Maximum
+      qtw.QSizePolicy.Policy.Maximum,
+      qtw.QSizePolicy.Policy.Maximum
     )
     
     self.transformPanelGroupBox.setSizePolicy(
-      qtw.QSizePolicy.Maximum,
-      qtw.QSizePolicy.Maximum
+      qtw.QSizePolicy.Policy.Maximum,
+      qtw.QSizePolicy.Policy.Maximum
     )
 
     self.log_window.setSizePolicy(
-      qtw.QSizePolicy.MinimumExpanding,
-      qtw.QSizePolicy.MinimumExpanding
+      qtw.QSizePolicy.Policy.MinimumExpanding,
+      qtw.QSizePolicy.Policy.MinimumExpanding
     )
     
     # Connect signals and slots ------------------------------------------------------------------
@@ -592,7 +592,8 @@ class MainWindow(qtw.QMainWindow):
     
   def centreWindow(self):
     qr = self.frameGeometry()
-    cp = qtw.QDesktopWidget().availableGeometry().center()
+    screen = qtw.QApplication.primaryScreen()
+    cp = screen.availableGeometry().center()
     qr.moveCenter(cp)
     self.move(qr.topLeft())
   
@@ -613,14 +614,14 @@ class MainWindow(qtw.QMainWindow):
     
     self.pickerstyle = MyInteractorStyle()
     self.pickerstyle.AddObserver("UpdateEvent", self.keyEventDetected)
-    #self.pickerstyle.SetCurrentStyleToTrackballCamera()
     self.iren.SetInteractorStyle(self.pickerstyle)
+    #self.pickerstyle.SetCurrentStyleToTrackballCamera()
     #self.iren.SetInteractorStyle(vtk.vtkInteractorStyleSwitch())
     #print(self.iren.GetInteractorStyle().GetClassName())
     
     # Initialize
     self.iren.Initialize()
-    self.iren.Start()
+    # self.iren.Start()
 
   def refreshRenderWindow(self):
     self.renWin.Render()
@@ -705,7 +706,7 @@ class MainWindow(qtw.QMainWindow):
         return
       
     # Only two states are possible
-    if (qtc.Qt.Checked == _state):
+    if (qtc.Qt.CheckState.Checked == _state):
       ptr.setActorPickable(1)
       self.statusBar().showMessage("Toggling actor pickability ON",4000)
       self.refreshRenderWindow()
@@ -730,7 +731,7 @@ class MainWindow(qtw.QMainWindow):
         return
 
     # Only two states are possible
-    if (qtc.Qt.Checked == _state):
+    if (qtc.Qt.CheckState.Checked == _state):
       ptr.setActorVisibility(1)
       self.pickerstyle.setVisibilityOfPoints(name, 1)
       self.statusBar().showMessage("Toggling actor visibility ON",4000)
@@ -845,9 +846,9 @@ class MainWindow(qtw.QMainWindow):
   def resetTransform(self):
     if (self.in2_pipe != None):
       reply = qtw.QMessageBox.question(self, "Message",
-        "Are you sure you want to reset the transform?", qtw.QMessageBox.Yes |
-        qtw.QMessageBox.No, qtw.QMessageBox.Yes)
-      if reply == qtw.QMessageBox.Yes:
+        "Are you sure you want to reset the transform?", qtw.QMessageBox.StandardButton.Yes |
+        qtw.QMessageBox.StandardButton.No, qtw.QMessageBox.StandardButton.Yes)
+      if reply == qtw.QMessageBox.StandardButton.Yes:
         self.in2_pipe.setRigidBodyTransformToIdentity()
         self.pickerstyle.removePoints("in1_pipeline")
         self.pickerstyle.removePoints("in2_pipeline")
@@ -857,7 +858,7 @@ class MainWindow(qtw.QMainWindow):
     
   def toggleTransformApplied(self, _state):
     if (self.in2_pipe != None):
-      if (qtc.Qt.Checked == _state):
+      if (qtc.Qt.CheckState.Checked == _state):
         self.in2_pipe.useTransform(True)
         self.statusBar().showMessage("Toggling transform ON",4000)
       else:
@@ -971,8 +972,8 @@ class MainWindow(qtw.QMainWindow):
       self.default_path,
       "Aim Files (*.aim) ;;Nifti Files (*.nii) ;;DICOM Files (*.dcm) ;;STL Files (*.stl) ;;All Files (*)",
       "All Files (*)",
-      qtw.QFileDialog.DontUseNativeDialog |
-      qtw.QFileDialog.DontResolveSymlinks
+      qtw.QFileDialog.Option.DontUseNativeDialog |
+      qtw.QFileDialog.Option.DontResolveSymlinks
     )
     self.default_path = qtc.QFileInfo(filename).path()
     
@@ -1059,18 +1060,18 @@ class MainWindow(qtw.QMainWindow):
     
   def quit(self):
     reply = qtw.QMessageBox.question(self, "Message",
-      "Are you sure you want to quit?", qtw.QMessageBox.Yes |
-      qtw.QMessageBox.No, qtw.QMessageBox.Yes)
-    if reply == qtw.QMessageBox.Yes:
+      "Are you sure you want to quit?", qtw.QMessageBox.StandardButton.Yes |
+      qtw.QMessageBox.StandardButton.No, qtw.QMessageBox.StandardButton.Yes)
+    if reply == qtw.QMessageBox.StandardButton.Yes:
       exit(0)
 
   def about(self):
     about = qtw.QMessageBox(self)
     about.setWindowIcon(qtg.QIcon('/bonelab/gui/src/icon.png'))
-    about.setIcon(qtw.QMessageBox.Information)
+    about.setIcon(qtw.QMessageBox.Icon.Information)
     about.setText("blQtViewer 1.0")
     about.setInformativeText("Copyright (C) 2020\nBone Imaging Laboratory\nAll rights reserved.\nbonelab@ucalgary.ca")
-    about.setStandardButtons(qtw.QMessageBox.Ok | qtw.QMessageBox.Cancel)
+    about.setStandardButtons(qtw.QMessageBox.StandardButton.Ok | qtw.QMessageBox.StandardButton.Cancel)
     about.exec_()
 
   def extrudeFromPoints(self):

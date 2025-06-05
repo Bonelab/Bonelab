@@ -16,9 +16,9 @@ import vtk
 
 from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
-from PyQt5 import QtWidgets as qtw
-from PyQt5 import QtCore as qtc
-from PyQt5 import QtGui as qtg
+from PyQt6 import QtWidgets as qtw
+from PyQt6 import QtCore as qtc
+from PyQt6 import QtGui as qtg
 
 class MainWindow(qtw.QMainWindow):
   

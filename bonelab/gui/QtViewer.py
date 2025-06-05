@@ -52,8 +52,11 @@ import sys
 import math
 import vtk
 import vtkbone
+print(vtk.vtkVersion.GetVTKVersion())
 
-from PyQt5 import QtWidgets as qtw
+from PyQt6 import QtWidgets as qtw
+from PyQt6 import QtCore as qtc
+from PyQt6 import QtGui as qtg
 
 #-------------------------------------------------------------------------------
 def argManager():
@@ -87,9 +90,19 @@ $ blQtViewer --window_size 1536 1024
 def main(): 
   args = argManager()
   
-  app = qtw.QApplication([])
-  main_window = MainWindow(**vars(args))
-  sys.exit(app.exec())
+  # Create QApplication with proper attributes
+  app = qtw.QApplication(sys.argv)
+  # app.setAttribute(qtc.Qt.ApplicationAttribute.AA_DontShowIconsInMenus, False)
+  
+  try:
+    main_window = MainWindow(**vars(args))
+    main_window.show()
+    return app.exec()
+  except Exception as e:
+    print(f"Error creating main window: {e}")
+    import traceback
+    traceback.print_exc()
+    return 1
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
