@@ -3,7 +3,10 @@
 # Created by: The Resource Compiler for Qt version 6.8.3
 # WARNING! All changes made in this file will be lost!
 
-from PySide6 import QtCore
+# Note: PyQt6 does not come with pyrcc, so PySide6 had to be installed and generate resources.py with pyside6-rcc
+
+# This had to be changed to PyQt6 after generation
+from PyQt6 import QtCore
 
 qt_resource_data = b"\
 \x00\x00K\xc1\
