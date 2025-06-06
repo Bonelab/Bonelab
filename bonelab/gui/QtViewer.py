@@ -54,9 +54,7 @@ import vtk
 import vtkbone
 print(vtk.vtkVersion.GetVTKVersion())
 
-from PyQt6 import QtWidgets as qtw
-from PyQt6 import QtCore as qtc
-from PyQt6 import QtGui as qtg
+from PyQt6.QtWidgets import QApplication
 
 #-------------------------------------------------------------------------------
 def argManager():
@@ -91,7 +89,7 @@ def main():
   args = argManager()
   
   # Create QApplication with proper attributes
-  app = qtw.QApplication(sys.argv)
+  app = QApplication(sys.argv)
   # app.setAttribute(qtc.Qt.ApplicationAttribute.AA_DontShowIconsInMenus, False)
   
   try:

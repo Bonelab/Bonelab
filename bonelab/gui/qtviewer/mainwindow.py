@@ -22,7 +22,12 @@ import sys
 import vtk
 import vtkbone
 
-from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
+# from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
+from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
+
+print(f"Using vtkmodules.qt.QVTKRenderWindowInteractor from {vtk.__file__}")
+import vtkmodules
+print(f"Printing vtkmodules qt {vtkmodules.qt.__file__}")
 
 from bonelab.gui.qtviewer.interactor import MyInteractorStyle
 from bonelab.gui.qtviewer.pipeline import Pipeline
@@ -83,7 +88,7 @@ class MainWindow(qtw.QMainWindow):
     ########################################
     # Create Widgets
     ########################################
-        
+    
     # Fixed image (in1)    
     self.in1_loadPushButton = qtw.QPushButton(
       "Load Image 1",
@@ -363,7 +368,7 @@ class MainWindow(qtw.QMainWindow):
     
     self.in1_mainGroupBox.layout().addLayout(self.in1_loadGridLayout)
     self.in1_mainGroupBox.layout().addWidget(self.in1_isosurfaceGroupBox)
-        
+    
     # Moving Image (in2) -------------------------------------------------------------------------
     self.in2_mainGroupBox = qtw.QGroupBox("Moving Image (in2) [yellow]")
     self.in2_mainGroupBox.setLayout(qtw.QHBoxLayout())
@@ -476,7 +481,9 @@ class MainWindow(qtw.QMainWindow):
     self.panelWidget.setLayout(self.panel)    
     
     # Create the VTK rendering window ------------------------------------------------------------
+    print("PROBLEM HERE")
     self.vtkWidget = QVTKRenderWindowInteractor()
+    print("PROBLEM ENDED")
     self.vtkWidget.AddObserver("ExitEvent", lambda o, e, a=self: a.quit())
     #self.vtkWidget.AddObserver("KeyReleaseEvent", self.keyEventDetected)
     #self.vtkWidget.AddObserver("LeftButtonReleaseEvent", self.mouseEventDetected)

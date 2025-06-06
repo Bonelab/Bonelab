@@ -27,7 +27,7 @@ import sys
 import math
 import vtk
 
-from PyQt6 import QtWidgets as qtw
+from PyQt6.QtWidgets import QApplication
 
 #-------------------------------------------------------------------------------
 def argManager():
@@ -61,8 +61,9 @@ $ blQtBasic --window_size 1536 1024
 def main(): 
   args = argManager()
   
-  app = qtw.QApplication([])
+  app = QApplication(sys.argv)
   main_window = MainWindow(**vars(args))
+  main_window.show()
   sys.exit(app.exec())
 
 if __name__ == '__main__':
