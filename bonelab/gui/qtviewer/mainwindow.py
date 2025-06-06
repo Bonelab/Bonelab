@@ -22,7 +22,16 @@ import sys
 import vtk
 import vtkbone
 
-# from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
+# ==================================================================================
+# Tip:
+# Vtk >9.0 has a new way of handling the interactor style. If PyQt or PySide was installed
+# with pip, then the interactor will not work properly. PyQt or PySide must be installed
+# with conda. Otherwise, you must set the interactor style manually before importing QVTKRenderWindowInteractor:
+#
+# force use of PySide6 in QVTKRenderWindowInteractor
+#     import vtkmodules.qt
+#     vtkmodules.qt.PyQtImpl = 'PySide6'
+# =================================================================================
 from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
 print(f"Using vtkmodules.qt.QVTKRenderWindowInteractor from {vtk.__file__}")
