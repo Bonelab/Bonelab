@@ -35,9 +35,9 @@ from bonelab.gui.qtviewer.colourpalette import ColourPalette
 from bonelab.gui.qtviewer.scancomatrixconverter import ScancoMatrixConverter
 from bonelab.gui.qtviewer.resources import *
 
-from PyQt6 import QtWidgets as qtw
-from PyQt6 import QtCore as qtc
-from PyQt6 import QtGui as qtg
+from PySide6 import QtWidgets as qtw
+from PySide6 import QtCore as qtc
+from PySide6 import QtGui as qtg
 
 class MainWindow(qtw.QMainWindow):
   
@@ -460,7 +460,7 @@ class MainWindow(qtw.QMainWindow):
     # Set up the log window ----------------------------------------------------------------------
     font = qtg.QFont("Courier")
     font.setStyleHint(qtg.QFont.StyleHint.TypeWriter)
-    font.setWeight(25)
+    font.setWeight(qtg.QFont.Weight.Light)
     self.log_window.setTextColor(qtg.QColor("blue"))
     self.log_window.setCurrentFont(font)
     

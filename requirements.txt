@@ -7,11 +7,10 @@ gitpython
 
 # Image processing
 vtk
-simpleitk>=2.2,<2.3
+simpleitk>=2.2,<3.0
 pydicom
 scikit-image
 pyvista
-PyQt6
 
 # Numerics
 numpy

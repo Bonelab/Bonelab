@@ -5,20 +5,23 @@
 #---------------------------------------------------------------
 # Created December 4, 2020
 # Steven Boyd
+#
+# Updated June 6, 2025 - Added support for PySide6 and VTK 9.3
 #---------------------------------------------------------------
 # A Qt GUI-based 3D rendering tool. Used for viewing, point 
 # picking and estimating 3D registration transforms.
 #
-# Note: Uses PyQt5, vtk8.2 and python3:
-#     pyqt        5.12.3           py38hf180056_3    conda-forge
-#     vtk         8.2.0          py38h19d254c_206    conda-forge
-#     python      3.8.1                h5c2c468_1    conda-forge
-#     n88tools    8.3.0                py38_np118    numerics88
+# Note: Uses PySide6, vtk8.2 and python3:
+#     pyside6     6.8.3           py312h8c66da3_0         conda-forge
+#     vtk         9.3.1           qt_py312he4b582b_216    conda-forge
+#     vtkbone     2.0.0           py312                   Numerics88
+#     python      3.12.1          h5c2c468_1              conda-forge
+#     n88tools    10.0.0          py312_np126             Numerics88
 #
 # Create an environment like this:
 # conda create --name bonelab --channel numerics88 \
-#              --channel conda-forge python=3.8 \
-#              n88tools pyqt=5.12 vtk=8
+#              --channel conda-forge python=3.12 \
+#              n88tools pyside6 vtkbone
 #
 # Usage:
 #   blQtViewer -h
@@ -54,7 +57,7 @@ import vtk
 import vtkbone
 print(vtk.vtkVersion.GetVTKVersion())
 
-from PyQt6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication
 
 #-------------------------------------------------------------------------------
 def argManager():
