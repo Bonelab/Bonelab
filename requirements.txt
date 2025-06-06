@@ -7,14 +7,14 @@ gitpython
 
 # Image processing
 vtk
-simpleitk==2.2
+simpleitk>=2.2,<3.0
 pydicom
 scikit-image
 pyvista
 
 # Numerics
 numpy
-scipy==1.7
+scipy>=1.7,<1.13
 matplotlib
 
 # Data
