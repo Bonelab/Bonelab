@@ -14,11 +14,12 @@ import os
 import sys
 import vtk
 
-from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
+# from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
+from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
-from PyQt5 import QtWidgets as qtw
-from PyQt5 import QtCore as qtc
-from PyQt5 import QtGui as qtg
+from PySide6 import QtWidgets as qtw
+from PySide6 import QtCore as qtc
+from PySide6 import QtGui as qtg
 
 class MainWindow(qtw.QMainWindow):
   
@@ -169,13 +170,13 @@ class MainWindow(qtw.QMainWindow):
     self.mainGroupBox.setMaximumSize(1000,200)
     
     self.vtkWidget.setSizePolicy(
-      qtw.QSizePolicy.MinimumExpanding,
-      qtw.QSizePolicy.MinimumExpanding
+      qtw.QSizePolicy.Policy.MinimumExpanding,
+      qtw.QSizePolicy.Policy.MinimumExpanding
     )
     
     self.mainGroupBox.setSizePolicy(
-      qtw.QSizePolicy.Maximum,
-      qtw.QSizePolicy.Maximum
+      qtw.QSizePolicy.Policy.Maximum,
+      qtw.QSizePolicy.Policy.Maximum
     )
     
     # Connect signals and slots ------------------------------------------------------------------
@@ -202,7 +203,8 @@ class MainWindow(qtw.QMainWindow):
 
   def centreWindow(self):
     qr = self.frameGeometry()
-    cp = qtw.QDesktopWidget().availableGeometry().center()
+    screen = qtw.QApplication.primaryScreen()
+    cp = screen.availableGeometry().center()
     qr.moveCenter(cp)
     self.move(qr.topLeft())
   

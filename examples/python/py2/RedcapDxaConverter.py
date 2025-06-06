@@ -4,7 +4,7 @@
 # import _mypath
 import sys
 import os
-from PyQt5 import QtCore, QtWidgets
+from PySide6 import QtCore, QtWidgets
 import logging
 from redcap_dxa_converter import load_reference
 from redcap_dxa_converter import Measurement
