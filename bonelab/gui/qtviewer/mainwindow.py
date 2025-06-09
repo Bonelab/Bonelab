@@ -490,9 +490,7 @@ class MainWindow(qtw.QMainWindow):
     self.panelWidget.setLayout(self.panel)    
     
     # Create the VTK rendering window ------------------------------------------------------------
-    print("PROBLEM HERE")
     self.vtkWidget = QVTKRenderWindowInteractor()
-    print("PROBLEM ENDED")
     self.vtkWidget.AddObserver("ExitEvent", lambda o, e, a=self: a.quit())
     #self.vtkWidget.AddObserver("KeyReleaseEvent", self.keyEventDetected)
     #self.vtkWidget.AddObserver("LeftButtonReleaseEvent", self.mouseEventDetected)

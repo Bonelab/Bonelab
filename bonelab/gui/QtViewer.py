@@ -55,7 +55,6 @@ import sys
 import math
 import vtk
 import vtkbone
-print(vtk.vtkVersion.GetVTKVersion())
 
 from PySide6.QtWidgets import QApplication
 
