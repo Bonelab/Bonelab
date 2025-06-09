@@ -11,7 +11,7 @@
 # A Qt GUI-based 3D rendering tool. Used for viewing, point 
 # picking and estimating 3D registration transforms.
 #
-# Note: Uses PySide6, vtk8.2 and python3:
+# Note: Uses PySide6, vtk9.3 and python3:
 #     pyside6     6.8.3           py312h8c66da3_0         conda-forge
 #     vtk         9.3.1           qt_py312he4b582b_216    conda-forge
 #     vtkbone     2.0.0           py312                   Numerics88
