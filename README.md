@@ -27,7 +27,7 @@ git clone git@github.com:Bonelab/Bonelab.git
 git clone https://github.com/Bonelab/Bonelab.git
 
 # setup the environment
-conda create -n bl -c numerics88 -c conda-forge python=3 n88tools pbr nose
+conda create -n bl -c numerics88 -c conda-forge python=3 vtkbone pyside6
 
 # Activate the environemnt
 conda activate bl
