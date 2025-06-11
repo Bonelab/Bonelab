@@ -11,13 +11,13 @@
 # A Qt GUI-based tool demonstrating the basics of integrating 
 # pyqt, vtk and python.
 #
-# Note: Uses PySide6, vtk8.2 and python3:
+# Note: Uses PySide6, vtk9.3 and python3:
 #     pyside6     6.8.3           py312h8c66da3_0         conda-forge
 #     vtk         9.3.1           qt_py312he4b582b_216    conda-forge
 #     python      3.12.1          h5c2c468_1              conda-forge
 #
 # Create an environment like this:
-# conda create --name bonelab --channel conda-forge python=3.8 pyqt=5.12 vtk=8
+# conda create -n bonelab -c conda-forge -c numerics88 python=3.11 pyside6 vtkbone
 #
 # Usage:
 #   blQtBasic -h

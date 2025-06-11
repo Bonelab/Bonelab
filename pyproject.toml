@@ -1,0 +1,5 @@
+[build-system]
+requires = ["setuptools>=64", "pbr"]
+build-backend = "pbr.build"
+
+[tool.pbr]
