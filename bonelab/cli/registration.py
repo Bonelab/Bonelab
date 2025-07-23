@@ -254,11 +254,9 @@ def create_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "--transform-type", "-tt", default="Euler3D", metavar="STR",
-        type=create_string_argument_checker(["Euler3D", "Euler2D"], "transform-type"),
-        help="the type of transformation to do, options: `Euler3D`, `Euler2D`. NOTE: these are just rigid "
-             "transformations in 3D or 2D, non-rigid transforms are beyond the current scope of this tool. If you "
-             "want a deformable registration, then either use blDemonsRegistration, extend this tool to be more "
-             "flexible, or write a custom registration script and manually specify the transform you want to fit. "
+        help="the type of transformation to do, options: `Euler3D`, `Euler2D`, `Affine`, `Sim3D`."
+             "If you want a deformable registration, then either use blDemonsRegistration,"
+             "or write a custom registration script and manually specify the transform you want to fit. "
     )
 
     return parser

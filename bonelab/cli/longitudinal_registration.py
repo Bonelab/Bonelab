@@ -155,7 +155,7 @@ def longitudinal_registration(args: Namespace):
         registration_method = setup_transform(
             registration_method,
             baseline_image, follow_up_image,
-            "Euler3D", args.centering_initialization,
+            args.transform_type, args.centering_initialization,
             args.silent
         )  # hard code to always use rigid transformation for longitudinal registration
         message_s("Starting registration", args.silent)
@@ -378,6 +378,10 @@ def create_parser() -> ArgumentParser:
         "--centering-initialization", "-ci", default="Geometry", metavar="STR",
         type=create_string_argument_checker(["Geometry", "Moments"], "centering-initialization"),
         help="the centering initialization to use, options: `Geometry`, `Moments`"
+    )
+    parser.add_argument(
+        "--transform_type", "-tt", default="Euler3D", metavar="STR",
+        help="the registration type to use, options: `Euler3D`, `Euler2D`, `Affine`, `Sim3D`"
     )
 
     return parser
