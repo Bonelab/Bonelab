@@ -754,6 +754,10 @@ def setup_transform(
         transform = sitk.Euler3DTransform()
     elif transform_type == "Euler2D":
         transform = sitk.Euler2DTransform()
+    elif transform_type == "Affine":
+        transform = sitk.AffineTransform(fixed_image.GetDimension())
+    elif transform_type == "Sim3D":
+        transform = sitk.Similarity3DTransform()    
     else:
         raise ValueError("`transform-type` is invalid and was not caught")
     if centering_initialization == "Geometry":
