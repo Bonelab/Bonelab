@@ -219,7 +219,7 @@ def autocontour_buie(img, args):
 
     # Step 13: Threshold
     s13_threshold = vtk.vtkImageThreshold()
-    s13_threshold.ThresholdByLower(S13_THRESH)
+    s13_threshold.ThresholdByLower(args.step_13_threshold)
     s13_threshold.SetInValue(args.out_value)
     s13_threshold.SetOutValue(args.in_value)
     s13_threshold.SetInputConnection(s12_gauss.GetOutputPort())
