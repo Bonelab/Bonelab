@@ -92,6 +92,11 @@ def create_parser():
         '--step-13-threshold', '-s13t', type=float, default=100, metavar='N',
         help = 'threshold for rebinarizing after gaussian in step 13'
     )
+    
+    parser.add_argument(
+        '--output-dir', '-o', type=str, default=None, metavar='OUTPUT_DIR',
+        help = 'optional directory to write output masks to (defaults to input file directory)'
+    )
 
     return parser
 
@@ -285,9 +290,14 @@ def main():
     for aim_fn in aim_fn_list:
 
         print(aim_fn)
-
-        cort_mask_fn = aim_fn.replace('.AIM','_CORT_MASK.AIM')
-        trab_mask_fn = aim_fn.replace('.AIM','_TRAB_MASK.AIM')
+        
+        # Determine output directory: use --output-dir if provided, otherwise same directory as input file
+        output_dir = args.output_dir if args.output_dir else os.path.dirname(aim_fn)
+        os.makedirs(output_dir, exist_ok=True)
+        
+        base = os.path.splitext(os.path.basename(aim_fn))[0]
+        cort_mask_fn = os.path.join(output_dir, f"{base}_CORT_MASK.AIM")
+        trab_mask_fn = os.path.join(output_dir, f"{base}_TRAB_MASK.AIM")
 
         reader.SetFileName(aim_fn)
         reader.Update()
