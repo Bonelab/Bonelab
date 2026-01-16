@@ -95,7 +95,7 @@ def histogram(image):
     nBins = 128
     
     # https://numpy.org/doc/stable/reference/generated/numpy.histogram.html
-    hist,bin_edges = np.histogram(array,nBins,nRange,None,None,False)
+    hist,bin_edges = np.histogram(array,nBins,nRange)
     nValues = sum(hist)
 
     print(guard)
