@@ -388,7 +388,7 @@ def write_stl(model,output_file,mat4x4):
   writer.Write()
   message("Writing file " + output_file)
 
-def img2stl(input_file, output_file, transform_file, threshold, gaussian, radius, marching_cubes, decimation, visualize, overwrite, func):
+def img2stl(input_file, output_file, transform_file, threshold, gaussian, radius, marching_cubes, decimation, connectivity, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -473,6 +473,25 @@ def img2stl(input_file, output_file, transform_file, threshold, gaussian, radius
     mesh = mcube
   
   mesh = applyTransform(transform_file, mesh)
+  
+  if (connectivity):
+    message("Using connectivity filter to extract largest component.")
+    connectivityFilter = vtk.vtkConnectivityFilter()
+    connectivityFilter.SetInputConnection(mesh.GetOutputPort())
+    connectivityFilter.SetExtractionModeToLargestRegion()
+    connectivityFilter.Update()
+    
+    message("Done extracting largest component from {} regions.".format(connectivityFilter.GetNumberOfExtractedRegions()))
+    
+    cleaner = vtk.vtkCleanPolyData()
+    cleaner.SetInputConnection(connectivityFilter.GetOutputPort())
+    cleaner.SetTolerance(0.0) # merge points with this tolerance
+    cleaner.Update()
+    
+    final_mesh = cleaner
+  else:
+    message("Not using connectivity filter to extract largest component.")
+    final_mesh = mesh    
   
   if (visualize):
     mat4x4 = visualize_actors( mesh.GetOutputPort(), None )
@@ -1072,6 +1091,7 @@ $ blRapidPrototype create_cube --help
     parser_img2stl.add_argument('--radius', type=float, default=1.0, metavar='RADIUS', help='Gaussian radius support (default: %(default)s)')
     parser_img2stl.add_argument('--marching_cubes', type=float, default=50.0, metavar='MC', help='Marching cubes threshold (default: %(default)s)')
     parser_img2stl.add_argument('--decimation', type=float, default=0.0, metavar='DEC', choices=Range(0.0,1.0), help='Decimation is 0 (none) to 1 (max) (default: %(default)s)')
+    parser_img2stl.add_argument('--connectivity', action='store_true', help='Keep largest component only (default: %(default)s)')
     parser_img2stl.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
     parser_img2stl.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
     parser_img2stl.set_defaults(func=img2stl)
