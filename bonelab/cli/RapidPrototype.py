@@ -9,7 +9,7 @@ import math
 import vtk
 import vtkbone
 import numpy as np
-from skimage.morphology import skeletonize, binary_dilation, ball
+from skimage.morphology import skeletonize, dilation, ball
 
 from bonelab.util.echo_arguments import echo_arguments
 from bonelab.util.time_stamp import message
@@ -454,7 +454,7 @@ def img2stl(input_file, output_file, transform_file, threshold, gaussian, radius
     skeleton = skeletonize(binary_image)
     skeleton_array = skeleton.astype(numpy_array.dtype) * np.max(numpy_array)
 
-    dilated_skeleton = binary_dilation(skeleton, ball(minimum_thickness))
+    dilated_skeleton = dilation(skeleton, ball(minimum_thickness))
 
     dilated_array = dilated_skeleton.astype(numpy_array.dtype) * np.max(numpy_array)
     concatenated_array = np.maximum(numpy_array, dilated_array)
