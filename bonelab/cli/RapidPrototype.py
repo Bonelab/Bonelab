@@ -1,16 +1,19 @@
 #Imports
 import argparse
+from csv import reader
 import os
+from random import gauss
 import sys
 import time
 import math
 import vtk
 import vtkbone
 import numpy as np
+from skimage.morphology import skeletonize, binary_dilation, ball
 
 from bonelab.util.echo_arguments import echo_arguments
 from bonelab.util.time_stamp import message
-from vtk.util.numpy_support import vtk_to_numpy
+from vtk.util.numpy_support import vtk_to_numpy, numpy_to_vtk
 from bonelab.io.vtk_helpers import get_vtk_reader, get_vtk_writer, handle_filetype_writing_special_cases
 
 def CheckExt(choices):
@@ -388,7 +391,7 @@ def write_stl(model,output_file,mat4x4):
   writer.Write()
   message("Writing file " + output_file)
 
-def img2stl(input_file, output_file, transform_file, threshold, gaussian, radius, marching_cubes, decimation, connectivity, visualize, overwrite, func):
+def img2stl(input_file, output_file, transform_file, threshold, gaussian, radius, marching_cubes, decimation, connectivity, minimum_thickness, visualize, overwrite, func):
 
   if os.path.isfile(output_file) and not overwrite:
     result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_file))
@@ -418,7 +421,7 @@ def img2stl(input_file, output_file, transform_file, threshold, gaussian, radius
   message("Histogram of input data:")
   histogram(image)
   
-  # Apply threshold if requested
+    # Apply threshold if requested
   if (threshold):
     message("Thresholding")
     thres = vtk.vtkImageThreshold()
@@ -430,14 +433,50 @@ def img2stl(input_file, output_file, transform_file, threshold, gaussian, radius
     message("Histogram of thresholded data:")
     histogram(thres.GetOutput())
   
+  # Apply minimum thickness by skeletonizing and then dilating the defined amount
+  # and finally overlap the result with the original image to ensure thin structures
+  # are thickened.
+  if minimum_thickness < 0:
+    sys.exit('[ERROR] Minimum thickness must be non-negative: {:.4f}'.format(minimum_thickness))
+  message("Minimum thickness is set to: {:.4f}".format(minimum_thickness))
+  if minimum_thickness:
+    if not threshold:
+      image_data = reader.GetOutput()
+    else:
+      image_data = thres.GetOutput()
+    dims = image_data.GetDimensions()
+    scalars = image_data.GetPointData().GetScalars()
+    numpy_array = vtk_to_numpy(scalars).reshape(dims[2], dims[1], dims[0])
+
+    threshold_binarize = np.mean(numpy_array)
+    binary_image = numpy_array > threshold_binarize
+
+    skeleton = skeletonize(binary_image)
+    skeleton_array = skeleton.astype(numpy_array.dtype) * np.max(numpy_array)
+
+    dilated_skeleton = binary_dilation(skeleton, ball(minimum_thickness))
+
+    dilated_array = dilated_skeleton.astype(numpy_array.dtype) * np.max(numpy_array)
+    concatenated_array = np.maximum(numpy_array, dilated_array)
+
+    vtk_image = vtk.vtkImageData()
+    vtk_image.SetDimensions(concatenated_array.shape[2], concatenated_array.shape[1], concatenated_array.shape[0])
+    vtk_image.SetSpacing(image_data.GetSpacing())
+    vtk_image.SetOrigin(image_data.GetOrigin())
+
+    vtk_array = numpy_to_vtk(concatenated_array.ravel(order='C'), deep=True)
+    vtk_image.GetPointData().SetScalars(vtk_array)
+
   message("Gaussian smoothing")
   gauss = vtk.vtkImageGaussianSmooth()
   gauss.SetStandardDeviation(gaussian)
   gauss.SetRadiusFactor(radius)
-  if (not threshold):
-    gauss.SetInputConnection(reader.GetOutputPort())
-  else:
+  if minimum_thickness:
+    gauss.SetInputData(vtk_image)
+  elif threshold:
     gauss.SetInputConnection(thres.GetOutputPort())
+  else:
+    gauss.SetInputConnection(reader.GetOutputPort())
   gauss.Update()
   message("Total of %d voxels" % gauss.GetOutput().GetNumberOfCells())
   
@@ -1092,6 +1131,7 @@ $ blRapidPrototype create_cube --help
     parser_img2stl.add_argument('--marching_cubes', type=float, default=50.0, metavar='MC', help='Marching cubes threshold (default: %(default)s)')
     parser_img2stl.add_argument('--decimation', type=float, default=0.0, metavar='DEC', choices=Range(0.0,1.0), help='Decimation is 0 (none) to 1 (max) (default: %(default)s)')
     parser_img2stl.add_argument('--connectivity', action='store_true', help='Keep largest component only (default: %(default)s)')
+    parser_img2stl.add_argument('--minimum_thickness', type=float, default=0.0, metavar='TH', help='Uses skeletonization to create minimum thickness (default: %(default)s)')
     parser_img2stl.add_argument('--visualize', action='store_true', help='Visualize the model (default: %(default)s)')
     parser_img2stl.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
     parser_img2stl.set_defaults(func=img2stl)
