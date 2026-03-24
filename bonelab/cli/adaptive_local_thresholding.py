@@ -4,7 +4,7 @@ from __future__ import annotations
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace
 import SimpleITK as sitk
 from vtkbone import vtkboneAIMReader, vtkboneAIMWriter
-from vtk import VTK_CHAR
+from vtk import VTK_SIGNED_CHAR
 import os
 import numpy as np
 from scipy import ndimage
@@ -132,7 +132,7 @@ def compute_adaptive_local_threshold_segmentation(
     density = gaussian(density, sigma=sigma)
     return remove_small_objects(
         ((density > low_threshold) & (density > threshold_image)) | (density > high_threshold),
-        min_size=min_size
+        max_size=max(min_size - 1, 0)
     )
 
 
@@ -178,7 +178,7 @@ def adaptive_local_thresholding(args: Namespace):
             127 * (segmentation > 0),
             spacing=reader.GetOutput().GetSpacing(),
             origin=reader.GetOutput().GetOrigin(),
-            array_type=VTK_CHAR
+            array_type=VTK_SIGNED_CHAR
         )
         processing_log = (
             reader.GetProcessingLog() + os.linesep +
