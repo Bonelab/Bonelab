@@ -26,6 +26,8 @@ def get_vtk_reader(filename):
         if filename.lower().endswith('.aim'):
             reader = vtkbone.vtkboneAIMReader()
             reader.DataOnCellsOff()
+        elif filename.lower().endswith('.isq'):
+            reader = vtkbone.vtkboneISQReader()
         elif filename.lower().endswith('.nii'):
             reader = vtk.vtkNIFTIImageReader()
         elif filename.lower().endswith('.nii.gz'):
