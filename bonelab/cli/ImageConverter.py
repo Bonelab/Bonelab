@@ -60,7 +60,7 @@ def main():
     description='''Convert from one image type to another.
 
 Valid input and output formats include (partial list): 
-.aim, .nii, .nii.gz, .dcm, .mha/mhd, .mnc, .bmp, .jpeg/jpg, .png, .tiff/tif
+.aim, .isq, .nii, .nii.gz, .dcm, .mha/mhd, .mnc, .bmp, .jpeg/jpg, .png, .tiff/tif
 
 If a processing log is set, it is appended to the processing log of the
 input AIM file. If the input is not an AIM file, then the processing log
