@@ -10,7 +10,7 @@ from bonelab.util.registration_util import (
     INPUT_EXTENSIONS, TRANSFORM_EXTENSIONS, check_percentage, get_output_base, write_args_to_yaml, check_inputs_exist,
     check_for_output_overwrite, write_metrics_to_csv, create_and_save_metrics_plot, read_and_downsample_images,
     setup_optimizer, setup_similarity_metric, setup_interpolator, setup_transform, setup_multiscale_progression,
-    check_image_size_and_shrink_factors, MetricTrackingCallback
+    check_image_size_and_shrink_factors, setup_masks, MetricTrackingCallback
 )
 from bonelab.util.time_stamp import message
 
@@ -34,7 +34,12 @@ def registration(args: Namespace):
     output_metric_csv = f"{output_base}_metric_history.csv"
     output_metric_png = f"{output_base}_metric_history.png"
     # check that the inputs actually exist
-    check_inputs_exist([args.fixed_image, args.moving_image], args.silent)
+    inputs_to_check = [args.fixed_image, args.moving_image]
+    if args.fixed_mask is not None:
+        inputs_to_check.append(args.fixed_mask)
+    if args.moving_mask is not None:
+        inputs_to_check.append(args.moving_mask)
+    check_inputs_exist(inputs_to_check, args.silent)
     # check if we're going to overwrite some outputs
     check_for_output_overwrite(
         [args.output, output_yaml, output_metric_csv, output_metric_png],
@@ -81,6 +86,13 @@ def registration(args: Namespace):
         registration_method,
         fixed_image, moving_image,
         args.transform_type, args.centering_initialization,
+        args.silent
+    )
+    registration_method = setup_masks(
+        registration_method,
+        args.fixed_mask, args.moving_mask,
+        args.downsampling_shrink_factor, args.downsampling_smoothing_sigma,
+        args.dilate_fixed_mask, args.dilate_moving_mask,
         args.silent
     )
     registration_method = setup_multiscale_progression(
@@ -144,8 +156,33 @@ def create_parser() -> ArgumentParser:
              "downsampled further."
     )
     parser.add_argument(
+        "--fixed-mask", "-fm", type=create_file_extension_checker(INPUT_EXTENSIONS, "fixed_mask"), 
+        default=None, metavar="MASK",
+        help=f"Optional mask for fixed image ({', '.join(INPUT_EXTENSIONS)}). "
+             "Only non-zero regions will be used for registration. "
+             "RECOMMENDED for rigid/affine registration: use this mask alone without --moving-mask."
+    )
+    parser.add_argument(
+        "--moving-mask", "-mm", type=create_file_extension_checker(INPUT_EXTENSIONS, "moving_mask"), 
+        default=None, metavar="MASK",
+        help=f"Optional mask for moving image ({', '.join(INPUT_EXTENSIONS)}). "
+             "Only non-zero regions will be used for registration. "
+             "WARNING: Using both masks with rigid/affine registration can cause failure if masked regions "
+             "lose overlap during optimization. Both masks are more suitable for nonlinear/deformable registration."
+    )
+    parser.add_argument(
+        "--dilate-fixed-mask", "-dfm", type=int, default=0, metavar="N",
+        help="Dilate the fixed mask by N voxels (default: 0, no dilation). "
+             "Useful to create a more generous region of interest or to help maintain overlap during optimization."
+    )
+    parser.add_argument(
+        "--dilate-moving-mask", "-dmm", type=int, default=0, metavar="N",
+        help="Dilate the moving mask by N voxels (default: 0, no dilation). "
+             "Useful when using both masks to help maintain overlap during rigid/affine registration."
+    )
+    parser.add_argument(
         "--downsampling-shrink-factor", "-dsf", type=float, default=None, metavar="X",
-        help="the shrink factor to apply to the fixed and moving image before starting the registration"
+        help="the shrink factor to apply to the  -fixed and moving image before starting the registration"
     )
     parser.add_argument(
         "--downsampling-smoothing-sigma", "-dss", type=float, default=None, metavar="X",

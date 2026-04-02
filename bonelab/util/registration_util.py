@@ -5,7 +5,7 @@ import os
 from argparse import ArgumentTypeError, Namespace
 
 import SimpleITK as sitk
-from typing import List, Callable
+from typing import List, Callable, Optional, Tuple
 import yaml
 from matplotlib import pyplot as plt
 
@@ -709,6 +709,214 @@ def setup_interpolator(
         registration_method.SetInterpolator(INTERPOLATORS[interpolator])
     else:
         raise ValueError("`interpolator` is invalid and was not caught")
+    return registration_method
+
+
+def resample_mask(mask: sitk.Image, shrink_factor: float) -> sitk.Image:
+    """
+    Resample a mask using nearest neighbor interpolation without smoothing.
+    
+    Parameters
+    ----------
+    mask : sitk.Image
+        The mask to resample.
+    
+    shrink_factor : float
+        The factor by which to shrink the mask.
+    
+    Returns
+    -------
+    sitk.Image
+        The resampled mask.
+    """
+    # Compute the new size and spacing
+    new_size = [int(sz / float(shrink_factor) + 0.5) for sz in mask.GetSize()]
+    new_spacing = [
+        ((osz - 1) * osp) / (nsz - 1)
+        for (osz, osp, nsz) in zip(mask.GetSize(), mask.GetSpacing(), new_size)
+    ]
+    
+    # Resample using nearest neighbor interpolation without smoothing
+    return sitk.Resample(
+        mask,
+        new_size, sitk.Transform(), sitk.sitkNearestNeighbor, mask.GetOrigin(),
+        new_spacing, mask.GetDirection(), 0, mask.GetPixelID()
+    )
+
+
+def setup_masks(
+        registration_method: sitk.ImageRegistrationMethod,
+        fixed_mask_path: Optional[str],
+        moving_mask_path: Optional[str],
+        downsampling_shrink_factor: Optional[float],
+        downsampling_smoothing_sigma: Optional[float],
+        dilate_fixed_mask: int,
+        dilate_moving_mask: int,
+        silent: bool
+) -> sitk.ImageRegistrationMethod:
+    """
+    Load and apply masks to the registration method.
+    
+    Parameters
+    ----------
+    registration_method : sitk.ImageRegistrationMethod
+        The registration method to set masks for.
+    
+    fixed_mask_path : Optional[str]
+        Path to fixed image mask (None to skip).
+    
+    moving_mask_path : Optional[str]
+        Path to moving image mask (None to skip).
+    
+    downsampling_shrink_factor : Optional[float]
+        Shrink factor to apply to masks (should match images).
+    
+    downsampling_smoothing_sigma : Optional[float]
+        Smoothing sigma (ignored for masks, but provided for consistency).
+    
+    dilate_fixed_mask : int
+        Number of voxels to dilate the fixed mask (0 for no dilation).
+    
+    dilate_moving_mask : int
+        Number of voxels to dilate the moving mask (0 for no dilation).
+    
+    silent : bool
+        Whether to suppress messages.
+        
+    Returns
+    -------
+    sitk.ImageRegistrationMethod
+        The registration method with masks set.
+    """
+    if fixed_mask_path is not None:
+        if not silent:
+            message(f"Loading fixed mask from {fixed_mask_path}")
+        fixed_mask = sitk.ReadImage(fixed_mask_path, sitk.sitkUInt8)
+        
+        if not silent:
+            message(f"Fixed mask size: {fixed_mask.GetSize()}, spacing: {fixed_mask.GetSpacing()}")
+        
+        # Check that mask has non-zero values
+        stats = sitk.StatisticsImageFilter()
+        stats.Execute(fixed_mask)
+        nonzero_count = stats.GetSum()
+        max_val = stats.GetMaximum()
+        if not silent:
+            message(f"Fixed mask has {int(nonzero_count)} non-zero voxels (max value: {int(max_val)})")
+        
+        if nonzero_count == 0:
+            raise ValueError("Fixed mask contains only zeros - no valid points for registration!")
+        
+        # Normalize mask to 0 and 1 if needed (in case it's 0 and 255)
+        if max_val > 1:
+            if not silent:
+                message(f"Normalizing fixed mask to binary 0/1 values")
+            fixed_mask = sitk.Cast(fixed_mask > 0, sitk.sitkUInt8)
+        
+        # Dilate mask if requested
+        if dilate_fixed_mask > 0:
+            if not silent:
+                message(f"Dilating fixed mask by {dilate_fixed_mask} voxels")
+            dilate_filter = sitk.BinaryDilateImageFilter()
+            dilate_filter.SetKernelRadius(int(dilate_fixed_mask))
+            dilate_filter.SetForegroundValue(1)
+            fixed_mask = dilate_filter.Execute(fixed_mask)
+            # Re-check mask after dilation
+            stats.Execute(fixed_mask)
+            nonzero_count = stats.GetSum()
+            if not silent:
+                message(f"After dilation, fixed mask has {int(nonzero_count)} non-zero voxels")
+        
+        # Downsample mask if needed
+        if (downsampling_shrink_factor is not None) and (downsampling_smoothing_sigma is not None):
+            if not silent:
+                message(f"Downsampling fixed mask with shrink factor {downsampling_shrink_factor}")
+            fixed_mask = resample_mask(fixed_mask, downsampling_shrink_factor)
+            
+            # Ensure mask is still binary after resampling
+            fixed_mask = sitk.Cast(fixed_mask > 0, sitk.sitkUInt8)
+            
+            # Check mask still has non-zero values after downsampling
+            stats.Execute(fixed_mask)
+            nonzero_count = stats.GetSum()
+            if not silent:
+                message(f"After downsampling, fixed mask has {int(nonzero_count)} non-zero voxels")
+            
+            if nonzero_count == 0:
+                raise ValueError("Fixed mask contains only zeros after downsampling - shrink factor may be too large!")
+        
+        registration_method.SetMetricFixedMask(fixed_mask)
+        if not silent:
+            message("Fixed mask set successfully")
+        
+        # Warn if both masks will be used
+        if moving_mask_path is not None and not silent:
+            message("WARNING: Both fixed and moving masks are being used.")
+            message("         This can cause 'no valid points' errors during rigid/affine registration")
+            message("         if masked regions lose overlap as the transform updates.")
+            message("         Consider using only --fixed-mask for rigid/affine registration.")
+    
+    if moving_mask_path is not None:
+        if not silent:
+            message(f"Loading moving mask from {moving_mask_path}")
+        moving_mask = sitk.ReadImage(moving_mask_path, sitk.sitkUInt8)
+        
+        if not silent:
+            message(f"Moving mask size: {moving_mask.GetSize()}, spacing: {moving_mask.GetSpacing()}")
+        
+        # Check that mask has non-zero values
+        stats = sitk.StatisticsImageFilter()
+        stats.Execute(moving_mask)
+        nonzero_count = stats.GetSum()
+        max_val = stats.GetMaximum()
+        if not silent:
+            message(f"Moving mask has {int(nonzero_count)} non-zero voxels (max value: {int(max_val)})")
+        
+        if nonzero_count == 0:
+            raise ValueError("Moving mask contains only zeros - no valid points for registration!")
+        
+        # Normalize mask to 0 and 1 if needed (in case it's 0 and 255)
+        if max_val > 1:
+            if not silent:
+                message(f"Normalizing moving mask to binary 0/1 values")
+            moving_mask = sitk.Cast(moving_mask > 0, sitk.sitkUInt8)
+        
+        # Dilate mask if requested
+        if dilate_moving_mask > 0:
+            if not silent:
+                message(f"Dilating moving mask by {dilate_moving_mask} voxels")
+            dilate_filter = sitk.BinaryDilateImageFilter()
+            dilate_filter.SetKernelRadius(int(dilate_moving_mask))
+            dilate_filter.SetForegroundValue(1)
+            moving_mask = dilate_filter.Execute(moving_mask)
+            # Re-check mask after dilation
+            stats.Execute(moving_mask)
+            nonzero_count = stats.GetSum()
+            if not silent:
+                message(f"After dilation, moving mask has {int(nonzero_count)} non-zero voxels")
+        
+        # Downsample mask if needed
+        if (downsampling_shrink_factor is not None) and (downsampling_smoothing_sigma is not None):
+            if not silent:
+                message(f"Downsampling moving mask with shrink factor {downsampling_shrink_factor}")
+            moving_mask = resample_mask(moving_mask, downsampling_shrink_factor)
+            
+            # Ensure mask is still binary after resampling
+            moving_mask = sitk.Cast(moving_mask > 0, sitk.sitkUInt8)
+            
+            # Check mask still has non-zero values after downsampling
+            stats.Execute(moving_mask)
+            nonzero_count = stats.GetSum()
+            if not silent:
+                message(f"After downsampling, moving mask has {int(nonzero_count)} non-zero voxels")
+            
+            if nonzero_count == 0:
+                raise ValueError("Moving mask contains only zeros after downsampling - shrink factor may be too large!")
+        
+        registration_method.SetMetricMovingMask(moving_mask)
+        if not silent:
+            message("Moving mask set successfully")
+    
     return registration_method
 
 
