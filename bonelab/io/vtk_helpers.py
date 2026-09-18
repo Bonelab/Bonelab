@@ -28,6 +28,10 @@ def get_vtk_reader(filename):
             reader.DataOnCellsOff()
         elif filename.lower().endswith('.isq'):
             reader = vtkbone.vtkboneISQReader()
+        elif filename.lower().endswith('.rsq'):
+            reader = vtkbone.vtkboneISQReader()
+        elif filename.lower().endswith('.rad'):
+            reader = vtkbone.vtkboneISQReader()
         elif filename.lower().endswith('.nii'):
             reader = vtk.vtkNIFTIImageReader()
         elif filename.lower().endswith('.nii.gz'):
