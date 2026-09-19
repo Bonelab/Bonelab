@@ -1,282 +1,314 @@
-
-# Imports
+"""Filter and examine AIM and NIfTI images without changing scalar encoding."""
 import argparse
-import os
-import vtk
-import vtkbone
+from datetime import datetime
+from pathlib import Path
+
 import numpy as np
-import math
 
 from bonelab.util.echo_arguments import echo_arguments
-from vtk.util.numpy_support import vtk_to_numpy
+from bonelab.util.image_info import print_image_info
+
+
+def image_format(filename):
+    name = str(filename).lower()
+    if name.endswith('.aim'):
+        return 'aim'
+    if name.endswith(('.nii', '.nii.gz')):
+        return 'nifti'
+    raise ValueError('Supported image formats are .aim, .nii, and .nii.gz.')
+
+
+def update_checked(algorithm):
+    errors = []
+    observer = algorithm.AddObserver('ErrorEvent', lambda obj, event: errors.append(event))
+    try:
+        algorithm.Update()
+    finally:
+        algorithm.RemoveObserver(observer)
+    if errors or (hasattr(algorithm, 'GetErrorCode') and algorithm.GetErrorCode()):
+        raise RuntimeError(f'{algorithm.GetClassName()} failed; see VTK error output.')
+
+
+def read_image(filename, label="Input"):
+    kind = image_format(filename)
+    if not Path(filename).is_file():
+        raise ValueError(f'Cannot find input image: {filename}')
+    if kind == 'aim':
+        from vtkbone import vtkboneAIMReader
+        reader = vtkboneAIMReader()
+        reader.DataOnCellsOff()
+    else:
+        from vtkmodules.vtkIOImage import vtkNIFTIImageReader
+        reader = vtkNIFTIImageReader()
+    reader.SetFileName(str(filename))
+    update_checked(reader)
+    image = reader.GetOutput()
+    scalars = image.GetPointData().GetScalars()
+    if scalars is None or not scalars.GetNumberOfTuples():
+        raise ValueError('Input image has no scalar data.')
+    if scalars.GetNumberOfComponents() != 1 or (kind == 'nifti' and reader.GetTimeDimension() > 1):
+        raise ValueError('ImageFilter requires a three-dimensional scalar image.')
+    print(f'\n{label} image:')
+    print_image_info(filename, image)
+    return reader, image
+
+
+def image_array(image):
+    from vtkmodules.util.numpy_support import vtk_to_numpy
+    return vtk_to_numpy(image.GetPointData().GetScalars()).reshape(image.GetDimensions(), order='F')
+
+
+def first_voxel_origin(image):
+    spacing = np.asarray(image.GetSpacing())
+    direction = np.array([[image.GetDirectionMatrix().GetElement(i, j) for j in range(3)] for i in range(3)])
+    return np.asarray(image.GetOrigin()) + direction @ (np.asarray(image.GetExtent()[::2]) * spacing)
+
+
+def array_image(data, template, offset=(0, 0, 0), factor=1):
+    from vtkmodules.vtkCommonDataModel import vtkImageData
+    from vtkmodules.util.numpy_support import numpy_to_vtk
+    image = vtkImageData()
+    image.SetDimensions(*data.shape)
+    spacing = np.asarray(template.GetSpacing())
+    direction = np.array([[template.GetDirectionMatrix().GetElement(i, j) for j in range(3)] for i in range(3)])
+    image.SetOrigin(*(first_voxel_origin(template) + direction @ (np.asarray(offset) * spacing)))
+    image.SetSpacing(*(spacing * factor))
+    image.SetDirectionMatrix(template.GetDirectionMatrix())
+    image.GetPointData().SetScalars(numpy_to_vtk(data.ravel(order='F'), deep=True,
+                                               array_type=template.GetScalarType()))
+    return image
+
+
+def output_allowed(input_filename, output_filename, overwrite):
+    image_format(output_filename)
+    if Path(input_filename).resolve() == Path(output_filename).resolve():
+        raise ValueError('Output must differ from the input image.')
+    if Path(output_filename).exists() and not overwrite:
+        answer = input(f'File "{output_filename}" already exists. Overwrite? [y/n]: ')
+        if answer.lower() not in ('y', 'yes'):
+            print('Not overwriting. Exiting...')
+            return False
+    return True
+
+
+def shifted_matrix(matrix, offset):
+    from vtkmodules.vtkCommonMath import vtkMatrix4x4
+    result = vtkMatrix4x4()
+    if matrix is not None:
+        result.DeepCopy(matrix)
+    for i in range(3):
+        result.SetElement(i, 3, result.GetElement(i, 3)
+                          + sum(result.GetElement(i, j) * offset[j] for j in range(3)))
+    return result
+
+
+def write_image(filename, image, reader, operation):
+    """Preserve AIM logs and NIfTI qform/sform, including grid shifts."""
+    from vtkmodules.vtkCommonDataModel import vtkImageData
+    output = vtkImageData()
+    output.DeepCopy(image)
+    origin = first_voxel_origin(image)
+    source_nifti = reader.IsA('vtkNIFTIImageReader')
+    kind = image_format(filename)
+    if kind == 'nifti':
+        from vtkmodules.vtkIOImage import vtkNIFTIImageWriter
+        writer = vtkNIFTIImageWriter()
+        # Store spatial shifts in the forms, not a VTK origin the format might ignore.
+        output.SetOrigin(0, 0, 0)
+        if source_nifti:
+            writer.SetNIFTIHeader(reader.GetNIFTIHeader())
+            writer.SetTimeDimension(reader.GetTimeDimension())
+            writer.SetTimeSpacing(reader.GetTimeSpacing())
+            writer.SetRescaleSlope(reader.GetRescaleSlope())
+            writer.SetRescaleIntercept(reader.GetRescaleIntercept())
+            writer.SetQFac(reader.GetQFac())
+            qform, sform = reader.GetQFormMatrix(), reader.GetSFormMatrix()
+            if qform is not None:
+                writer.SetQFormMatrix(shifted_matrix(qform, origin))
+            if sform is not None:
+                writer.SetSFormMatrix(shifted_matrix(sform, origin))
+            if qform is None and sform is None:
+                writer.SetQFormMatrix(shifted_matrix(None, origin))
+        else:
+            writer.SetQFormMatrix(shifted_matrix(None, origin))
+    else:
+        from vtkbone import vtkboneAIMWriter
+        writer = vtkboneAIMWriter()
+        if source_nifti:
+            form = reader.GetSFormMatrix() or reader.GetQFormMatrix()
+            if form is not None:
+                linear = np.array([[form.GetElement(i, j) for j in range(3)] for i in range(3)])
+                if not np.allclose(linear, np.eye(3), atol=1e-6):
+                    raise ValueError('AIM cannot represent this NIfTI orientation; write NIfTI to preserve it.')
+                origin = np.asarray(form.MultiplyPoint((*origin, 1)))[:3]
+                output.SetOrigin(*origin)
+            if reader.GetRescaleSlope() not in (0, 1) or reader.GetRescaleIntercept() != 0:
+                raise ValueError('AIM cannot preserve NIfTI intensity scaling; write NIfTI instead.')
+        scalar_name = output.GetScalarTypeAsString()
+        if scalar_name not in ('char', 'signed char', 'short', 'float'):
+            raise ValueError(f'AIM cannot preserve scalar type {scalar_name}; use NIfTI output.')
+        processing_log = reader.GetProcessingLog() if reader.IsA('vtkboneAIMReader') else ''
+        writer.SetProcessingLog((processing_log or '') + f'\n{datetime.now().isoformat()} blImageFilter {operation}\n'
+                                + f'Requested output origin (mm): {tuple(origin)}\n')
+        # AIM uses integer voxel positions, so block-center shifts may be inexact.
+        position = origin / np.asarray(output.GetSpacing())
+        if not np.allclose(position, np.rint(position), rtol=0, atol=1e-5):
+            print('WARNING: AIM stores its position in whole output voxels. The requested '
+                  'block-center origin may be rounded by the AIM writer; use NIfTI for exact alignment.')
+    writer.SetFileName(str(filename))
+    writer.SetInputData(output)
+    update_checked(writer)
+    if not Path(filename).is_file():
+        raise RuntimeError(f'Output was not written: {filename}')
+    print('Saved:', filename)
+    # Report actual stored geometry (especially AIM integer-position rounding).
+    _, stored = read_image(filename, label="Output")
+    return stored
+
 
 def histogram(image):
-    array = vtk_to_numpy(image.GetPointData().GetScalars()).ravel()
-    guard = '!-------------------------------------------------------------------------------'
+    values = image_array(image)
+    counts, edges = np.histogram(values, bins=128)
+    print('!> Value range                Count')
+    for i in np.flatnonzero(counts):
+        print(f'!> {edges[i]:10.3f}–{edges[i+1]:10.3f} {counts[i]:12d}')
 
-    if (array.min() < -128):
-      range_min = -32768
-    elif (array.min() < 0):
-      range_min = -128
+
+def thres(input_filename, output_filename, range, overwrite=False, func=None):
+    if range[0] > range[1]:
+        raise ValueError('Threshold minimum must not exceed maximum.')
+    if not output_allowed(input_filename, output_filename, overwrite):
+        return
+    reader, image = read_image(input_filename)
+    data = image_array(image)
+    result = np.where((data >= range[0]) & (data <= range[1]), data, 0).astype(data.dtype)
+    write_image(output_filename, array_image(result, image), reader, f'thres range={range}')
+
+
+def subvol(input_filename, output_filename, voi, overwrite=False, func=None):
+    if not output_allowed(input_filename, output_filename, overwrite):
+        return
+    reader, image = read_image(input_filename)
+    extent = image.GetExtent()
+    if any(voi[i] > voi[i+1] or voi[i] < extent[i] or voi[i+1] > extent[i+1]
+           for i in (0, 2, 4)):
+        raise ValueError('VOI must be ordered, inclusive bounds inside the input extent.')
+    start = np.array(voi[::2]) - np.array(extent[::2])
+    stop = np.array(voi[1::2]) - np.array(extent[::2]) + 1
+    data = image_array(image)[tuple(slice(a, b) for a, b in zip(start, stop))]
+    write_image(output_filename, array_image(data, image, offset=start), reader, f'subvol voi={voi}')
+
+
+def exam(input_filename, func=None):
+    _, image = read_image(input_filename)
+    histogram(image)
+
+
+def reduction_factor(value):
+    try:
+        factor = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError('Reduction factor must be an integer >= 2.')
+    if factor < 2:
+        raise argparse.ArgumentTypeError('Reduction factor must be >= 2.')
+    return factor
+
+
+def reduced_filename(filename, factor):
+    path = Path(filename)
+    extension = path.name[-7:] if path.name.lower().endswith('.nii.gz') else path.suffix
+    return str(path.with_name(path.name[:-len(extension)] + f'_R{factor:02d}' + extension))
+
+
+def reduce_array(data, factor):
+    """Block majority for char segmentation; rounded mean for signed short."""
+    if not isinstance(factor, (int, np.integer)) or factor < 2:
+        raise ValueError('Reduction factor must be an integer >= 2.')
+    shape = np.asarray(data.shape) // factor
+    if data.ndim != 3 or np.any(shape < 1):
+        raise ValueError('Factor must not exceed any input image dimension.')
+    if data.dtype.kind in 'iu' and data.dtype.itemsize == 1:
+        counts = np.zeros(128, dtype=np.int64)
+        for plane in data:
+            if plane.min() < 0 or plane.max() > 127:
+                raise ValueError('Binary char input must use background 0 and one foreground value in 1–127.')
+            counts += np.bincount(plane.ravel(), minlength=128)
+        positive = np.flatnonzero(counts[1:]) + 1
+        if len(positive) > 1:
+            raise ValueError('Binary reduction requires one foreground value; multiple positive labels found.')
+        label = int(positive[0]) if len(positive) else 0
+        mode = 'binary majority (ties become background)'
+    elif data.dtype == np.dtype('int16'):
+        label = None
+        mode = 'raw mean (nearest integer; half-way ties to even)'
     else:
-      range_min = 0
-    
-    if (array.max() > 255):
-      range_max = 32767
-    elif (array.max() > 127):
-      range_max = 255
-    else:
-      range_max = 127
+        raise ValueError('Reduce supports char binary data or signed short raw data.')
+    result = np.empty(tuple(shape), dtype=data.dtype)
+    for x in range(shape[0]):
+        block = data[x*factor:(x+1)*factor, :shape[1]*factor, :shape[2]*factor]
+        blocks = block.reshape(factor, shape[1], factor, shape[2], factor)
+        if label is not None:
+            votes = np.count_nonzero(blocks, axis=(0, 2, 4))
+            result[x] = (votes > factor**3 / 2) * label
+        else:
+            means = blocks.sum(axis=(0, 2, 4), dtype=np.int64) / factor**3
+            result[x] = np.rint(means).astype(data.dtype)
+    return result, mode
 
-    nRange = [range_min, range_max]
-    nBins = 128
-    
-    # https://numpy.org/doc/stable/reference/generated/numpy.histogram.html
-    hist,bin_edges = np.histogram(array,nBins,nRange,None,None,False)
-    nValues = sum(hist)
 
-    print(guard)
-    print('!>  {:4s} ({:.3s}) : {:s}'.format('Lab','Qty','#Voxels'))
-    for bin in range(nBins):
-      index = nRange[0] + int(bin * (nRange[1]-nRange[0])/(nBins-1))
-      count = hist[bin]/nValues # We normalize so total count = 1
-      nStars = int(count*100)
-      if (count>0 and nStars==0): # Ensures at least one * if the histogram bin is not zero
-        nStars = 1
-      if (nStars > 60):
-        nStars = 60 # just prevents it from wrapping in the terminal
-      if (count>0):
-        print('!> {:4d} ({:.3f}): {:d}'.format(index,count,hist[bin]))
-#    print(guard)
+def reduce(input_filename, factor, overwrite=False, func=None):
+    output_filename = reduced_filename(input_filename, factor)
+    if not output_allowed(input_filename, output_filename, overwrite):
+        return
+    reader, image = read_image(input_filename)
+    result, mode = reduce_array(image_array(image), factor)
+    trimmed = np.array(image.GetDimensions()) % factor
+    print('Reduction mode:', mode)
+    print(f'Reduction factor: {factor}; output: {output_filename}')
+    if trimmed.any():
+        print(f'WARNING: Trimming incomplete blocks at upper X/Y/Z boundaries: {tuple(trimmed)} voxels.')
+    output = array_image(result, image, offset=np.full(3, (factor - 1) / 2), factor=factor)
+    write_image(output_filename, output, reader, f'reduce factor={factor}; {mode}; trimmed={tuple(trimmed)}')
 
-def aix(infile,image):
-    guard = '!-------------------------------------------------------------------------------'
-    phys_dim = [x*y for x,y in zip(image.GetDimensions(), image.GetSpacing())]
-    position = [math.floor(x/y) for x,y in zip(image.GetOrigin(), image.GetSpacing())]
-    size = os.path.getsize(infile) # gets size of file; used to calculate K,M,G bytes
-    names = ['Bytes', 'KBytes', 'MBytes', 'GBytes']
-    n_image_voxels = image.GetDimensions()[0] * image.GetDimensions()[1] * image.GetDimensions()[2]
-    voxel_volume = image.GetSpacing()[0] * image.GetSpacing()[1] * image.GetSpacing()[2]
-    i = 0
-    while int(size) > 1024 and i < len(names):
-        i+=1
-        size = size / 2.0**10
-    
-    # Print header
-    print('')
-    print(guard)
-    print('!>')
-    print('!> dim                            {: >6}  {: >6}  {: >6}'.format(*image.GetDimensions()))
-    print('!> off                                 x       x       x')
-    print('!> pos                            {: >6}  {: >6}  {: >6}'.format(*position))
-    print('!> element size in mm             {:.4f}  {:.4f}  {:.4f}'.format(*image.GetSpacing()))
-    print('!> phys dim in mm                 {:.4f}  {:.4f}  {:.4f}'.format(*phys_dim))
-    print('!>')
-    print('!> Type of data               {}'.format(image.GetScalarTypeAsString()))
-    print('!> Total memory size          {:.1f} {: <10}'.format(size, names[i]))
-    print(guard)
 
-def thres(input_filename, output_filename, range, overwrite, func):
-    # Python 2/3 compatible input
-    from six.moves import input
+def create_parser():
+    parser = argparse.ArgumentParser(prog='blImageFilter', description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='All commands accept .aim, .nii, and .nii.gz.\n\n'
+               'Examples:\n  blImageFilter reduce vertebra.aim --factor 2\n'
+               '  blImageFilter thres vertebra.aim threshold.aim --range 100 127\n'
+               '  blImageFilter subvol vertebra.aim crop.aim --voi 0 49 0 49 0 49\n'
+               '  blImageFilter exam vertebra.aim')
+    commands = parser.add_subparsers(dest='command', required=True)
+    for name, function in [('thres', thres), ('subvol', subvol), ('exam', exam), ('reduce', reduce)]:
+        sub = commands.add_parser(name)
+        sub.add_argument('input_filename', help='Input .aim, .nii, or .nii.gz image.')
+        if name in ('thres', 'subvol'):
+            sub.add_argument('output_filename', help='Output .aim, .nii, or .nii.gz image.')
+        if name == 'thres':
+            sub.add_argument('--range', type=int, nargs=2, default=[0, 10], metavar=('MIN', 'MAX'), help='Inclusive values to keep (default: 0 10).')
+        if name == 'subvol':
+            sub.add_argument('--voi', type=int, nargs=6, default=[0, 1, 0, 1, 0, 1], help='Inclusive XMIN XMAX YMIN YMAX ZMIN ZMAX voxel indices.')
+        if name == 'reduce':
+            sub.add_argument('--factor', type=reduction_factor, required=True,
+                             help='Integer >= 2. Majority for char, mean for short; output suffix _R02, _R03, etc. Incomplete blocks are trimmed.')
+        if name != 'exam':
+            sub.add_argument('--overwrite', action='store_true', help='Overwrite existing output without asking.')
+        sub.set_defaults(func=function)
+    return parser
 
-    # Check if output exists and should overwrite
-    if os.path.isfile(output_filename) and not overwrite:
-        result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_filename))
-        if result.lower() not in ['y', 'yes']:
-            print('Not overwriting. Exiting...')
-            os.sys.exit()
 
-    # Check valid range
-    if (range[0]>range[1] or range[0]<0):
-        os.sys.exit('[ERROR] Invalid range: {:d} {:d}'.format(range[0],range[1]))
-
-    # Read input
-    if not os.path.isfile(input_filename):
-        os.sys.exit('[ERROR] Cannot find file \"{}\"'.format(input_filename))
-
-    if input_filename.lower().endswith('.nii'):
-        reader = vtk.vtkNIFTIImageReader()
-    elif input_filename.lower().endswith('.nii.gz'):
-        reader = vtk.vtkNIFTIImageReader()
-    else:
-        os.sys.exit('[ERROR] Cannot find reader for file \"{}\"'.format(input_filename))
-
-    print('Reading input image ' + input_filename)
-    reader.SetFileName(input_filename)
-    reader.Update()
-
-    scalarType = reader.GetOutput().GetScalarType()
-    print('Input image scalar type: {:s}'.format(reader.GetOutput().GetScalarTypeAsString()))
-    print('\n!> Input image labels')
-    histogram(reader.GetOutput())
-    aix(input_filename,reader.GetOutput())
-    
-    thres = vtk.vtkImageThreshold()
-    thres.SetInputConnection(reader.GetOutputPort())
-    thres.SetOutputScalarType(scalarType)
-    thres.ThresholdBetween(1,10)
-    thres.ReplaceOutOn()
-    thres.SetOutValue(0)
-    thres.Update()
-    
-    print('\n!> Output image labels')
-    histogram(thres.GetOutput())
-    aix(input_filename,thres.GetOutput())
-    
-    # Create writer
-    if output_filename.lower().endswith('.nii'):
-        writer = vtk.vtkNIFTIImageWriter()
-    elif output_filename.lower().endswith('.nii.gz'):
-        writer = vtk.vtkNIFTIImageWriter()
-    else:
-        os.sys.exit('[ERROR] Cannot find writer for file \"{}\"'.format(output_filename))
-        
-    writer.SetInputConnection(thres.GetOutputPort())
-    writer.SetFileName(output_filename)
-    writer.SetTimeDimension(reader.GetTimeDimension())
-    writer.SetTimeSpacing(reader.GetTimeSpacing())
-    writer.SetRescaleSlope(reader.GetRescaleSlope())
-    writer.SetRescaleIntercept(reader.GetRescaleIntercept())
-    writer.SetQFac(reader.GetQFac())
-    writer.SetQFormMatrix(reader.GetQFormMatrix())
-    writer.SetNIFTIHeader(reader.GetNIFTIHeader())
-
-    print('Saving image ' + output_filename)
-    writer.Update()
-
-def subvol(input_filename, output_filename, voi, overwrite, func):
-
-  if os.path.isfile(output_filename) and not overwrite:
-    result = input('File \"{}\" already exists. Overwrite? [y/n]: '.format(output_filename))
-    if result.lower() not in ['y', 'yes']:
-      print('Not overwriting. Exiting...')
-      os.sys.exit()
-  
-  if not os.path.isfile(input_filename):
-      os.sys.exit('[ERROR] Cannot find file \"{}\"'.format(input_filename))
-
-  if input_filename.lower().endswith('.nii'):
-      reader = vtk.vtkNIFTIImageReader()
-  elif input_filename.lower().endswith('.nii.gz'):
-      reader = vtk.vtkNIFTIImageReader()
-  else:
-      os.sys.exit('[ERROR] Cannot find reader for file \"{}\"'.format(input_filename))
-
-  print('Reading input image ' + input_filename)
-  reader.SetFileName(input_filename)
-  reader.Update()
-
-  print('\n!> Input image')
-  aix(input_filename,reader.GetOutput())
-
-  extract = vtk.vtkExtractVOI()
-  extract.SetInputConnection(reader.GetOutputPort())
-  extract.SetVOI(voi)
-  extract.SetSampleRate(1,1,1)
-  extract.IncludeBoundaryOn()
-  extract.Update()
-
-  # Create writer
-  if output_filename.lower().endswith('.nii'):
-      writer = vtk.vtkNIFTIImageWriter()
-  elif output_filename.lower().endswith('.nii.gz'):
-      writer = vtk.vtkNIFTIImageWriter()
-  else:
-      os.sys.exit('[ERROR] Cannot find writer for file \"{}\"'.format(output_filename))
-      
-  writer.SetInputConnection(extract.GetOutputPort())
-  writer.SetFileName(output_filename)
-  writer.SetTimeDimension(reader.GetTimeDimension())
-  writer.SetTimeSpacing(reader.GetTimeSpacing())
-  writer.SetRescaleSlope(reader.GetRescaleSlope())
-  writer.SetRescaleIntercept(reader.GetRescaleIntercept())
-  writer.SetQFac(reader.GetQFac())
-  writer.SetQFormMatrix(reader.GetQFormMatrix())
-  writer.SetNIFTIHeader(reader.GetNIFTIHeader())
-      
-  print('Saving image ' + output_filename)
-  writer.Update()
-  
-  print('\n!> Output image')
-  aix(output_filename,extract.GetOutput())
-
-def exam(input_filename, func):
-
-  if not os.path.isfile(input_filename):
-      os.sys.exit('[ERROR] Cannot find file \"{}\"'.format(input_filename))
-  
-  if input_filename.lower().endswith('.nii'):
-     reader = vtk.vtkNIFTIImageReader()
-  elif input_filename.lower().endswith('.nii.gz'):
-     reader = vtk.vtkNIFTIImageReader()
-  else:
-     os.sys.exit('[ERROR] Cannot find reader for file \"{}\"'.format(input_filename))
-     
-  print('Reading input image ' + input_filename)
-  reader.SetFileName(input_filename)
-  reader.Update()
-  
-  print('\n!> Input image information')
-  histogram(reader.GetOutput())
-  aix(input_filename,reader.GetOutput())
-  
-def main():
-    # Setup description
-    description='''
-A utility to perform various filter operations on image data.
-
-Valid input and output formats include: 
-.nii, .nii.gz
-
-Currently only accepts NIFTI file formats as input and output.
-
-subvol          : takes a subvolume from the input file
-thres           : thresholds input within range provided (replaces with zero)
-exam            : reads an input file and provides a report of size and content
-'''
-    epilog='''
-To see the options for each of the utilities, type something like this:
-$ blImageFilter thres --help
-
-'''
-
-    # Setup argument parsing
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.RawTextHelpFormatter,
-        prog="blImageFilter",
-        description=description,
-        epilog=epilog
-    )
-    subparsers = parser.add_subparsers()
-    
-    # parser for thres
-    parser_thres = subparsers.add_parser('thres')
-    parser_thres.add_argument('input_filename', help='Input image file (*.nii, *.nii.gz)')
-    parser_thres.add_argument('output_filename', help='Output image file (*.nii, *.nii.gz)')
-    parser_thres.add_argument('--range', type=int, nargs=2, default=[0,10], metavar='0', help='Set range of scalars to keep (default: %(default)s)')
-    parser_thres.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
-    parser_thres.set_defaults(func=thres)
-
-    # parser for subvol
-    parser_subvol = subparsers.add_parser('subvol')
-    parser_subvol.add_argument('input_filename', help='Input image file (*.nii, *.nii.gz)')
-    parser_subvol.add_argument('output_filename', help='Output image file (*.nii, *.nii.gz)')
-    parser_subvol.add_argument('--voi', type=int, nargs=6, default=[0,1,0,1,0,1], metavar='0', help='VOI bounds in units pixels (default: %(default)s)')
-    parser_subvol.add_argument('--overwrite', action='store_true', help='Overwrite output without asking (default: %(default)s)')
-    parser_subvol.set_defaults(func=subvol)
-    
-    # parser for exam
-    parser_exam = subparsers.add_parser('exam')
-    parser_exam.add_argument('input_filename', help='Input image file (*.nii, *.nii.gz)')
-    parser_exam.set_defaults(func=exam)
-    
-    # Parse and display
-    args = parser.parse_args()
+def main(argv=None):
+    parser = create_parser()
+    args = parser.parse_args(argv)
     print(echo_arguments('ImageFilter', vars(args)))
+    kwargs = vars(args).copy()
+    del kwargs['command']
+    try:
+        args.func(**kwargs)
+    except (ValueError, OSError, RuntimeError) as exc:
+        parser.exit(1, f'Error: {exc}\n')
 
-    # Run program
-    args.func(**vars(args))
 
 if __name__ == '__main__':
     main()

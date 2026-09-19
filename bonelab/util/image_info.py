@@ -18,6 +18,7 @@ def print_image_info(infile, image):
     # Print header
     print('')
     print(guard)
+    print('!> File                      {}'.format(os.fspath(infile)))
     print('!>')
     print('!> dim                            {: >6}  {: >6}  {: >6}'.format(*image.GetDimensions()))
     print('!> off                                 x       x       x')
@@ -28,4 +29,3 @@ def print_image_info(infile, image):
     print('!> Type of data               {}'.format(image.GetScalarTypeAsString()))
     print('!> Total memory size          {:.1f} {: <10}'.format(size, names[i]))
     print(guard)
-
