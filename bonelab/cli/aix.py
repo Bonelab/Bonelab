@@ -7,7 +7,7 @@ from vtk.util.numpy_support import vtk_to_numpy
 from bonelab.io.vtk_helpers import get_vtk_reader
 import numpy as np
 import re
-import math
+from bonelab.util.image_info import print_image_info
 
 # vtkNIFTIImageReader
 # vtkboneAIMReader
@@ -33,31 +33,10 @@ def aix(infile, log, stat, histo, verbose, meta):
 
     # Precompute some values
     guard = '!-------------------------------------------------------------------------------'
-    phys_dim = [x*y for x,y in zip(image.GetDimensions(), image.GetSpacing())]
-    position = [math.floor(x/y) for x,y in zip(image.GetOrigin(), image.GetSpacing())]
-    size = os.path.getsize(infile)
-    names = ['Bytes', 'KBytes', 'MBytes', 'GBytes']
     n_image_voxels = image.GetDimensions()[0] * image.GetDimensions()[1] * image.GetDimensions()[2]
     voxel_volume = image.GetSpacing()[0] * image.GetSpacing()[1] * image.GetSpacing()[2]
-    i = 0
-    while int(size) > 1024 and i < len(names):
-        i+=1
-        size = size / 2.0**10
-
-    if (not meta):
-      # Print header
-      print('')
-      print(guard)
-      print('!>')
-      print('!> dim                            {: >6}  {: >6}  {: >6}'.format(*image.GetDimensions()))
-      print('!> off                                 x       x       x')
-      print('!> pos                            {: >6}  {: >6}  {: >6}'.format(*position))
-      print('!> element size in mm             {:.4f}  {:.4f}  {:.4f}'.format(*image.GetSpacing()))
-      print('!> phys dim in mm                 {:.4f}  {:.4f}  {:.4f}'.format(*phys_dim))
-      print('!>')
-      print('!> Type of data               {}'.format(image.GetScalarTypeAsString()))
-      print('!> Total memory size          {:.1f} {: <10}'.format(size, names[i]))
-      print(guard)
+    if not meta:
+        print_image_info(infile, image)
 
     # Print log
     if log:
