@@ -1,4 +1,7 @@
-"""Prepare segmented AIMs: plan primitives, fill interiors, cut, and add material.
+"""Prepare segmented AIM files: plan primitives, fill interiors, cut, and add material.
+
+Inputs must be segmented .aim files with background 0 and foreground labels 1–127.
+NIfTI files (.nii and .nii.gz) are not supported.
 
 Geometry and morphology use voxel coordinates (XYZ), including for anisotropic
 images. Transforms map a physical, locally centered primitive into AIM space.
@@ -849,7 +852,8 @@ For a plain cut, omit --detail. Direct placement is also available:
     for name, function in [('view', view), ('fill', fill), ('cut', cut), ('add', add)]:
         sub = commands.add_parser(name, epilog=examples[name] + '\n\n' + controls,
                                   formatter_class=argparse.RawDescriptionHelpFormatter)
-        sub.add_argument('input_file')
+        sub.add_argument('input_file', metavar='INPUT_AIM',
+                         help='Segmented .aim file (background 0, foreground labels 1–127).')
         if name != 'view':
             sub.add_argument('output_file')
             sub.add_argument('--visualize', action='store_true', help='Preview before writing; x cancels, q/close writes.')
@@ -865,7 +869,7 @@ For a plain cut, omit --detail. Direct placement is also available:
             sub.add_argument('--cutout_output', metavar='CUTOUT_AIM',
                              help='Also save the extracted piece on the input grid; --detail restores its inner buffer.')
             sub.add_argument('--detail', nargs=2, metavar=('REFERENCE_AIM', 'BUFFER'),
-                             help='Restore reference values around the cut within BUFFER voxels (minimum 1).')
+                             help='Restore values from a segmented .aim reference around the cut within BUFFER voxels (minimum 1).')
         if name != 'fill':
             sub.add_argument('--primitive', nargs='+', metavar='SHAPE_OR_SIZE', required=name != 'view',
                              help='sphere D; cube E; box X Y Z; cylinder D L (local Z length), in voxels.')
